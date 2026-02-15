@@ -1,0 +1,15 @@
+./webserv
+/webserv
+webserv
+
+./compile_commands.json
+/compile_commands.json
+compile_commands.json
+
+./src/*.o
+/src/*.o
+src/*.o
+
+./compile_flags.txt
+/compile_flags.txt
+compile_flags.txt
