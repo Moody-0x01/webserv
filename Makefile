@@ -20,4 +20,4 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 re: fclean all
-.PHONY: re fclean clean bonus
+.PHONY: re fclean clean bonus $(NAME)
