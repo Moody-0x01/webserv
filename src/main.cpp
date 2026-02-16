@@ -1,75 +1,120 @@
+#include <ostream>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
 
+
+# define EVENT_MAX 4096
 int main() {
-    // Create socket
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	struct epoll_event event;
+	const char* response = 
+		"HTTP/1.0 200 OK\r\n"
+		"Content-Type: text/html\r\n"
+		"\r\n"
+		"<html><body><h1>Hello, World!</h1></body></html>";
+	struct epoll_event events[EVENT_MAX];
     if (server_fd < 0) {
         std::cerr << "Socket creation failed\n";
         return 1;
     }
-    
-    // Allow port reuse
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    
-    // Setup address structure
     struct sockaddr_in address;
     std::memset(&address, 0, sizeof(address));
+    std::memset(&event, 0, sizeof(event));
+
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(8080);
-    
-    // Bind socket to port
+
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         std::cerr << "Bind failed\n";
         close(server_fd);
         return 1;
     }
-    
-    // Listen for connections
     if (listen(server_fd, 3) < 0) {
         std::cerr << "Listen failed\n";
         close(server_fd);
         return 1;
     }
-    
+
+	int epol_instance = epoll_create(1024);
+	if (epol_instance < 0)
+	{
+        std::cerr << "Epoll failed\n";
+        close(server_fd);
+        return 1;
+	}
     std::cout << "HTTP/1.0 Server listening on localhost:8080\n";
-    
-    // Accept and handle connections
-    while (true) {
+	event.events = EPOLLIN;
+    event.data.fd = server_fd;
+	int code = epoll_ctl(epol_instance, EPOLL_CTL_ADD, server_fd, &event);
+	if (code < 0)
+	{
+        std::cerr << "Epoll ctl failed\n";
+        close(server_fd);
+        return 1;
+	}
+    while (true)
+	{
         struct sockaddr_in client_addr;
-        socklen_t client_len = sizeof(client_addr);
-        
-        int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
-        if (client_fd < 0) {
-            std::cerr << "Accept failed\n";
-            continue;
-        }
-        
-        std::cout << "Client connected\n";
-        
-        // Read request
-        char buffer[1024] = {0};
-        read(client_fd, buffer, sizeof(buffer));
-        std::cout << "Received:\n" << buffer << "\n";
-        
-        // HTTP/1.0 response (connection closes after response)
-        const char* response = 
-            "HTTP/1.0 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "\r\n"
-            "<html><body><h1>Hello, World!</h1></body></html>";
-        
-        write(client_fd, response, std::strlen(response));
-        
-        // HTTP/1.0: connection closes after each response
-        close(client_fd);
+		int ready = epoll_wait(epol_instance, events, EVENT_MAX, 5000);
+		if (ready < 0)
+		{
+			std::cerr << "Epoll ctl failed\n";
+			close(server_fd);
+			return 1;
+		}
+		for (int index = 0; index < ready; ++index)
+		{
+			int ready_fd = events[index].data.fd;
+			if (ready_fd == server_fd)
+			{
+				// TODO: New client;
+				socklen_t client_len = sizeof(client_addr);
+				int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
+				if (client_fd < 0) {
+					std::cerr << "Accept failed\n";
+					continue;
+				}
+				// Add client socket to epoll
+				event.events = EPOLLIN;
+				event.data.fd = client_fd;
+				epoll_ctl(epol_instance, EPOLL_CTL_ADD, client_fd, &event);
+			} else {
+				// Ready fd
+				std::cout << "Client connected\n";
+				char buffer[1024] = {0};
+				size_t n = read(ready_fd, buffer, sizeof(buffer));
+				if (n > 0)
+				{
+					// TODO: Incremental parser for the response is actually needed.
+					// save the state and keep on accumulating the requenst until u find \n\r.
+					// if the response is done generate the response..
+					// This write should never be done before
+					// 1. reading and parsing the request correctly.
+					// 2. generaing a valid response.. depending on the content that was requested
+					// 3. after everything is done u shall close the connection and cleanup client data
+
+					std::cout << "Recv from fd=" << ready_fd << " this request: \n";
+					std::cout << buffer << "\n\n";
+
+					write(ready_fd, response, std::strlen(response));
+					// NOTE: This epoll call is only here for testing later this call would be called before being done with this client of crs
+                    epoll_ctl(epol_instance, EPOLL_CTL_DEL, ready_fd, NULL);
+				} else {
+					std::cout << "Client closed: ready_fd=" << ready_fd << std::endl;
+                    epoll_ctl(epol_instance, EPOLL_CTL_DEL, ready_fd, NULL);
+				}
+				// No closing before finishing..
+				close(ready_fd);
+			}
+		}
     }
-    
     close(server_fd);
     return 0;
 }
