@@ -1,10 +1,11 @@
 # include <Server.hpp>
-#include <cerrno>
-#include <cstdio>
-#include <iostream>
-#include <map>
-#include <sys/epoll.h>
-#include <unistd.h>
+# include <cerrno>
+# include <cstdio>
+# include <iostream>
+# include <map>
+# include <sys/epoll.h>
+# include <unistd.h>
+
 const char *head = "<!DOCTYPE html>\n"
 	"<html lang=\"en\">\n"
 	"<head>\n"
@@ -87,7 +88,7 @@ int main() {
         return 1;
 	}
     std::cout << "HTTP/1.0 Server listening on localhost:8080\n";
-	event.events = EPOLLIN;
+	event.events = EPOLLIN|EPOLLET;
     event.data.fd = server_fd;
 	int code = epoll_ctl(epol_instance, EPOLL_CTL_ADD, server_fd, &event);
 	if (code < 0)
@@ -122,7 +123,7 @@ int main() {
 						break ;
 					}
 					set_nonblocking(client_fd);
-					event.events = EPOLLIN|EPOLLOUT;
+					event.events = EPOLLIN|EPOLLET;
 					event.data.fd = client_fd;
 					if (epoll_ctl(epol_instance, EPOLL_CTL_ADD, client_fd, &event) == -1)
 					{
@@ -130,7 +131,7 @@ int main() {
 						close(client_fd);
 					} else {
 						requests[client_fd] = head;
-						std::cout << "Client was added\n";
+						std::cout << "Client was added with fd=" << client_fd << "\n";
 					}
 				}
 			} else {
@@ -141,13 +142,19 @@ int main() {
 				{
 					ssize_t count;
 					char buffer[4096];
-					count = read(ready_fd, buffer, 4096);
-					requests[ready_fd] += buffer;
-					if (errno == EAGAIN) events[index].events = EPOLLOUT;
-					else if (count < 0)
-					{
+					while ((count = read(ready_fd, buffer, 4096)) > 0);
+					std::cout << "[count ] " << count << "\n";
+					if (count > 0)
+						requests[ready_fd] += buffer;
+					if (count == -1 && errno != EAGAIN) {
 						std::cerr << "read: " << strerror(errno) << "\n";
 						close(ready_fd);
+					} else if (errno == EAGAIN || errno == EWOULDBLOCK)
+					{
+						event.events = EPOLLOUT|EPOLLET;
+						event.data.fd = ready_fd;
+						epoll_ctl(epol_instance, EPOLL_CTL_MOD, ready_fd, &event);
+						std::cout << "Client done sending fd=" << ready_fd << "\n";
 					}
 				} else if (events[index].events & EPOLLOUT) {
 					// generate response here...

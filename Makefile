@@ -1,6 +1,6 @@
 CXX=c++
 SOURCE_DIR=./src
-NAME=webserv
+NAME=./webserv
 SRCS=./src/multiplexing/socket_io.cpp
 OBJS=$(SRCS:%.cpp=%.o)
 INCLUDE=./include/
@@ -20,4 +20,7 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 re: fclean all
+run: all
+	$(NAME)
+
 .PHONY: re fclean clean bonus $(NAME)
