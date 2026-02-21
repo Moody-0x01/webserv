@@ -117,8 +117,7 @@ int main() {
 					socklen_t client_len = sizeof(client_addr);
 					int client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
 					if (client_fd == -1) {
-						if (errno == EAGAIN || errno == EWOULDBLOCK)
-							break ; 
+						if (errno == EAGAIN || errno == EWOULDBLOCK) break ; 
 						std::cerr << "accept: " << strerror(errno) << "\n";
 						break ;
 					}
@@ -135,21 +134,16 @@ int main() {
 					}
 				}
 			} else {
-				// Ready fd
-				// Data from an existing client
-				// Read data from the client
 				if (events[index].events & EPOLLIN)
 				{
 					ssize_t count;
 					char buffer[4096];
-					while ((count = read(ready_fd, buffer, 4096)) > 0);
-					std::cout << "[count ] " << count << "\n";
-					if (count > 0)
+					while ((count = read(ready_fd, buffer, 4096)) > 0)
 						requests[ready_fd] += buffer;
 					if (count == -1 && errno != EAGAIN) {
 						std::cerr << "read: " << strerror(errno) << "\n";
 						close(ready_fd);
-					} else if (errno == EAGAIN || errno == EWOULDBLOCK)
+					} else if (errno == EAGAIN)
 					{
 						event.events = EPOLLOUT|EPOLLET;
 						event.data.fd = ready_fd;
@@ -157,8 +151,6 @@ int main() {
 						std::cout << "Client done sending fd=" << ready_fd << "\n";
 					}
 				} else if (events[index].events & EPOLLOUT) {
-					// generate response here...
-					// Example: send back...
 					const char *http_header = 
 						"HTTP/1.0 200 OK\r\n"
 						"Content-Type: text/html; charset=UTF-8\r\n"
@@ -167,6 +159,8 @@ int main() {
 					requests[ready_fd] = http_header + requests[ready_fd] + tail;
 					write(ready_fd, requests[ready_fd].c_str(), requests[ready_fd].size());
 					close(ready_fd);
+					epoll_ctl(epol_instance, EPOLL_CTL_DEL, ready_fd, &event);
+					requests[ready_fd] = "";
 				}
 			}
 		}
