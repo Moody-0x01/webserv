@@ -14,7 +14,11 @@ enum TokenType {
 struct Token {
     std::string value;
     TokenType type;
+
+    Token(std::string v, TokenType t);
 };
+
+Token::Token(std::string v, TokenType t) : value(v), type(t) {}
 
 std::string readfile(std::string fileName) {
     std::string line;
@@ -40,7 +44,7 @@ std::vector<Token> tokenize(const std::string& content) {
 
         if (std::isspace(c)) {
             if (!currentToken.empty()) {
-                tokens.push_back({currentToken, TOKEN_TYPE_WORD});
+                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
                 currentToken.clear();
             }
             continue;
@@ -48,7 +52,7 @@ std::vector<Token> tokenize(const std::string& content) {
 
         if (c == '{' || c == '}' || c == ';') {
             if (!currentToken.empty()) {
-                tokens.push_back({currentToken, TOKEN_TYPE_WORD});
+                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
                 currentToken.clear();
             }
 
@@ -57,14 +61,14 @@ std::vector<Token> tokenize(const std::string& content) {
             else if (c == '}') type = TOKEN_TYPE_RBRACE;
             else type = TOKEN_TYPE_SEMICOLON;
 
-            tokens.push_back({std::string(1, c), type});
+            tokens.push_back(Token(std::string(1, c), type));
             continue;
         }
         currentToken += c;
     }
 
     if (!currentToken.empty()) {
-        tokens.push_back({currentToken, TOKEN_TYPE_WORD});
+        tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
     }
 
     return tokens;
@@ -73,6 +77,7 @@ std::vector<Token> tokenize(const std::string& content) {
 std::vector<Token> lexer(std::string fn) {
     std::string fileContent = readfile(fn);
     std::vector<Token> tokens = tokenize(fileContent);
+
     return tokens;
 }
 
