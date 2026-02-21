@@ -1,0 +1,4 @@
+config baby;
+gorrila{
+    flag output;
+}
