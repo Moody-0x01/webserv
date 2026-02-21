@@ -19,5 +19,11 @@ clean:
 	$(RM) $(OBJS)
 fclean: clean
 	$(RM) $(NAME)
+
+# Docker Shit!
+r:
+	docker start webserv-container
+	docker exec -it webserv-container zsh
+
 re: fclean all
-.PHONY: re fclean clean bonus $(NAME)
+.PHONY: re fclean clean bonus $(NAME) r
