@@ -5,9 +5,10 @@ SRCS=
 OBJS=$(SRCS:%.cpp=%.o)
 INCLUDE=./include/
 CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE)
-MAIN=$(SOURCE_DIR)/main.cpp
 RM=rm -rf
-
+MAIN=$(SOURCE_DIR)/main.cpp \
+	$(SOURCE_DIR)/Parser/HTTP/Lexer.cpp \
+	$(SOURCE_DIR)/Parser/HTTP/HttpParser.cpp
 all: $(NAME)
 
 %.o: %.cpp
@@ -25,5 +26,9 @@ r:
 	docker start webserv-container
 	docker exec -it webserv-container zsh
 
+run: $(NAME)
+	./$(NAME)
+
 re: fclean all
-.PHONY: re fclean clean bonus $(NAME) r
+
+.PHONY: re fclean clean bonus $(NAME) r run

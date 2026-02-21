@@ -7,4 +7,6 @@
 
 # include <CGI/Cgi.hpp>
 # include <Response/Response.hpp>
-# include <Parser/Parser.hpp>
+
+#include <Parser/HTTP/Lexer.hpp>
+#include <Parser/HTTP/HttpParser.hpp>
