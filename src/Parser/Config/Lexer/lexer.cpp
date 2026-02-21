@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <cctype>
 
 enum TokenType {
     TOKEN_TYPE_WORD,
@@ -26,6 +27,8 @@ std::string readfile(std::string fileName) {
     std::ifstream inputFile;
 
     inputFile.open(fileName.c_str(), std::ios::in);
+    if (!inputFile.is_open())
+        throw std::runtime_error("Error: could not open file");
     while (getline(inputFile, line)) {
         result += line;
         if (!inputFile.eof())
@@ -64,6 +67,17 @@ std::vector<Token> tokenize(const std::string& content) {
             tokens.push_back(Token(std::string(1, c), type));
             continue;
         }
+
+        if (c == '#') {
+            if (!currentToken.empty()) {
+                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
+                currentToken.clear();
+            }
+            for (; i < content.length() && content[i] != '\n'; ++i)
+                ;
+            continue;
+        }
+
         currentToken += c;
     }
 
@@ -81,10 +95,13 @@ std::vector<Token> lexer(std::string fn) {
     return tokens;
 }
 
-int main(int ac, char **av)
-{
+int main(int ac, char **av) {
+    if (ac != 2)
+        return (1);
     std::vector<Token> tokens = lexer(std::string(av[1]));
     for (std::vector<Token>::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-        std::cout << "Token: " << it->value << "\t type:" << "W{};"[it->type] << "\n";
+        std::cout << "Token: " << it->value << "\t type: " << "W{};"[it->type] << "\n";
     }
+
+    return 0;
 }
