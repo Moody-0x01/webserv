@@ -11,5 +11,11 @@
 # include <unistd.h>
 # include <cstring>
 # include <iostream>
+# include <map>
+/*  typedef context_t int(*ctx)(void);  */
 
 int set_nonblocking(int sockfd);
+typedef struct socket_context_s {
+	int fd;
+	int (*handler)(struct epoll_event);
+} socket_context_t;
