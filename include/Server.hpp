@@ -1,5 +1,5 @@
 #pragma once
-# include <multiplexing/multiplexing.h>
+# include <multiplexing/multiplexing.hpp>
 # include <Request/Request.hpp>
 # include <CGI/Cgi.hpp>
 # include <Response/Response.hpp>

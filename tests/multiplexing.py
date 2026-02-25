@@ -14,6 +14,7 @@ def crawl():
     __import__('pprint').pprint(response)
 
 def main():
+    req_count = 10
     if len(argv) > 1: req_count = int(argv[1])
     for i in range(req_count): threads.append(Thread(target=crawl))
     for t in threads: t.start()

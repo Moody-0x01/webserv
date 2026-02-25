@@ -1,64 +1,153 @@
 # include <Server.hpp>
+// # include <algorithm>
 # include <cerrno>
 # include <cstdio>
 # include <iostream>
+# include <string>
 # include <sys/epoll.h>
 # include <sys/socket.h>
 # include <unistd.h>
+# include <cassert>
+#include <vector>
 
-std::map<int, std::string> requests;
-const char *head = "<!DOCTYPE html>\n"
-	"<html lang=\"en\">\n"
-	"<head>\n"
-	"<meta charset=\"UTF-8\">\n"
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-    "<title>Styled Paragraph</title>\n"
-    "<style>\n"
-	"body {\n"
-           " margin: 0;\n"
-           " padding: 20px;\n"
-           " background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n"
-           " min-height: 100vh;\n"
-           " display: flex;\n"
-           " justify-content: center;\n"
-           " align-items: center;\n"
-           " font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n"
-       " }\n"
-       " p {\n"
-           " max-width: 600px;\n"
-           " background: white;\n"
-           " padding: 40px;\n"
-           " border-radius: 12px;\n"
-           " box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);\n"
-           " line-height: 1.8;\n"
-           " font-size: 18px;\n"
-           " color: #333;\n"
-           " letter-spacing: 0.5px;\n"
-           " border-left: 5px solid #667eea;\n"
-           " transition: transform 0.3s ease, box-shadow 0.3s ease;\n"
-       " }\n"
-       " p:hover {\n"
-           " transform: translateY(-5px);\n"
-           " box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);\n"
-       " }\n"
-	   " </style>\n</head>\n<body>\n<p>\n";
+typedef struct SocketContext SocketContext;
+typedef SocketContext Client;
+typedef SocketContext Server;
+typedef void (*SocketHandler)(uint32_t , SocketContext *);
 
-const char *tail = "</p>\n"
-"</body>\n"
-"</html>\n";
+typedef struct SocketContext
+{
+public:
+	static int epoll_fd;
+	SocketContext(SocketHandler a);
+	SocketContext(SocketHandler a, int sock);
+	SocketContext();
+	~SocketContext();
+
+	void set_socket(int sockfd) { _sockfd = sockfd; }
+	int get_socket(void) const { return _sockfd; }
+	std::string request_buffer;
+	std::string response_buffer;
+	SocketHandler action;
+
+private:
+	int _sockfd;
+} SocketContext;
+
+int SocketContext::epoll_fd = 0;
+
+SocketContext::SocketContext(): request_buffer(""), response_buffer(""), action(NULL), _sockfd(-1)
+{
+}
+
+SocketContext::SocketContext(SocketHandler a, int sock): request_buffer(""), response_buffer(""), action(a), _sockfd(sock)
+{
+}
+
+SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buffer(""), action(a), _sockfd(-1)
+{
+}
+
+SocketContext::~SocketContext()
+{
+	if (_sockfd != -1) close(_sockfd);
+	std::cout << "Closed -> " << _sockfd << "\n";
+	_sockfd = -1;
+}
+
+const char* http10_ok_header =
+    "HTTP/1.0 200 OK\r\n"
+    "Content-Type: text/plain\r\n\r\n";
+
+std::map<int, Client&> clients;
 # define EVENT_MAX 4096
-int main() {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-	struct epoll_event event;
+void client_handler(uint32_t e, Client *Self)
+{
+	char buff[4096];
+	int client;
+	ssize_t count;
+
+	client = Self->get_socket();
+	if (e & EPOLLOUT) {
+		std::cout << "Writing to conn: " << client << "\n";;
+		count = read(client, buff, sizeof(buff));
+		if (count > 0) clients[client].request_buffer += buff;
+		clients[client].response_buffer = http10_ok_header + clients[client].request_buffer;
+		count = write(client, clients[client].response_buffer.c_str(), clients[client].response_buffer.size());
+		if (count == -1) std::cerr << "write: " << strerror(errno) << "\n";
+		close(client);
+		clients.erase(client);
+		epoll_ctl(SocketContext::epoll_fd, EPOLL_CTL_DEL, client, NULL);
+	} else if (e & EPOLLIN) {
+		std::cout << "Reading from conn: " << client << "\n";;
+		count = read(client, buff, sizeof(buff));
+		std::cout << "Read: " << count << "\n";
+		if (count > 0) {
+			clients[client].request_buffer += buff;
+		} else if (count <= 0) {
+			if (count < 0)
+				std::cerr << "read: " << strerror(errno) << "\n";
+			clients.erase(client);
+			return ;
+		}
+		if (clients[client].request_buffer.find("\r\n\r\n") != std::string::npos)
+		{
+			struct epoll_event cev;
+			cev.events = EPOLLOUT;
+			cev.data.ptr = ((void *)&clients[client]);
+			if (epoll_ctl(SocketContext::epoll_fd, EPOLL_CTL_MOD, client, &cev) ==
+			-1) {
+				std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
+				clients.erase(client);
+			}
+			std::cout << "Client " << client << " is done sending http/1.0\n";
+		}
+	}
+}
+
+void server_handler(uint32_t e, Server *Self)
+{
+	(void)e;
+	struct sockaddr_in addr;
+	socklen_t len = sizeof(addr);
+	int conn = accept(Self->get_socket(), (struct sockaddr*)&addr, &len);
+	if (conn == -1)
+	{
+		std::cerr << "accept: " << strerror(errno) << "\n";
+		return ;
+	}
+	// TODO: This makes an unwanted temperary variable, of T: Client
+	// Maybe that should not be the case, and any memory that is not needed should
+	// not be allocated.
+	clients[conn] = Client(client_handler);
+	clients[conn].set_socket(conn);
+	std::cout << "All set\n";
+	struct epoll_event cev;
+	cev.events = EPOLLIN;
+	cev.data.ptr = ((void*)&clients[conn]);
+	set_nonblocking(conn);
+	if (epoll_ctl(SocketContext::epoll_fd, EPOLL_CTL_ADD, conn, &cev) == -1)
+	{
+		std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
+		clients.erase(conn);
+		return ;
+	}
+	std::cout << "Accepted a conn: " << conn << "\n";
+}
+
+int main() {	 
 	struct epoll_event events[EVENT_MAX];
-    if (server_fd < 0) {
+	struct epoll_event event;
+    struct sockaddr_in address;
+	Server server(server_handler, socket(AF_INET, SOCK_STREAM, 0));
+    int opt = 1;
+
+    if (server.get_socket() < 0) {
         std::cerr << "Socket creation failed\n";
         return 1;
     }
-    int opt = 1;
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    struct sockaddr_in address;
+    setsockopt(server.get_socket(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     std::memset(&address, 0, sizeof(address));
     std::memset(&event, 0, sizeof(event));
 
@@ -66,108 +155,49 @@ int main() {
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(8080);
 
-    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+    if (bind(server.get_socket(), (struct sockaddr*)&address, sizeof(address)) < 0) {
         std::cerr << "Bind failed\n";
-        close(server_fd);
+        close(server.get_socket());
         return 1;
     }
-	if (set_nonblocking(server_fd) == -1) return 1;
+	if (set_nonblocking(server.get_socket()) == -1) return 1;
 
-    if (listen(server_fd, 3) < 0) {
+    if (listen(server.get_socket(), 3) < 0) {
         std::cerr << "Listen failed\n";
-        close(server_fd);
+        close(server.get_socket());
         return 1;
     }
 
-	int epol_instance = epoll_create(1024);
-	if (epol_instance < 0)
+	SocketContext::epoll_fd = epoll_create(1024);
+	if (SocketContext::epoll_fd < 0)
 	{
         std::cerr << "Epoll failed\n";
-        close(server_fd);
+        close(server.get_socket());
         return 1;
 	}
     std::cout << "HTTP/1.0 Server listening on localhost:8080\n";
 	event.events = EPOLLIN;
-    event.data.fd = server_fd;
-	int code = epoll_ctl(epol_instance, EPOLL_CTL_ADD, server_fd, &event);
+	event.data.ptr = (&server);
+	int code = epoll_ctl(SocketContext::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
 	if (code < 0)
 	{
         std::cerr << "Epoll ctl failed\n";
-        close(server_fd);
         return 1;
 	}
     while (true)
 	{
-		int ready = epoll_wait(epol_instance, events, EVENT_MAX, 5000);
+		int ready = epoll_wait(SocketContext::epoll_fd, events, EVENT_MAX, 100);
 		if (ready < 0)
 		{
 			std::cerr << "epoll_wait: " << strerror(errno) << "\n";
-			close(server_fd);
 			return 1;
 		}
 		for (int index = 0; index < ready; ++index)
 		{
-			int client = events[index].data.fd;
-			int event_mask = events[index].events;
-			if (client == server_fd)
-			{
-				struct sockaddr addr;
-				socklen_t len = sizeof(addr);
-				int conn = accept(client, &addr, &len);
-				if (conn == -1)
-				{
-					std::cerr << "accept: " << strerror(errno) << "\n";
-					continue ;
-				}
-				// Register new conn with epoll in ET mode
-				struct epoll_event cev;
-				cev.events = EPOLLIN;
-				cev.data.fd = conn;
-				set_nonblocking(conn);
-				if (epoll_ctl(epol_instance, EPOLL_CTL_ADD, conn, &cev) == -1) {
-					std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-					continue ;
-				}
-				requests[conn] = head;
-			}
-			if (event_mask & EPOLLIN) {
-				// Ready for a single read?.
-				std::cout << "Reading >~<\n";
-				char buff[4096];
-				ssize_t count = read(client, buff, sizeof(buff));
-				if (count == 0) {
-					struct epoll_event cev;
-					cev.events |= EPOLLOUT;
-					cev.data.fd = client;
-					if (epoll_ctl(epol_instance, EPOLL_CTL_MOD, client, &cev) == -1) {
-						std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-						continue ;
-					}
-					requests[client] += tail;
-				} else if (count == -1) {
-					// reading encounterred an error and probably needs to stop and remove fd from epoll?
-					std::cerr << "read: " << strerror(errno) << "\n";
-					close(client);
-					if (epoll_ctl(epol_instance, EPOLL_CTL_DEL, client, NULL) == -1) {
-						std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-						continue ;
-					}
-				}
-				requests[client] += buff;
-			} else if (event_mask & EPOLLOUT) {
-				// Ready for a single write?.
-				std::cout << "Writing >~<\n";
-				ssize_t count = write(client, requests[client].c_str(), requests[client].size());
-				if (count == -1)
-					std::cerr << "write: " << strerror(errno) << "\n";
-				close(client);
-				if (epoll_ctl(epol_instance, EPOLL_CTL_DEL, client, NULL) == -1) {
-					std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-					continue ;
-				}
-			}
+			Client *handle = (Client *)(events[index].data.ptr);
+			std::cout << "Next: " << handle->get_socket() << "\n";
+			handle->action(events[index].events, handle);
 		}
     }
-    close(server_fd);
     return 0;
 }
