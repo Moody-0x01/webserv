@@ -1,11 +1,19 @@
-# include <Server.hpp>
+#include <Server.hpp>
 
+int set_nonblocking(int sockfd) {
+	errno = 0;
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    if (flags == -1) {
+		std::cerr << "set_nonblocking: " << strerror(errno);
+        return -1;
+    }
+    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+		std::cerr << "set_nonblocking: " << strerror(errno);
+        return -1;
+    }
+    return 0;
+}
 
-const char* http10_ok_header =
-    "HTTP/1.0 200 OK\r\n"
-    "Content-Type: text/plain\r\n";
-
-std::map<int, Client> clients;
 
 void client_handler(uint32_t e, Client *Self)
 {
@@ -79,70 +87,4 @@ void server_handler(uint32_t e, Server *Self)
 		return ;
 	}
 	std::cout << "Accepted a conn: " << conn << "\n";
-}
-
-int main() {	 
-	struct epoll_event events[EVENT_MAX];
-	struct epoll_event event;
-    struct sockaddr_in address;
-	Server server(server_handler, socket(AF_INET, SOCK_STREAM, 0));
-    int opt = 1;
-
-    if (server.get_socket() < 0) {
-        std::cerr << "Socket creation failed\n";
-        return 1;
-    }
-    setsockopt(server.get_socket(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    std::memset(&address, 0, sizeof(address));
-    std::memset(&event, 0, sizeof(event));
-
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
-
-    if (bind(server.get_socket(), (struct sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "Bind failed\n";
-        close(server.get_socket());
-        return 1;
-    }
-	if (set_nonblocking(server.get_socket()) == -1) return 1;
-
-    if (listen(server.get_socket(), 3) < 0) {
-        std::cerr << "Listen failed\n";
-        close(server.get_socket());
-        return 1;
-    }
-
-	SocketContext::epoll_fd = epoll_create(1024);
-	if (SocketContext::epoll_fd < 0)
-	{
-        std::cerr << "Epoll failed\n";
-        close(server.get_socket());
-        return 1;
-	}
-    std::cout << "HTTP/1.0 Server listening on localhost:8080\n";
-	event.events = EPOLLIN;
-	event.data.ptr = (&server);
-	int code = epoll_ctl(SocketContext::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
-	if (code < 0)
-	{
-        std::cerr << "Epoll ctl failed\n";
-        return 1;
-	}
-    while (true)
-	{
-		int ready = epoll_wait(SocketContext::epoll_fd, events, EVENT_MAX, 100);
-		if (ready < 0)
-		{
-			std::cerr << "epoll_wait: " << strerror(errno) << "\n";
-			return 1;
-		}
-		for (int index = 0; index < ready; ++index)
-		{
-			Client *handle = (Client *)(events[index].data.ptr);
-			std::cout << "Next: " << handle->get_socket() << "\n";
-			handle->action(events[index].events, handle);
-		}
-    }
-    return 0;
 }
