@@ -2,15 +2,15 @@
 
 int SocketContext::epoll_fd = 0;
 
-SocketContext::SocketContext(): request_buffer(""), response_buffer(""), action(NULL), _sockfd(-1)
+SocketContext::SocketContext(): request_buffer(""), response_buffer(""), action(NULL), _sockfd(-1), _owner(-1)
 {
 }
 
-SocketContext::SocketContext(SocketHandler a, int sock): request_buffer(""), response_buffer(""), action(a), _sockfd(sock)
+SocketContext::SocketContext(SocketHandler a, int sock): request_buffer(""), response_buffer(""), action(a), _sockfd(sock), _owner(-1)
 {
 }
 
-SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buffer(""), action(a), _sockfd(-1)
+SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buffer(""), action(a), _sockfd(-1), _owner(-1)
 {
 }
 

@@ -17,7 +17,6 @@ typedef void (*SocketHandler)(uint32_t , SocketContext *);
 typedef struct SocketContext
 {
 public:
-	static int epoll_fd;
 	SocketContext(SocketHandler a);
 	SocketContext(SocketHandler a, int sock);
 	SocketContext();
@@ -25,10 +24,16 @@ public:
 
 	void set_socket(int sockfd) { _sockfd = sockfd; }
 	int get_socket(void) const { return _sockfd; }
+
+	void set_owner(int owner) { _owner = owner; }
+	int get_owner(void) const { return _owner; }
+
 	std::string request_buffer;
 	std::string response_buffer;
 	SocketHandler action;
 
 private:
-	int _sockfd;
+	int  _sockfd;
+	int  _owner;
+	bool _owns_fd;
 } SocketContext;
