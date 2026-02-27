@@ -1,5 +1,6 @@
 #pragma once
 
+# include <map>
 # include <Multiplexing/SocketContext.hpp>
 
 # define EVENT_MAX 4096
@@ -16,7 +17,8 @@ public:
 	// TODO: Implement, registration of a new server
 	static Server *register_server(void);
 	// TODO: Implement, registration of a new client
-	static Client *register_client(int server_fd, int client_fd);
+	static Client *register_client(uint32_t e, Server *server);
+	static void   unregister_client(int owner, int client);
 	static int loop(void);
 	// TODO: When the Multiplexer is constructed it should init all the current servers that have been
 	// parsed by the configuration.

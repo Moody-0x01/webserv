@@ -1,24 +1,35 @@
 #include <Multiplexing/SocketContext.hpp>
+#include <iostream>
 
-int SocketContext::epoll_fd = 0;
-
-SocketContext::SocketContext(): request_buffer(""), response_buffer(""), action(NULL), _sockfd(-1), _owner(-1)
-{
-}
-
-SocketContext::SocketContext(SocketHandler a, int sock): request_buffer(""), response_buffer(""), action(a), _sockfd(sock), _owner(-1)
-{
-}
-
-SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buffer(""), action(a), _sockfd(-1), _owner(-1)
-{
-}
+SocketContext::SocketContext(): request_buffer(""), response_buffer(""), action(NULL), _sockfd(-1), _owner(-1), _owns_fd(true) {}
+SocketContext::SocketContext(SocketHandler a, int sock): request_buffer(""), response_buffer(""), action(a), _sockfd(sock), _owner(-1), _owns_fd(true) {}
+SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buffer(""), action(a), _sockfd(-1), _owner(-1),  _owns_fd(true) {}
 
 SocketContext::~SocketContext()
 {
+	if (!_owns_fd) return ;
 	if (_sockfd != -1) {
+		std::cout << "Closed: " << _sockfd << "\n";
 		close(_sockfd);
-		std::cout << "Closed -> " << _sockfd << "\n";
 	}
 	_sockfd = -1;
 }
+
+SocketContext &SocketContext::operator=(const SocketContext &Other)
+{
+	if (this != &Other) {
+		this->_owner = Other.get_owner();
+		this->_sockfd = Other.get_socket();
+		this->_owns_fd = true;
+		this->action = Other.action;
+		// NOTE: Call disown on other after using it to 
+		// copy because c++98 has no move semantic
+	}
+	return (*this);
+}
+
+void SocketContext::set_socket(int sockfd) { _sockfd = sockfd; }
+int SocketContext::get_socket(void) const { return _sockfd; }
+void SocketContext::set_owner(int owner) { _owner = owner; }
+int SocketContext::get_owner(void) const { return _owner; }
+void SocketContext::disown(void) { _owns_fd = false; }
