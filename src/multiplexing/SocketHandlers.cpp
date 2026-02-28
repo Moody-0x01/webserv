@@ -11,10 +11,13 @@ void client_handler(uint32_t e, Client *Self)
 
 	conn = Self->get_socket();
 	if (e & EPOLLOUT) {
+		// Response
 		std::cout << "Writing to conn: " << conn << "\n";;
 		count = read(conn, buff, sizeof(buff));
-		if (count > 0) Self->request_buffer += std::string(buff);
+		if (count > 0)
+			Self->request_buffer += std::string(buff);
 		Self->response_buffer = http10_ok_header + Self->request_buffer;
+		std::cout << "DEBUG: " << Self->response_buffer << std::endl;
 		count = write(conn, Self->response_buffer.c_str(), Self->response_buffer.size());
 		if (count == -1)
 			std::cerr << "write: " << strerror(errno) << "\n";
@@ -22,6 +25,7 @@ void client_handler(uint32_t e, Client *Self)
 			Self->get_owner(),
 			Self->get_socket());
 	} else if (e & EPOLLIN) {
+		// Request
 		std::cout << "Reading from conn: " << conn << "\n";;
 		count = read(conn, buff, sizeof(buff));
 		std::cout << "Read: " << count << "\n";
@@ -33,6 +37,7 @@ void client_handler(uint32_t e, Client *Self)
 			Multiplexer::unregister_client(Self->get_owner(), Self->get_socket());
 			return ;
 		}
+		std::cout << buff << "\n";
 		if (Self->request_buffer.find("\r\n\r\n") != std::string::npos)
 		{
 			struct epoll_event cev;

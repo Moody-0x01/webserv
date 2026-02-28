@@ -1,18 +1,21 @@
 CXX=c++
 SOURCE_DIR=./src
 NAME=./webserv
-SRCS=./src/multiplexing/Multiplexer.cpp ./src/multiplexing/SocketContext.cpp  ./src/multiplexing/SocketHandlers.cpp
-OBJS=$(SRCS:%.cpp=%.o)
+OBJDIR = .objs
+OBJS=$(SRCS:%.cpp=$(OBJDIR)/%.o)
 INCLUDE=./include/
 CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE)
 RM=rm -rf
-MAIN=$(SOURCE_DIR)/main.cpp \
-	$(SOURCE_DIR)/Parser/HTTP/Lexer.cpp \
-	$(SOURCE_DIR)/Parser/HTTP/HttpParser.cpp
+MAIN=$(SOURCE_DIR)/main.cpp
+
+SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/SocketContext.cpp \
+	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp $(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
+	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp
 
 all: $(NAME)
 
-%.o: %.cpp
+$(OBJDIR)/%.o: %.cpp
+	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(NAME): $(OBJS) $(MAIN)
@@ -22,7 +25,6 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 
-# Docker Shit!
 r:
 	docker start webserv-container
 	docker exec -it webserv-container zsh
