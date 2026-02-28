@@ -1,7 +1,7 @@
 #pragma once
 
 # include <map>
-# include <Multiplexing/SocketContext.hpp>
+# include <Multiplexing/SocketHandlers.hpp>
 
 # define EVENT_MAX 4096
 int set_nonblocking(int sockfd);
@@ -19,10 +19,10 @@ public:
 	// TODO: Implement, registration of a new client
 	static Client *register_client(uint32_t e, Server *server);
 	static void   unregister_client(int owner, int client);
-	static int loop(void);
 	// TODO: When the Multiplexer is constructed it should init all the current servers that have been
 	// parsed by the configuration.
 	static void init(void); // Should take configuration.
+	static int loop(void);
 	static void deinit(void);
 	// TODO: When the Multiplexer is deconstructed it shuld actually make sure that every Server was dealloated successfully
 	// it should also remove the allocated epoll instance. then exit cleanly

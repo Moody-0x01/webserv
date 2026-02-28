@@ -7,7 +7,8 @@ SocketContext::SocketContext(SocketHandler a): request_buffer(""), response_buff
 
 SocketContext::~SocketContext()
 {
-	if (!_owns_fd) return ;
+	if (!_owns_fd)
+		return ;
 	if (_sockfd != -1) {
 		std::cout << "Closed: " << _sockfd << "\n";
 		close(_sockfd);

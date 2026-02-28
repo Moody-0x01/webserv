@@ -1,7 +1,7 @@
 CXX=c++
 SOURCE_DIR=./src
 NAME=./webserv
-SRCS=./src/multiplexing/Multiplexer.cpp ./src/multiplexing/SocketContext.cpp
+SRCS=./src/multiplexing/Multiplexer.cpp ./src/multiplexing/SocketContext.cpp  ./src/multiplexing/SocketHandlers.cpp
 OBJS=$(SRCS:%.cpp=%.o)
 INCLUDE=./include/
 CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE)
