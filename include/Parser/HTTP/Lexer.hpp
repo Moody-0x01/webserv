@@ -40,7 +40,6 @@ private:
 public:
     Lexer();
     // read the content (i will use file for now and store it on content string)
-    void readStream(std::istream &input);
     void tokenize();
     void loadReservedKeys();
     bool isReserved(std::string key) const;
