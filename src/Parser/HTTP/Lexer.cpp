@@ -1,4 +1,4 @@
-#include "../../../include/Parser/HTTP/Lexer.hpp"
+#include <Server.hpp>
 
 Lexer::Lexer() : pos(0), lpos(0)
 {

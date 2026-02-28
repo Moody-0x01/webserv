@@ -1,5 +1,4 @@
-#include "../../../include/Parser/HTTP/HttpParser.hpp"
-#include "../../../include/Parser/HTTP/Lexer.hpp"
+#include <Server.hpp>
 
 HttpParser::HttpParser()
 {
