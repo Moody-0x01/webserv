@@ -1,6 +1,8 @@
 #include "../../../include/Parser/HTTP/HttpParser.hpp"
+#include "../../../include/Parser/HTTP/Lexer.hpp"
 
 HttpParser::HttpParser()
 {
-    std::cout << "HttpParser()" <<std::endl;
+    Lexer lexer;
+
 }

@@ -9,7 +9,7 @@ RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp \
 	$(SOURCE_DIR)/Parser/HTTP/Lexer.cpp \
 	$(SOURCE_DIR)/Parser/HTTP/HttpParser.cpp
-all: $(NAME)
+all: $(NAME) run
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
