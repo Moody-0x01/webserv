@@ -9,7 +9,8 @@ RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp \
 	$(SOURCE_DIR)/Parser/HTTP/Lexer.cpp \
 	$(SOURCE_DIR)/Parser/HTTP/HttpParser.cpp
-all: $(NAME) run
+
+all: $(NAME)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -26,7 +27,7 @@ r:
 	docker start webserv-container
 	docker exec -it webserv-container zsh
 
-run: all
+run: $(NAME)
 	./$(NAME)
 
 re: fclean all
