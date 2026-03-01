@@ -2,9 +2,9 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "request-parsing" ]
+    branches: [ "master", "request-parsing" ]
   pull_request:
-    branches: [ "request-parsing" ]
+    branches: [ "master", "request-parsing" ]
 
 jobs:
   build:
