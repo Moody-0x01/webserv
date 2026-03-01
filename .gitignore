@@ -69,3 +69,4 @@ dkms.conf
 Dockerfile
 .idea
 .build
+.DS_Store
