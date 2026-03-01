@@ -12,7 +12,7 @@ threads = []
 # User-Agent: Mozilla/5.0
 # Accept: text/html
 headers = {
-    'User-Agent': 'Mozilla/5.0',
+    'User-Agent': 'Mozilla/902.0',
     'Accept': 'text/html'
 }
 

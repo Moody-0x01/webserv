@@ -1,6 +1,11 @@
 #include <Server.hpp>
 
-Lexer::Lexer() : pos(0), lpos(0)
+Lexer::Lexer() : parser(NULL), pos(0), lpos(0)
+{
+    
+}
+
+Lexer::Lexer(HttpParser *httpParser) : parser(httpParser), pos(0), lpos(0)
 {
     loadReservedKeys();
     tokenize();
@@ -8,13 +13,14 @@ Lexer::Lexer() : pos(0), lpos(0)
 
 void Lexer::tokenize()
 {
-    if (content.empty()) return;
-    
+    if (content.empty())
+        return;
 }
 
 bool Lexer::isReserved(std::string key) const
 {
-    if (key.length() == 0) return false;
+    if (key.length() == 0)
+        return false;
 
     if (std::find(reservedKeys.begin(), reservedKeys.end(), key) != reservedKeys.end())
         return true;

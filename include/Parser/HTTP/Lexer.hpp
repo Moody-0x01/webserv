@@ -8,6 +8,7 @@
 #include <sstream>
 #include <algorithm>
 
+
 enum HttpTokenType
 {
     METHOD,
@@ -25,9 +26,13 @@ enum HttpTokenType
 typedef std::map<std::string, std::string> HTTPHeader;
 typedef std::pair<HttpTokenType, std::string> Token;
 
+
+class HttpParser;
+
 class Lexer
 {
 private:
+    HttpParser *parser;
     std::vector<std::string> content;
     std::vector<Token> tokens;
     Token currentToken;
@@ -39,6 +44,7 @@ private:
 
 public:
     Lexer();
+    Lexer(HttpParser *httpParser);
     // read the content (i will use file for now and store it on content string)
     void tokenize();
     void loadReservedKeys();

@@ -1,9 +1,8 @@
 #pragma once
 # include <Multiplexing/Multiplexer.hpp>
-# include <Request/Request.hpp>
 # include <CGI/Cgi.hpp>
-# include <Response/Response.hpp>
-
+# include <HTTP/Request.hpp>
+# include <HTTP/Response.hpp>
 #include <Parser/HTTP/Lexer.hpp>
 #include <Parser/HTTP/HttpParser.hpp>
 # include <iostream>
