@@ -12,7 +12,7 @@ SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/Socke
 	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp $(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
 	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp
 
-all: $(NAME) run
+all: $(NAME)
 
 $(OBJDIR)/%.o: %.cpp
 	@mkdir -p $(@D)
