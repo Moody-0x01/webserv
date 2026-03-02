@@ -26,6 +26,10 @@ enum ParserState
     READY,
 };
 
+// For debugging only
+template<typename T>
+void dd(const T &s);
+
 struct SocketContext;
 
 class HttpParser

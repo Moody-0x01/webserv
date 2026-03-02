@@ -12,13 +12,16 @@ enum HttpTokenType
 {
     HEADER_NAME,
     HEADER_VALUE,
-    NEWLINE
+    HEADER_REQUSET_LINE,
+    METHOD,
+    URI,
+    VERSION
 };
 
 typedef std::pair<HttpTokenType, std::string> Token;
 
 //                   key           value
-typedef std::map<std::string, std::string> HTTPHeader;
+// typedef std::map<std::string, std::string> HTTPHeader;
 
 class Lexer
 {
@@ -28,8 +31,26 @@ private:
     unsigned int pos;
     unsigned int lpos;
 
+    void increment();
+    void decrement();
+    unsigned int getPos() const;
+    char &current();
 public:
     Lexer();
     void tokenize(std::string &content);
     void setContent(std::string &content);
+
+    std::string getTypeName(Token &token) const
+    {
+        switch (token.first)
+        {
+            case HEADER_NAME:         return "HEADER_NAME";
+            case HEADER_VALUE:        return "HEADER_VALUE";
+            case HEADER_REQUSET_LINE: return "HEADER_REQUSET_LINE";
+            case METHOD:              return "METHOD";
+            case URI:                 return "URI";
+            case VERSION:             return "VERSION";
+            default:                  return "UNKNOWN_TOKEN";
+        }
+    }
 };
