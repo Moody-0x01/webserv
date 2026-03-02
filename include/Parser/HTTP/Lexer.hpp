@@ -40,6 +40,11 @@ public:
     void tokenize(std::string &content);
     void setContent(std::string &content);
 
+    
+    void handleRequstline(std::string &buff);
+    void handleHeaderline(std::string &buff, size_t &endofkey);
+    void headerLineBufferFill(std::string &buff);
+    void debug();
     std::string getTypeName(Token &token) const
     {
         switch (token.first)
