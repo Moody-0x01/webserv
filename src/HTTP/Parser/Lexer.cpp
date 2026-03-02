@@ -1,39 +1,18 @@
 #include <Server.hpp>
 
-Lexer::Lexer() : parser(NULL), pos(0), lpos(0)
-{
-    
-}
+Lexer::Lexer() : content(""), pos(0), lpos(0) {}
 
-Lexer::Lexer(HttpParser *httpParser) : parser(httpParser), pos(0), lpos(0)
+void Lexer::tokenize(std::string &content)
 {
-    loadReservedKeys();
-    tokenize();
-}
+    this->setContent(content);
 
-void Lexer::tokenize()
-{
     if (content.empty())
         return;
+
+    std::cout << "tokenize:\n" << content << std::endl;
 }
 
-bool Lexer::isReserved(std::string key) const
+void Lexer::setContent(std::string &content)
 {
-    if (key.length() == 0)
-        return false;
-
-    if (std::find(reservedKeys.begin(), reservedKeys.end(), key) != reservedKeys.end())
-        return true;
-    return false;
-}
-
-void Lexer::loadReservedKeys()
-{
-    reservedKeys.push_back("GET");
-    reservedKeys.push_back("Host:");
-    reservedKeys.push_back("User-Agent:");
-    reservedKeys.push_back("Accept-Encoding:");
-    reservedKeys.push_back("Accept-Language:");
-    reservedKeys.push_back("Accept-Charset:");
-    reservedKeys.push_back("Accept:");
+    this->content = content;
 }

@@ -1,29 +1,29 @@
 #include <Server.hpp>
 
-HttpParser::HttpParser() : parent(NULL)
+HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL)
 {
-    lexerInstence = Lexer(this);
 }
 
-void HttpParser::handle(ssize_t count)
+void HttpParser::handle()
 {
     if (!this->validated())
         return;
-    std::string safe_buffer(buffer, count);
-
-    std::cout << "RECEIVED:\n"<< safe_buffer << std::endl;
-
-    std::cout << "PARENT BUFFER:\n" << parent->request_buffer << std::endl;
-    // testing only
     if (parent->request_buffer.find("\r\n\r\n") != std::string::npos)
     {
+        // we got all HEaders triggeing the lexer
         this->currentState = READY;
+        this->lexerInstence.tokenize(getRequestBuffer());
     }
 }
 
-char *HttpParser::getBuffer()
+std::string &HttpParser::getRequestBuffer()
 {
-    return buffer;
+    return parent->request_buffer;
+}
+
+std::string &HttpParser::getResponseBuffer()
+{
+    return parent->response_buffer;
 }
 
 ParserState HttpParser::state() const

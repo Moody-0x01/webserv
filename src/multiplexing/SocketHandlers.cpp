@@ -4,24 +4,23 @@ void client_request(Client *client)
 {
 	int conn = client->get_socket();
 	HttpParser &clientP = client->getParser();
-	char *buff = clientP.getBuffer();
+	char buff[BUFFER_SIZE];
 
 	ssize_t count = read(conn, buff, BUFFER_SIZE);
 	std::cout << "Read: " << count << "\n";
 	if (count > 0)
 	{
 		client->request_buffer.append(buff, count);
-		clientP.handle(count);
+		clientP.handle();
 	}
-	else if (count <= 0)
+	else
 	{
 		if (count < 0)
 			std::cerr << "read: " << strerror(errno) << "\n";
 		client->free();
 		return;
 	}
-	// 
-	if (clientP.state() == READY)
+	if (clientP.state() == READY) // check if the clint done sending the request
 	{
 		struct epoll_event cev;
 		cev.events = EPOLLOUT;
@@ -31,8 +30,6 @@ void client_request(Client *client)
 			std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
 			client->free();
 		}
-		// std::cout << "DEBUG: " << client->request_buffer << std::endl;
-		std::cout << "Client " << conn << " is done sending http/1.0\n";
 	}
 }
 
@@ -42,14 +39,14 @@ void client_response(Client *client)
 		"HTTP/1.0 200 OK\r\n"
 		"Content-Type: text/plain\r\n\r\n";
 	int conn = client->get_socket();
-	char *buff = client->getParser().getBuffer();
+	char buff[BUFFER_SIZE];
+
 	// Response
 	std::cout << "Writing to conn: " << conn << "\n";
 	ssize_t count = read(conn, buff, BUFFER_SIZE);
 	if (count > 0)
-		client->request_buffer += std::string(buff);
+		client->request_buffer.append(buff);
 	client->response_buffer = http10_ok_header + client->request_buffer;
-	// std::cout << "DEBUG: " << client->response_buffer << std::endl;
 	count = write(conn, client->response_buffer.c_str(), client->response_buffer.size());
 	if (count == -1)
 		std::cerr << "write: " << strerror(errno) << "\n";

@@ -3,6 +3,20 @@
 #include <iostream>
 #include <Parser/HTTP/Lexer.hpp>
 
+#define BUFFER_SIZE 4096
+
+// 
+//  METHOD,
+// HOST,
+// CONTENT_TYPE,
+// CONTENT_LENGTH,
+// SPACE,
+// PATH,
+// HTTP_VERSION,
+// CRLF,
+// KEY,
+// VALUE,
+
 enum ParserState
 {
     REQUEST_LINE,
@@ -11,8 +25,6 @@ enum ParserState
     IDLE,
     READY,
 };
-
-#define BUFFER_SIZE 4096
 
 struct SocketContext;
 
@@ -27,14 +39,15 @@ private:
 public:
     HttpParser();
 
-    void handle(ssize_t count);
+    void handle();
 
-   char* getBuffer();
+    std::string &getRequestBuffer();
+    std::string &getResponseBuffer();
 
-   ParserState state() const;
+    ParserState state() const;
 
-   SocketContext *getParent() const;
-   void setParent(SocketContext *client);
+    SocketContext *getParent() const;
+    void setParent(SocketContext *client);
 
-   bool validated();
+    bool validated();
 };

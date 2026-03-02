@@ -8,45 +8,28 @@
 #include <sstream>
 #include <algorithm>
 
-
 enum HttpTokenType
 {
-    METHOD,
-    HOST,
-    CONTENT_TYPE,
-    CONTENT_LENGTH,
-    SPACE,
-    PATH,
-    HTTP_VERSION,
-    CRLF,
-    KEY,
-    VALUE,
+    HEADER_NAME,
+    HEADER_VALUE,
+    NEWLINE
 };
 
-typedef std::map<std::string, std::string> HTTPHeader;
 typedef std::pair<HttpTokenType, std::string> Token;
 
-
-class HttpParser;
+//                   key           value
+typedef std::map<std::string, std::string> HTTPHeader;
 
 class Lexer
 {
 private:
-    HttpParser *parser;
-    std::vector<std::string> content;
+    std::string content;
     std::vector<Token> tokens;
-    Token currentToken;
-    Token prevToken;
     unsigned int pos;
     unsigned int lpos;
-    std::vector<std::string> reservedKeys;
-    std::vector<std::vector<std::string> > sContent;
 
 public:
     Lexer();
-    Lexer(HttpParser *httpParser);
-    // read the content (i will use file for now and store it on content string)
-    void tokenize();
-    void loadReservedKeys();
-    bool isReserved(std::string key) const;
+    void tokenize(std::string &content);
+    void setContent(std::string &content);
 };
