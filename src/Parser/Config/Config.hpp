@@ -36,6 +36,7 @@ struct LocationConfig {
     std::vector<std::string>    methods;
 
     LocationConfig();
+    LocationConfig& operator=(const LocationConfig& other);
 };
 
 struct ServerConfig {

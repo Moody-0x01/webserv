@@ -2,6 +2,18 @@
 
 LocationConfig::LocationConfig() : uri(""), root(""), index(""), autoindex(false) {}
 
+
+LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
+    if (this != &other) {
+        uri        = other.uri;
+        root       = other.root;
+        index      = other.index;
+        autoindex  = other.autoindex;
+        methods    = other.methods;
+    }
+    return *this;
+}
+
 ServerConfig::ServerConfig() : port(80), host("127.0.0.1"), root(""), index("") {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
