@@ -42,12 +42,14 @@ struct ServerConfig {
     int                             port;
     std::string                     host;
     std::string                     server_name;
+    std::string                     client_max_body_size;
     std::string                     root;
     std::string                     index;
     std::map<int, std::string>      error_pages;
     std::vector<LocationConfig>     locations;
 
     ServerConfig();
+    ServerConfig& operator=(const ServerConfig& other);
 };
 
 class Config {
@@ -56,6 +58,7 @@ class Config {
 
     public:
         void addServer(const ServerConfig& server);
+        Config& operator=(const Config& other);
         void debug() const;
 };
 
@@ -74,6 +77,7 @@ class Parser {
         Token peek();
         void handleListen();
         void handleServerName();
+        void handleClientMaxBodySize();
         void handleRoot(bool inLocation);
         void handleIndex(bool inLocation);
 

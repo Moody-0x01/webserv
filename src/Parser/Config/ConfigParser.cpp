@@ -4,10 +4,31 @@ LocationConfig::LocationConfig() : uri(""), root(""), index(""), autoindex(false
 
 ServerConfig::ServerConfig() : port(80), host("127.0.0.1"), root(""), index("") {}
 
+ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
+    if (this != &other) {
+        port                  = other.port;
+        host                  = other.host;
+        server_name           = other.server_name;
+        client_max_body_size  = other.client_max_body_size;
+        root                  = other.root;
+        index                 = other.index;
+        error_pages           = other.error_pages;
+        locations             = other.locations;
+    }
+    return *this;
+}
+
 Parser::Parser(std::vector<Token> tokens) : _tokens(tokens), _pos(0), _state(STATE_GLOBAL) {}
 
 void Config::addServer(const ServerConfig& server) {
     _servers.push_back(server);
+}
+
+Config& Config::operator=(const Config& other) {
+    if (this != &other) {
+        _servers = other._servers;
+    }
+    return *this;
 }
 
 void Config::debug() const {
@@ -55,6 +76,11 @@ void Parser::handleServerName() {
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
+void Parser::handleClientMaxBodySize() {
+    consume(TOKEN_TYPE_WORD);
+    _currentServer.client_max_body_size = consume(TOKEN_TYPE_WORD).value;
+}
+
 void Parser::handleRoot(bool inLocation) {
     consume(TOKEN_TYPE_WORD);
     Token t = consume(TOKEN_TYPE_WORD);
@@ -95,6 +121,7 @@ Config Parser::parse() {
                 }
                 else if (t.value == "listen") handleListen();
                 else if (t.value == "server_name") handleServerName();
+                else if (t.value == "client_max_body_size") handleClientMaxBodySize();
                 else if (t.value == "root") handleRoot(false);
                 else if (t.value == "index") handleIndex(false);
                 else if (t.value == "location") {
