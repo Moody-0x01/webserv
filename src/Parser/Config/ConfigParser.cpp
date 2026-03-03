@@ -79,6 +79,7 @@ void Parser::handleServerName() {
 void Parser::handleClientMaxBodySize() {
     consume(TOKEN_TYPE_WORD);
     _currentServer.client_max_body_size = consume(TOKEN_TYPE_WORD).value;
+    consume(TOKEN_TYPE_SEMICOLON);
 }
 
 void Parser::handleRoot(bool inLocation) {
