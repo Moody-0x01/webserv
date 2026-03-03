@@ -80,6 +80,7 @@ class Parser {
         void handleClientMaxBodySize();
         void handleRoot(bool inLocation);
         void handleIndex(bool inLocation);
+        void handleAutoIndex();
 
     public:
         Parser(std::vector<Token> tokens);

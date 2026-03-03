@@ -39,6 +39,7 @@ void Config::debug() const {
         std::cout << "  Root: " << _servers[i].root << "\n";
         std::cout << "  Index: " << _servers[i].index << "\n";
         std::cout << "  Server Name: " << _servers[i].server_name << "\n";
+        std::cout << "  client max body size: " << _servers[i].client_max_body_size << "\n";
         for (size_t j = 0; j < _servers[i].locations.size(); ++j) {
             std::cout << "  LOCATION [" << _servers[i].locations[j].uri << "]\n";
             std::cout << "    Root: " << _servers[i].locations[j].root << "\n";
@@ -98,6 +99,15 @@ void Parser::handleIndex(bool inLocation) {
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
+void Parser::handleAutoIndex() {
+    consume(TOKEN_TYPE_WORD);
+    if (consume(TOKEN_TYPE_WORD).value == "on")
+        _currentLocation.autoindex = true;
+    else
+        _currentLocation.autoindex = false;
+    consume(TOKEN_TYPE_SEMICOLON);
+}
+
 Config Parser::parse() {
     while (_pos < _tokens.size()) {
         Token t = peek();
@@ -143,6 +153,7 @@ Config Parser::parse() {
                 }
                 else if (t.value == "root") handleRoot(true);
                 else if (t.value == "index") handleIndex(true);
+                else if (t.value == "auto_index") handleAutoIndex();
                 else throw std::runtime_error("Unknown directive in Location: " + t.value);
                 break;
         }
