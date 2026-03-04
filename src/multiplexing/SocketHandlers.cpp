@@ -20,8 +20,10 @@ void client_request(Client *client)
 		client->free();
 		return;
 	}
-	if (clientP.state() == READY) // check if the clint done sending the request
+
+	if (clientP.state() == READY)
 	{
+		//  TODO: check the request code ... 
 		struct epoll_event cev;
 		cev.events = EPOLLOUT;
 		cev.data.ptr = client;

@@ -20,9 +20,6 @@ enum HttpTokenType
 
 typedef std::pair<HttpTokenType, std::string> Token;
 
-//                   key           value
-// typedef std::map<std::string, std::string> HTTPHeader;
-
 class Lexer
 {
 private:
@@ -33,17 +30,19 @@ private:
 
     void increment();
     void decrement();
-    unsigned int getPos() const;
     char &current();
+    unsigned int getPos() const;
 public:
     Lexer();
     void tokenize(std::string &content);
     void setContent(std::string &content);
 
-    
     void handleRequstline(std::string &buff);
     void handleHeaderline(std::string &buff, size_t &endofkey);
     void headerLineBufferFill(std::string &buff);
+    std::vector<Token> &getTokens();
+    
+    // DEBUG
     void debug();
     std::string getTypeName(Token &token) const
     {
@@ -59,3 +58,9 @@ public:
         }
     }
 };
+
+template <typename T>
+void dd(const T &s)
+{
+    std::cout << s << std::endl;
+}

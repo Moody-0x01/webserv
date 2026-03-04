@@ -8,11 +8,74 @@ void HttpParser::handle()
 {
     if (!this->validated())
         return;
-    if (parent->request_buffer.find("\r\n\r\n") != std::string::npos)
+
+    if (state() == IDLE)
     {
-        // we got all HEaders triggeing the lexer
-        this->currentState = READY;
-        this->lexerInstence.tokenize(getRequestBuffer());
+        size_t endOfHeaders = parent->request_buffer.find("\r\n\r\n");
+        if (endOfHeaders != std::string::npos)
+        {
+            endOfHeaders += 4;
+            std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
+            parent->request_buffer.erase(0, endOfHeaders);
+            this->lexerInstence.tokenize(headersOnly);
+            this->currentState = HEADERS_DONE;
+        }
+    }
+
+    if (state() == HEADERS_DONE)
+    {
+        std::vector<Token> &tokens = lexerInstence.getTokens();
+        for (size_t i = 0; i < tokens.size(); i++)
+        {
+            HttpTokenType &key = tokens[i].first;
+            std::string &val = tokens[i].second;
+            if (key == METHOD)
+                this->request.setMethod(val);
+            else if (key == URI)
+                this->request.setURI(val);
+            else if (key == VERSION)
+                this->request.setHttpVersion(val);
+            else if (key == HEADER_NAME)
+            {
+                std::string headerkey = val;
+                if (i + 1 < tokens.size() && tokens[i + 1].first == HEADER_VALUE)
+                {
+                    std::string headervalue = tokens[i + 1].second;
+                    std::transform(headerkey.begin(), headerkey.end(), headerkey.begin(), ::tolower);
+                    request.addHeader(headerkey, headervalue);
+                    i++;
+                }
+            }
+        }
+        /*
+            TODO: request Validation before marking it READY STATE
+            check if only GET, POST, DELETE and version is HTTP/1.1
+            HTTP/1.1 headers should contain Host if not set request code to 400 -> Bad Request
+        */
+        if (this->requestValidation())
+        {
+            // i need to check if the client is sending something
+            if (isHeaderValueExist("content-length"))
+            {
+                // TODO: check the content-length
+                // get the value and convert it to int 
+                this->currentState = BODY;
+            }
+            else // Normal GET Request
+                this->currentState = READY;
+        }
+        else
+        {
+            // 400 Bad Request
+            this->request.setCode(400);
+            std::cout << "400 Bad Request" << std::endl;
+            this->currentState = READY;
+        }
+    }
+
+    if (state() == BODY)
+    {
+        std::cout << "--------------the Body STATE------------" << std::endl;
     }
 }
 
@@ -46,7 +109,33 @@ bool HttpParser::validated()
     bool validated = false;
 
     validated = (parent != NULL);
-    // more validation shit here ...
+    // more validation shit here idk i may need it :) ...
 
     return validated;
+}
+
+bool HttpParser::isHeaderValueExist(const std::string &key)
+{
+    return this->request.getHeaders().count(key);
+}
+
+bool HttpParser::requestValidation()
+{
+    bool valid = false;
+
+    // Required for HTTP/1.1
+    valid = isHeaderValueExist("host");
+    if (!valid)
+        return valid;
+    // Only Supported Methods
+    std::string method = this->request.getMethod();
+    valid = (method == "GET") || (method == "POST") || (method == "DELETE");
+    if (!valid)
+        return valid;
+    // version checking
+    valid = this->request.getHttpVersion() == "HTTP/1.1";
+    if (!valid)
+        return valid;
+
+    return true;
 }

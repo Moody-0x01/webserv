@@ -2,6 +2,9 @@
 
 #include <iostream>
 #include <Parser/HTTP/Lexer.hpp>
+#include <HTTP/Request.hpp>
+#include <HTTP/Response.hpp>
+#include <algorithm>
 
 #define BUFFER_SIZE 4096
 
@@ -20,7 +23,7 @@
 enum ParserState
 {
     REQUEST_LINE,
-    HEADERS,
+    HEADERS_DONE,
     BODY,
     IDLE,
     READY,
@@ -39,6 +42,7 @@ private:
     Lexer lexerInstence;
     char buffer[BUFFER_SIZE];
     SocketContext *parent;
+    Request request;
 
 public:
     HttpParser();
@@ -52,6 +56,7 @@ public:
 
     SocketContext *getParent() const;
     void setParent(SocketContext *client);
-
+    bool isHeaderValueExist(const std::string &key);
     bool validated();
+    bool requestValidation();
 };

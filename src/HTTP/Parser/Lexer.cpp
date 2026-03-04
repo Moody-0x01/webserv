@@ -10,6 +10,7 @@ void Lexer::tokenize(std::string &content)
 
     std::string buff;
     unsigned int contentLen = this->content.length();
+
     while (getPos() < contentLen)
     {
         this->headerLineBufferFill(buff);
@@ -51,7 +52,7 @@ void Lexer::handleHeaderline(std::string &buff, size_t &endofkey)
     if (!key.empty() && (key[key.length() - 1] == ' ' || key[key.length() - 1] == '\t'))
     {
         // catch to send a 400 Bad Request response.
-        dd("Invalid whitespace before colon in header");
+        // dd("Invalid whitespace before colon in header");
     }
     endofkey++; // skip : of the key
     while (endofkey < buff.length() && (buff[endofkey] == ' ' || buff[endofkey] == '\t'))
@@ -63,7 +64,6 @@ void Lexer::handleHeaderline(std::string &buff, size_t &endofkey)
 
 void Lexer::handleRequstline(std::string &buff)
 {
-    // GET /index.html HTTP/1.1
     size_t fspace = buff.find(' ');
 
     if (fspace == std::string::npos)
@@ -119,13 +119,12 @@ unsigned int Lexer::getPos() const
     return this->pos;
 }
 
-// Debug
-template <typename T>
-void dd(const T &s)
+std::vector<Token> &Lexer::getTokens()
 {
-    std::cout << s << std::endl;
+    return tokens;
 }
 
+// Debug
 void Lexer::debug()
 {
     for (size_t i = 0; i < tokens.size(); ++i)
