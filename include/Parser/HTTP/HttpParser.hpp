@@ -44,6 +44,8 @@ private:
     SocketContext *parent;
     Request request;
 
+    unsigned int targetBodySize;
+
 public:
     HttpParser();
 

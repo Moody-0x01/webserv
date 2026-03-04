@@ -15,7 +15,7 @@ RAW_HTTP_REQUEST = (
     "Accept:text/html\r\n"
     "X-Empty-Value:\r\n"
     "X-Trailing-Spaces: Some value       \r\n"
-    "cOnTeNt-LeNgTh: 42\r\n"
+    "cOnTeNt-LeNgTh: 0\r\n"
     "X-Special-Chars: a=1; b=2; c=\"hello:world\"\r\n"
     "Valid-Header-With-Tab:\tTabbed-value\r\n"
     "Bad-Header : value-with-space-before-colon\r\n" 

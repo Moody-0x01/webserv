@@ -1,6 +1,6 @@
 #include <Server.hpp>
 
-HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL)
+HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(0)
 {
 }
 
@@ -47,19 +47,19 @@ void HttpParser::handle()
                 }
             }
         }
-        /*
-            TODO: request Validation before marking it READY STATE
-            check if only GET, POST, DELETE and version is HTTP/1.1
-            HTTP/1.1 headers should contain Host if not set request code to 400 -> Bad Request
-        */
         if (this->requestValidation())
         {
             // i need to check if the client is sending something
             if (isHeaderValueExist("content-length"))
             {
-                // TODO: check the content-length
-                // get the value and convert it to int 
-                this->currentState = BODY;
+                const std::map<std::string, std::string>& headers = this->request.getHeaders();
+                std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
+                unsigned int contentLenght = std::atoi(it->second.c_str());
+                this->targetBodySize = contentLenght;
+                if (this->targetBodySize > 0)
+                    this->currentState = BODY;
+                else
+                    this->currentState = READY;
             }
             else // Normal GET Request
                 this->currentState = READY;
@@ -75,7 +75,12 @@ void HttpParser::handle()
 
     if (state() == BODY)
     {
-        std::cout << "--------------the Body STATE------------" << std::endl;
+        if (this->getRequestBuffer().size() >= this->targetBodySize)
+        {
+            std::string safe_buffer = this->getRequestBuffer().substr(0, this->targetBodySize);
+            this->request.setBody(safe_buffer);
+            this->currentState = READY;
+        }
     }
 }
 
