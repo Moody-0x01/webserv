@@ -29,11 +29,13 @@ enum ParserState {
 };
 
 struct LocationConfig {
-    std::string                 uri;
-    std::string                 root;
-    std::string                 index;
-    bool                        autoindex;
-    std::vector<std::string>    methods;
+    std::string                         uri;
+    std::string                         root;
+    std::string                         index;
+    bool                                autoindex;
+    std::vector<std::string>            methods;
+    std::pair<int, std::string>         return_loc;
+    std::map<std::string, std::string>  cgi_path;
 
     LocationConfig();
     LocationConfig& operator=(const LocationConfig& other);
@@ -78,10 +80,14 @@ class Parser {
         Token peek();
         void handleListen();
         void handleServerName();
+        void handleErrorPage();
         void handleClientMaxBodySize();
         void handleRoot(bool inLocation);
         void handleIndex(bool inLocation);
         void handleAutoIndex();
+        void handleAllowMethods();
+        void handleReturn();
+        void handleCgiPass();
 
     public:
         Parser(std::vector<Token> tokens);
