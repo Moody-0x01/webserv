@@ -109,6 +109,11 @@ SocketContext *HttpParser::getParent() const
     return this->parent;
 }
 
+Request &HttpParser::getRequestObject()
+{
+    return this->request;
+}
+
 bool HttpParser::validated()
 {
     bool validated = false;

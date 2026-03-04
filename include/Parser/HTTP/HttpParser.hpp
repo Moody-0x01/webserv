@@ -53,7 +53,7 @@ public:
 
     std::string &getRequestBuffer();
     std::string &getResponseBuffer();
-
+    Request &getRequestObject();
     ParserState state() const;
 
     SocketContext *getParent() const;
