@@ -1,20 +1,23 @@
 #include "Config.hpp"
 
-LocationConfig::LocationConfig() : uri(""), root(""), index(""), autoindex(false) {}
-
+LocationConfig::LocationConfig() : uri(""), root(""), index(""), upload_path(""), autoindex(false), upload_enabled(true) {}
 
 LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     if (this != &other) {
-        uri        = other.uri;
-        root       = other.root;
-        index      = other.index;
-        autoindex  = other.autoindex;
-        methods    = other.methods;
+        uri             = other.uri;
+        root            = other.root;
+        index           = other.index;
+        autoindex       = other.autoindex;
+        upload_enabled  = other.upload_enabled;
+        upload_path     = other.upload_path;
+        methods         = other.methods;
+        cgi_path        = other.cgi_path;
+        return_loc      = other.return_loc;
     }
     return *this;
 }
 
-ServerConfig::ServerConfig() : port(80), host("127.0.0.1"), root(""), index("") {}
+ServerConfig::ServerConfig() : port(std::string::npos), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     if (this != &other) {
@@ -43,25 +46,68 @@ Config& Config::operator=(const Config& other) {
     return *this;
 }
 
+const std::vector<ServerConfig>& Config::getservers() const {
+    return _servers;
+}
+
 void Config::debug() const {
     std::cout << "=== CONFIG DUMP ===\n";
     for (size_t i = 0; i < _servers.size(); ++i) {
+        const ServerConfig& srv = _servers[i];
         std::cout << "SERVER [" << i << "]\n";
-        std::cout << "  Port: " << _servers[i].port << "\n";
-        std::cout << "  Root: " << _servers[i].root << "\n";
-        std::cout << "  Index: " << _servers[i].index << "\n";
-        std::cout << "  Server Name: " << _servers[i].server_name << "\n";
-        std::cout << "  client max body size: " << _servers[i].client_max_body_size << "\n";
-        for (size_t j = 0; j < _servers[i].locations.size(); ++j) {
-            std::cout << "  LOCATION [" << _servers[i].locations[j].uri << "]\n";
-            std::cout << "    Root: " << _servers[i].locations[j].root << "\n";
-            std::cout << "    Index: " << _servers[i].locations[j].index << "\n";
+        std::cout << "  Host:                " << srv.host << "\n";
+        std::cout << "  Port:                " << srv.port << "\n";
+        std::cout << "  Server Name:         " << (srv.server_name.empty() ? "(none)" : srv.server_name) << "\n";
+        std::cout << "  Root:                " << (srv.root.empty() ? "(none)" : srv.root) << "\n";
+        std::cout << "  Index:               " << (srv.index.empty() ? "(none)" : srv.index) << "\n";
+        std::cout << "  Client Max Body Size: " << srv.client_max_body_size << " bytes\n";
+
+        if (!srv.error_pages.empty()) {
+            std::cout << "  Error Pages:\n";
+            for (std::map<size_t, std::string>::const_iterator it = srv.error_pages.begin(); it != srv.error_pages.end(); ++it)
+                std::cout << "    " << it->first << " -> " << it->second << "\n";
+        }
+
+        for (size_t j = 0; j < srv.locations.size(); ++j) {
+            const LocationConfig& loc = srv.locations[j];
+            std::cout << "  LOCATION [" << loc.uri << "]\n";
+            std::cout << "    Root:           " << (loc.root.empty() ? "(none)" : loc.root) << "\n";
+            std::cout << "    Index:          " << (loc.index.empty() ? "(none)" : loc.index) << "\n";
+            std::cout << "    Auto Index:     " << (loc.autoindex ? "on" : "off") << "\n";
+            std::cout << "    Upload Enabled: " << (loc.upload_enabled ? "on" : "off") << "\n";
+            std::cout << "    Upload Path:    " << (loc.upload_path.empty() ? "(none)" : loc.upload_path) << "\n";
+
+            if (!loc.methods.empty()) {
+                std::cout << "    Allow Methods:  ";
+                for (size_t m = 0; m < loc.methods.size(); ++m)
+                    std::cout << loc.methods[m] << (m + 1 < loc.methods.size() ? ", " : "\n");
+            }
+
+            if (!loc.return_loc.second.empty())
+                std::cout << "    Return:         " << loc.return_loc.first << " " << loc.return_loc.second << "\n";
+
+            if (!loc.cgi_path.empty()) {
+                std::cout << "    CGI Pass:\n";
+                for (std::map<std::string, std::string>::const_iterator it = loc.cgi_path.begin(); it != loc.cgi_path.end(); ++it)
+                    std::cout << "      " << it->first << " -> " << it->second << "\n";
+            }
         }
         std::cout << "-------------------\n";
     }
 }
 
-bool isdigits(std::string str) {
+size_t parseNumber(const std::string &value) {
+    std::istringstream iss(value);
+    size_t parsedNumber;
+    iss >> parsedNumber;
+
+    if (iss.fail() || !iss.eof())
+        throw std::runtime_error("client_max_body_size: numeric conversion failed");
+    return parsedNumber;
+}
+
+bool isdigits(const std::string &str) {
+    if (str.size() == 0) return false;
     for (size_t i = 0; i < str.size(); i++) {
         if (!std::isdigit(str[i]))
             return false;
@@ -91,7 +137,10 @@ void Parser::handleListen() {
     _currentServer.host = host;
     if (!isdigits(port))
         throw std::runtime_error("Unexpected Value At host:port");
-    _currentServer.port = std::atoi(port.c_str());
+    size_t tmp = parseNumber(port);
+    if (tmp > 65535 || tmp < 1)
+        throw std::runtime_error("Unexpected Value At host:port");
+    _currentServer.port = tmp;
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
@@ -103,12 +152,15 @@ void Parser::handleServerName() {
 
 void Parser::handleErrorPage() {
     consume(TOKEN_TYPE_WORD);
-    std::vector<int> codes;
+    std::vector<size_t> codes;
     while (_pos < _tokens.size() && _tokens[_pos].type == TOKEN_TYPE_WORD) {
         Token t = peek();
         if (isdigits(t.value)) {
             consume(TOKEN_TYPE_WORD);
-            codes.push_back(std::atoi(t.value.c_str()));
+            size_t tmp = parseNumber(t.value);
+            if (tmp < 400 || tmp > 599)
+                throw std::runtime_error("Error: invalid html error code.");
+            codes.push_back(tmp);
         }
         else
             break;
@@ -122,9 +174,44 @@ void Parser::handleErrorPage() {
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
+size_t parseMaxBodySize(const std::string &value) {
+    if (value.empty())
+        throw std::runtime_error("client_max_body_size: empty value provided");
+    std::string numberPart = value;
+    size_t multiplier = 1;
+    char lastChar = value[value.size() - 1];
+
+    if (!std::isdigit(lastChar)) {
+        switch (lastChar) {
+            case 'K': case 'k':
+                multiplier = 1024UL;
+                break;
+            case 'M': case 'm':
+                multiplier = 1024UL * 1024UL;
+                break;
+            case 'G': case 'g':
+                multiplier = 1024UL * 1024UL * 1024UL;
+                break;
+            default:
+                throw std::runtime_error(std::string("client_max_body_size: invalid suffix '") + lastChar + "'");
+        }
+        numberPart = value.substr(0, value.size() - 1);
+    }
+    if (numberPart.empty())
+        throw std::runtime_error("client_max_body_size: missing numeric value before suffix");
+    if (!isdigits(numberPart))
+        throw std::runtime_error("client_max_body_size: invalid characters in numeric portion");
+
+    size_t number = parseNumber(numberPart);
+    size_t max_size = -1;
+    if (number > max_size / multiplier)
+        throw std::runtime_error("client_max_body_size: value is too large and exceeds system limits");
+    return number * multiplier;
+}
+
 void Parser::handleClientMaxBodySize() {
     consume(TOKEN_TYPE_WORD);
-    _currentServer.client_max_body_size = consume(TOKEN_TYPE_WORD).value;
+    _currentServer.client_max_body_size = parseMaxBodySize(consume(TOKEN_TYPE_WORD).value);
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
@@ -146,19 +233,32 @@ void Parser::handleIndex(bool inLocation) {
 
 void Parser::handleAutoIndex() {
     consume(TOKEN_TYPE_WORD);
-    if (consume(TOKEN_TYPE_WORD).value == "on")
+    Token t = consume(TOKEN_TYPE_WORD);
+    if (t.value == "on")
         _currentLocation.autoindex = true;
-    else
+    else if (t.value == "off")
         _currentLocation.autoindex = false;
+    else
+        throw std::runtime_error("Invalid Auto Index value: " + t.value);
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
-bool isExisted(std::vector<std::string> &ve, std::string const &str) {
-    for (size_t i = 0; i < ve.size(); i++) {
-        if (ve[i] == str)
-            return true;
-    }
-    return false;
+void Parser::handleUploadEnabled() {
+    consume(TOKEN_TYPE_WORD);
+    Token t = consume(TOKEN_TYPE_WORD);
+    if (t.value == "on")
+        _currentLocation.upload_enabled = true;
+    else if (t.value == "off")
+        _currentLocation.upload_enabled = false;
+    else
+        throw std::runtime_error("Invalid Upload_Enabled value: " + t.value);
+    consume(TOKEN_TYPE_SEMICOLON);
+}
+
+void Parser::handleUploadPath() {
+    consume(TOKEN_TYPE_WORD);
+    _currentLocation.upload_path = consume(TOKEN_TYPE_WORD).value;
+    consume(TOKEN_TYPE_SEMICOLON);
 }
 
 void Parser::handleAllowMethods() {
@@ -167,7 +267,7 @@ void Parser::handleAllowMethods() {
         Token t = consume(TOKEN_TYPE_WORD);
         if (t.value != "GET" && t.value != "POST" && t.value != "DELETE")
             throw std::runtime_error("Invalid method: " + t.value);
-        if (!isExisted(_currentLocation.methods, t.value))
+        if (std::find(_currentLocation.methods.begin(), _currentLocation.methods.end(), t.value) == _currentLocation.methods.end())
             _currentLocation.methods.push_back(t.value);
     }
     if (_currentLocation.methods.empty())
@@ -177,14 +277,14 @@ void Parser::handleAllowMethods() {
 
 void Parser::handleReturn() {
     consume(TOKEN_TYPE_WORD);
-    int code = 302;
+    size_t code = 302;
     std::string url = "";
     Token t = consume(TOKEN_TYPE_WORD);
     
     if (isdigits(t.value)) {
-        code = std::atoi(t.value.c_str());
-        if (peek().type != TOKEN_TYPE_WORD)
-            throw std::runtime_error("Error: return directive missing URL.");
+        code = parseNumber(t.value);
+        if (code > 399 || code < 300)
+            throw std::runtime_error("Error: invalid redirect codes at return.");
         url = consume(TOKEN_TYPE_WORD).value;
     }
     else
@@ -193,7 +293,7 @@ void Parser::handleReturn() {
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
-void verifyExt(std::string path) {
+void verifyExt(const std::string &path) {
     size_t i = path.find_last_of('.');
     if (i == std::string::npos)
         throw std::runtime_error("Error: Invalid CGI file.");
@@ -211,6 +311,12 @@ void Parser::handleCgiPass() {
     consume(TOKEN_TYPE_SEMICOLON);
 }
 
+void validateServer(const ServerConfig &server) {
+    if (server.host.empty() || server.port == std::string::npos)
+        throw std::runtime_error("Error: Invalid or not existed listen rule.");
+    // else if () to-do
+}
+
 Config Parser::parse() {
     while (_pos < _tokens.size()) {
         Token t = peek();
@@ -222,14 +328,15 @@ Config Parser::parse() {
                     consume(TOKEN_TYPE_LBRACE);
                     _state = STATE_IN_SERVER;
                     _currentServer = ServerConfig();
-                } else {
-                    throw std::runtime_error("Unexpected token in Global: " + t.value);
                 }
+                else
+                    throw std::runtime_error("Configuration Error:Unexpected token in Global: " + t.value);
                 break;
 
             case STATE_IN_SERVER:
                 if (t.type == TOKEN_TYPE_RBRACE) {
                     consume(TOKEN_TYPE_RBRACE);
+                    validateServer(_currentServer);
                     _mainConfig.addServer(_currentServer);
                     _state = STATE_GLOBAL;
                 }
@@ -255,15 +362,19 @@ Config Parser::parse() {
                     _currentServer.locations.push_back(_currentLocation);
                     _state = STATE_IN_SERVER;
                 }
-                else if (t.value == "root")          handleRoot(true);
-                else if (t.value == "index")         handleIndex(true);
-                else if (t.value == "auto_index")    handleAutoIndex();
-                else if (t.value == "allow_methods") handleAllowMethods();
-                else if (t.value == "return")        handleReturn();
-                else if (t.value == "cgi_pass")      handleCgiPass();
+                else if (t.value == "root")            handleRoot(true);
+                else if (t.value == "index")           handleIndex(true);
+                else if (t.value == "auto_index")      handleAutoIndex();
+                else if (t.value == "upload_enabled")  handleUploadEnabled();
+                else if (t.value == "upload_path")     handleUploadPath();
+                else if (t.value == "allow_methods")   handleAllowMethods();
+                else if (t.value == "return")          handleReturn();
+                else if (t.value == "cgi_pass")        handleCgiPass();
                 else throw std::runtime_error("Unknown directive in Location: " + t.value);
                 break;
         }
     }
+    if (_state != STATE_GLOBAL)
+        throw std::runtime_error("Error: Unexpected end of stream.");
     return _mainConfig;
 }

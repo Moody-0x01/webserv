@@ -1,13 +1,14 @@
-# ifndef CONFIG_HPP
+#ifndef CONFIG_HPP
 #define CONFIG_HPP
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <map>
 #include <cctype>
-#include <cstdlib> // for atoi (I will replace it later)
+#include <algorithm>
 
 enum TokenType {
     TOKEN_TYPE_WORD,
@@ -32,9 +33,11 @@ struct LocationConfig {
     std::string                         uri;
     std::string                         root;
     std::string                         index;
+    std::string                         upload_path;
     bool                                autoindex;
+    bool                                upload_enabled;
     std::vector<std::string>            methods;
-    std::pair<int, std::string>         return_loc;
+    std::pair<size_t, std::string>      return_loc;
     std::map<std::string, std::string>  cgi_path;
 
     LocationConfig();
@@ -42,14 +45,14 @@ struct LocationConfig {
 };
 
 struct ServerConfig {
-    int                             port;
-    std::string                     host;
-    std::string                     server_name;
-    std::string                     client_max_body_size;
-    std::string                     root;
-    std::string                     index;
-    std::map<int, std::string>      error_pages;
-    std::vector<LocationConfig>     locations;
+    size_t                       port;
+    std::string                  host;
+    std::string                  server_name;
+    size_t                       client_max_body_size;
+    std::string                  root;
+    std::string                  index;
+    std::map<size_t, std::string>   error_pages;
+    std::vector<LocationConfig>  locations;
 
     ServerConfig();
     ServerConfig& operator=(const ServerConfig& other);
@@ -62,6 +65,7 @@ class Config {
     public:
         void addServer(const ServerConfig& server);
         Config& operator=(const Config& other);
+        const std::vector<ServerConfig>& getservers() const;
         void debug() const;
 };
 
@@ -85,6 +89,8 @@ class Parser {
         void handleRoot(bool inLocation);
         void handleIndex(bool inLocation);
         void handleAutoIndex();
+        void handleUploadEnabled();
+        void handleUploadPath();
         void handleAllowMethods();
         void handleReturn();
         void handleCgiPass();
