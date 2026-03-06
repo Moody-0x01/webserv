@@ -26,23 +26,11 @@ clean:
 
 fclean: clean
 	$(RM) $(NAME)
-<<<<<<< HEAD
 	$(RM) $(OBJDIR)
 
-=======
-
-r:
-	docker start webserv-container
-	docker exec -it webserv-container zsh
-
->>>>>>> request-parsing
 run: $(NAME)
 	./$(NAME)
 
 re: fclean all
 
-<<<<<<< HEAD
-.PHONY: re fclean clean bonus $(NAME) r run
-=======
-.PHONY: re fclean clean bonus $(NAME) r run
->>>>>>> request-parsing
+.PHONY: re fclean clean bonus $(NAME) run
