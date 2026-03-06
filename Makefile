@@ -9,7 +9,8 @@ RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/SocketContext.cpp \
-	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp
+	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp $(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
+	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp
 
 all: $(NAME)
 
@@ -25,11 +26,23 @@ clean:
 
 fclean: clean
 	$(RM) $(NAME)
+<<<<<<< HEAD
 	$(RM) $(OBJDIR)
 
+=======
+
+r:
+	docker start webserv-container
+	docker exec -it webserv-container zsh
+
+>>>>>>> request-parsing
 run: $(NAME)
 	./$(NAME)
 
 re: fclean all
 
+<<<<<<< HEAD
 .PHONY: re fclean clean bonus $(NAME) r run
+=======
+.PHONY: re fclean clean bonus $(NAME) r run
+>>>>>>> request-parsing

@@ -5,6 +5,7 @@
 # include <unistd.h>
 # include <cassert>
 # include <netinet/in.h>
+#include <Parser/HTTP/HttpParser.hpp>
 
 typedef struct SocketContext SocketContext;
 typedef SocketContext Client;
@@ -32,8 +33,15 @@ public:
 	std::string response_buffer;
 	SocketHandler action;
 
+	HttpParser parserInstance;
+	// TODO: add and implement Request and Response class
+	// Request request;
+    // Response response;
+	void free();
+	HttpParser &getParser();
 private:
 	int  _sockfd;
 	int  _owner;
 	bool _owns_fd;
+
 } SocketContext;
