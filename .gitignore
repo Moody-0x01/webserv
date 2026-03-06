@@ -10,11 +10,6 @@ compile_commands.json
 /compile_flags.txt
 compile_flags.txt
 
-.DS_Store
-/.idea
-/.vscode
-/.zed
-Dockerfile
 # Prerequisites
 *.d
 
@@ -70,3 +65,10 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+.DS_Store
+/.idea
+/.vscode
+/.zed
+Dockerfile
+.build
