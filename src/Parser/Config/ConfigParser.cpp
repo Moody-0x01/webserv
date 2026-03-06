@@ -33,7 +33,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     return *this;
 }
 
-Parser::Parser(std::vector<Token> tokens) : _tokens(tokens), _pos(0), _state(STATE_GLOBAL) {}
+ConfigParser::ConfigParser(std::vector<ConfigToken> tokens) : _tokens(tokens), _pos(0), _state(CONFIG_STATE_GLOBAL) {}
 
 void Config::addServer(const ServerConfig& server) {
     _servers.push_back(server);
@@ -115,20 +115,20 @@ bool isdigits(const std::string &str) {
     return true;
 }
 
-Token Parser::consume(TokenType expected) {
+ConfigToken ConfigParser::consume(ConfigTokenType expected) {
     if (_pos >= _tokens.size()) throw std::runtime_error("Unexpected End of Stream");
     if (_tokens[_pos].type != expected) throw std::runtime_error("Syntax Error: Unexpected token " + _tokens[_pos].value);
     return _tokens[_pos++];
 }
 
-Token Parser::peek() {
+ConfigToken ConfigParser::peek() {
      if (_pos >= _tokens.size()) throw std::runtime_error("Unexpected End of Stream");
      return _tokens[_pos];
 }
 
-void Parser::handleListen() {
-    consume(TOKEN_TYPE_WORD);
-    Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleListen() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     size_t colInd = t.value.find(':');
     if (colInd == std::string::npos)
         throw std::runtime_error("Unexpected Value At host:port");
@@ -141,22 +141,22 @@ void Parser::handleListen() {
     if (tmp > 65535 || tmp < 1)
         throw std::runtime_error("Unexpected Value At host:port");
     _currentServer.port = tmp;
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleServerName() {
-    consume(TOKEN_TYPE_WORD);
-    _currentServer.server_name = consume(TOKEN_TYPE_WORD).value;
-    consume(TOKEN_TYPE_SEMICOLON);
+void ConfigParser::handleServerName() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    _currentServer.server_name = consume(CONFIG_TOKEN_TYPE_WORD).value;
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleErrorPage() {
-    consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleErrorPage() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
     std::vector<size_t> codes;
-    while (_pos < _tokens.size() && _tokens[_pos].type == TOKEN_TYPE_WORD) {
-        Token t = peek();
+    while (_pos < _tokens.size() && _tokens[_pos].type == CONFIG_TOKEN_TYPE_WORD) {
+        ConfigToken t = peek();
         if (isdigits(t.value)) {
-            consume(TOKEN_TYPE_WORD);
+            consume(CONFIG_TOKEN_TYPE_WORD);
             size_t tmp = parseNumber(t.value);
             if (tmp < 400 || tmp > 599)
                 throw std::runtime_error("Error: invalid html error code.");
@@ -167,11 +167,11 @@ void Parser::handleErrorPage() {
     }
     if (codes.empty())
         throw std::runtime_error("Error: error_page missing codes.");
-    Token pathToken = consume(TOKEN_TYPE_WORD);
+    ConfigToken pathToken = consume(CONFIG_TOKEN_TYPE_WORD);
     for (size_t i = 0; i < codes.size(); ++i) {
         _currentServer.error_pages[codes[i]] = pathToken.value;
     }
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
 size_t parseMaxBodySize(const std::string &value) {
@@ -209,62 +209,62 @@ size_t parseMaxBodySize(const std::string &value) {
     return number * multiplier;
 }
 
-void Parser::handleClientMaxBodySize() {
-    consume(TOKEN_TYPE_WORD);
-    _currentServer.client_max_body_size = parseMaxBodySize(consume(TOKEN_TYPE_WORD).value);
-    consume(TOKEN_TYPE_SEMICOLON);
+void ConfigParser::handleClientMaxBodySize() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    _currentServer.client_max_body_size = parseMaxBodySize(consume(CONFIG_TOKEN_TYPE_WORD).value);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleRoot(bool inLocation) {
-    consume(TOKEN_TYPE_WORD);
-    Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleRoot(bool inLocation) {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     if (inLocation) _currentLocation.root = t.value;
     else _currentServer.root = t.value;
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleIndex(bool inLocation) {
-    consume(TOKEN_TYPE_WORD);
-    Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleIndex(bool inLocation) {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     if (inLocation) _currentLocation.index = t.value;
     else _currentServer.index = t.value;
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleAutoIndex() {
-    consume(TOKEN_TYPE_WORD);
-    Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleAutoIndex() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     if (t.value == "on")
         _currentLocation.autoindex = true;
     else if (t.value == "off")
         _currentLocation.autoindex = false;
     else
         throw std::runtime_error("Invalid Auto Index value: " + t.value);
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleUploadEnabled() {
-    consume(TOKEN_TYPE_WORD);
-    Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleUploadEnabled() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     if (t.value == "on")
         _currentLocation.upload_enabled = true;
     else if (t.value == "off")
         _currentLocation.upload_enabled = false;
     else
         throw std::runtime_error("Invalid Upload_Enabled value: " + t.value);
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleUploadPath() {
-    consume(TOKEN_TYPE_WORD);
-    _currentLocation.upload_path = consume(TOKEN_TYPE_WORD).value;
-    consume(TOKEN_TYPE_SEMICOLON);
+void ConfigParser::handleUploadPath() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    _currentLocation.upload_path = consume(CONFIG_TOKEN_TYPE_WORD).value;
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleAllowMethods() {
-    consume(TOKEN_TYPE_WORD);
-    while (_pos < _tokens.size() && _tokens[_pos].type == TOKEN_TYPE_WORD) {
-        Token t = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleAllowMethods() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    while (_pos < _tokens.size() && _tokens[_pos].type == CONFIG_TOKEN_TYPE_WORD) {
+        ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
         if (t.value != "GET" && t.value != "POST" && t.value != "DELETE")
             throw std::runtime_error("Invalid method: " + t.value);
         if (std::find(_currentLocation.methods.begin(), _currentLocation.methods.end(), t.value) == _currentLocation.methods.end())
@@ -272,25 +272,25 @@ void Parser::handleAllowMethods() {
     }
     if (_currentLocation.methods.empty())
         throw std::runtime_error("Error: allow_methods empty.");
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void Parser::handleReturn() {
-    consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleReturn() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
     size_t code = 302;
     std::string url = "";
-    Token t = consume(TOKEN_TYPE_WORD);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     
     if (isdigits(t.value)) {
         code = parseNumber(t.value);
         if (code > 399 || code < 300)
             throw std::runtime_error("Error: invalid redirect codes at return.");
-        url = consume(TOKEN_TYPE_WORD).value;
+        url = consume(CONFIG_TOKEN_TYPE_WORD).value;
     }
     else
         url = t.value;
     _currentLocation.return_loc = std::make_pair(code, url);
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
 void verifyExt(const std::string &path) {
@@ -302,13 +302,13 @@ void verifyExt(const std::string &path) {
         throw std::runtime_error("Error: Unsupported CGI extension.");
 }
 
-void Parser::handleCgiPass() {
-    consume(TOKEN_TYPE_WORD);
-    Token ext = consume(TOKEN_TYPE_WORD);
-    Token bin = consume(TOKEN_TYPE_WORD);
+void ConfigParser::handleCgiPass() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken ext = consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken bin = consume(CONFIG_TOKEN_TYPE_WORD);
     verifyExt(ext.value);
     _currentLocation.cgi_path[ext.value] = bin.value;
-    consume(TOKEN_TYPE_SEMICOLON);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
 void validateServer(const ServerConfig &server) {
@@ -317,28 +317,28 @@ void validateServer(const ServerConfig &server) {
     // else if () to-do
 }
 
-Config Parser::parse() {
+Config ConfigParser::parse() {
     while (_pos < _tokens.size()) {
-        Token t = peek();
+        ConfigToken t = peek();
 
         switch (_state) {
-            case STATE_GLOBAL:
+            case CONFIG_STATE_GLOBAL:
                 if (t.value == "server") {
-                    consume(TOKEN_TYPE_WORD);
-                    consume(TOKEN_TYPE_LBRACE);
-                    _state = STATE_IN_SERVER;
+                    consume(CONFIG_TOKEN_TYPE_WORD);
+                    consume(CONFIG_TOKEN_TYPE_LBRACE);
+                    _state = CONFIG_STATE_IN_SERVER;
                     _currentServer = ServerConfig();
                 }
                 else
                     throw std::runtime_error("Configuration Error:Unexpected token in Global: " + t.value);
                 break;
 
-            case STATE_IN_SERVER:
-                if (t.type == TOKEN_TYPE_RBRACE) {
-                    consume(TOKEN_TYPE_RBRACE);
+            case CONFIG_STATE_IN_SERVER:
+                if (t.type == CONFIG_TOKEN_TYPE_RBRACE) {
+                    consume(CONFIG_TOKEN_TYPE_RBRACE);
                     validateServer(_currentServer);
                     _mainConfig.addServer(_currentServer);
-                    _state = STATE_GLOBAL;
+                    _state = CONFIG_STATE_GLOBAL;
                 }
                 else if (t.value == "listen")               handleListen();
                 else if (t.value == "server_name")          handleServerName();
@@ -347,20 +347,20 @@ Config Parser::parse() {
                 else if (t.value == "root")                 handleRoot(false);
                 else if (t.value == "index")                handleIndex(false);
                 else if (t.value == "location") {
-                    consume(TOKEN_TYPE_WORD);
+                    consume(CONFIG_TOKEN_TYPE_WORD);
                     _currentLocation = LocationConfig();
-                    _currentLocation.uri = consume(TOKEN_TYPE_WORD).value;
-                    consume(TOKEN_TYPE_LBRACE);
-                    _state = STATE_IN_LOCATION;
+                    _currentLocation.uri = consume(CONFIG_TOKEN_TYPE_WORD).value;
+                    consume(CONFIG_TOKEN_TYPE_LBRACE);
+                    _state = CONFIG_STATE_IN_LOCATION;
                 }
                 else throw std::runtime_error("Unknown directive in Server: " + t.value);
                 break;
 
-            case STATE_IN_LOCATION:
-                if (t.type == TOKEN_TYPE_RBRACE) {
-                    consume(TOKEN_TYPE_RBRACE);
+            case CONFIG_STATE_IN_LOCATION:
+                if (t.type == CONFIG_TOKEN_TYPE_RBRACE) {
+                    consume(CONFIG_TOKEN_TYPE_RBRACE);
                     _currentServer.locations.push_back(_currentLocation);
-                    _state = STATE_IN_SERVER;
+                    _state = CONFIG_STATE_IN_SERVER;
                 }
                 else if (t.value == "root")            handleRoot(true);
                 else if (t.value == "index")           handleIndex(true);
@@ -374,7 +374,7 @@ Config Parser::parse() {
                 break;
         }
     }
-    if (_state != STATE_GLOBAL)
+    if (_state != CONFIG_STATE_GLOBAL)
         throw std::runtime_error("Error: Unexpected end of stream.");
     return _mainConfig;
 }

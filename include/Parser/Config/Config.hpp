@@ -8,23 +8,23 @@
 #include <cctype>
 #include <algorithm>
 
-enum TokenType {
-    TOKEN_TYPE_WORD,
-    TOKEN_TYPE_LBRACE,
-    TOKEN_TYPE_RBRACE,
-    TOKEN_TYPE_SEMICOLON
+enum ConfigTokenType {
+    CONFIG_TOKEN_TYPE_WORD,
+    CONFIG_TOKEN_TYPE_LBRACE,
+    CONFIG_TOKEN_TYPE_RBRACE,
+    CONFIG_TOKEN_TYPE_SEMICOLON
 };
 
-struct Token {
+struct ConfigToken {
     std::string value;
-    TokenType type;
-    Token(std::string v, TokenType t);
+    ConfigTokenType type;
+    ConfigToken(std::string v, ConfigTokenType t);
 };
 
-enum ParserState {
-    STATE_GLOBAL,
-    STATE_IN_SERVER,
-    STATE_IN_LOCATION
+enum ConfigParserState {
+    CONFIG_STATE_GLOBAL,
+    CONFIG_STATE_IN_SERVER,
+    CONFIG_STATE_IN_LOCATION
 };
 
 struct LocationConfig {
@@ -68,18 +68,18 @@ class Config {
 };
 
 
-class Parser {
+class ConfigParser {
     private:
-        std::vector<Token>  _tokens;
-        size_t              _pos;
-        ParserState         _state;
+        std::vector<ConfigToken>  _tokens;
+        size_t                    _pos;
+        ConfigParserState         _state;
         
         Config              _mainConfig;
         ServerConfig        _currentServer;
         LocationConfig      _currentLocation;
 
-        Token consume(TokenType expected);
-        Token peek();
+        ConfigToken consume(ConfigTokenType expected);
+        ConfigToken peek();
         void handleListen();
         void handleServerName();
         void handleErrorPage();
@@ -94,9 +94,9 @@ class Parser {
         void handleCgiPass();
 
     public:
-        Parser(std::vector<Token> tokens);
+        ConfigParser(std::vector<ConfigToken> tokens);
         Config parse();
 };
 
-std::string readfile(std::string fileName);
-std::vector<Token> lexer(std::string fileName);
+std::string configReadFile(std::string fileName);
+std::vector<ConfigToken> configLexer(std::string fileName);

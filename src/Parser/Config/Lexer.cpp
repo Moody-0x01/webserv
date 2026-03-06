@@ -1,8 +1,8 @@
 #include "Config.hpp"
 
-Token::Token(std::string v, TokenType t) : value(v), type(t) {}
+ConfigToken::ConfigToken(std::string v, ConfigTokenType t) : value(v), type(t) {}
 
-std::string readfile(std::string fileName) {
+std::string configReadFile(std::string fileName) {
     std::ifstream inputFile(fileName.c_str());
     if (!inputFile.is_open())
         throw std::runtime_error("Error: could not open file");
@@ -14,9 +14,9 @@ std::string readfile(std::string fileName) {
     return result;
 }
 
-std::vector<Token> lexer(std::string fileName) {
-    std::string content = readfile(fileName);
-    std::vector<Token> tokens;
+std::vector<ConfigToken> configLexer(std::string fileName) {
+    std::string content = configReadFile(fileName);
+    std::vector<ConfigToken> tokens;
     std::string currentToken;
 
     for (size_t i = 0; i < content.length(); ++i) {
@@ -24,7 +24,7 @@ std::vector<Token> lexer(std::string fileName) {
 
         if (c == '#') { // Comment handling
              if (!currentToken.empty()) {
-                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
+                tokens.push_back(ConfigToken(currentToken, CONFIG_TOKEN_TYPE_WORD));
                 currentToken.clear();
             }
             while (i < content.length() && content[i] != '\n') i++;
@@ -33,7 +33,7 @@ std::vector<Token> lexer(std::string fileName) {
 
         if (std::isspace(c)) {
             if (!currentToken.empty()) {
-                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
+                tokens.push_back(ConfigToken(currentToken, CONFIG_TOKEN_TYPE_WORD));
                 currentToken.clear();
             }
             continue;
@@ -41,19 +41,19 @@ std::vector<Token> lexer(std::string fileName) {
 
         if (c == '{' || c == '}' || c == ';') {
             if (!currentToken.empty()) {
-                tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
+                tokens.push_back(ConfigToken(currentToken, CONFIG_TOKEN_TYPE_WORD));
                 currentToken.clear();
             }
-            TokenType type = (c == '{') ? TOKEN_TYPE_LBRACE : 
-                             (c == '}') ? TOKEN_TYPE_RBRACE : TOKEN_TYPE_SEMICOLON;
-            tokens.push_back(Token(std::string(1, c), type));
+            ConfigTokenType type = (c == '{') ? CONFIG_TOKEN_TYPE_LBRACE : 
+                             (c == '}') ? CONFIG_TOKEN_TYPE_RBRACE : CONFIG_TOKEN_TYPE_SEMICOLON;
+            tokens.push_back(ConfigToken(std::string(1, c), type));
             continue;
         }
 
         currentToken += c;
     }
     if (!currentToken.empty())
-        tokens.push_back(Token(currentToken, TOKEN_TYPE_WORD));
+        tokens.push_back(ConfigToken(currentToken, CONFIG_TOKEN_TYPE_WORD));
     
     return tokens;
 }
