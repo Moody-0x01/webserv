@@ -26,7 +26,7 @@ private:
     std::string content;
     std::vector<Token> tokens;
     unsigned int pos;
-    unsigned int lpos;
+    /*  unsigned int lpos;  */
 
     void increment();
     void decrement();

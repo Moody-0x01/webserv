@@ -40,7 +40,7 @@ class HttpParser
 private:
     ParserState currentState;
     Lexer lexerInstence;
-    char buffer[BUFFER_SIZE];
+    /*  char buffer[BUFFER_SIZE];  */
     SocketContext *parent;
     Request request;
 

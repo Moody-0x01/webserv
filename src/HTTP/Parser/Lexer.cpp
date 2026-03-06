@@ -1,6 +1,6 @@
 #include <Server.hpp>
 
-Lexer::Lexer() : content(""), pos(0), lpos(0) {}
+Lexer::Lexer() : content(""), pos(0) {}
 
 void Lexer::tokenize(std::string &content)
 {
