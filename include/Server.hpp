@@ -4,6 +4,7 @@
 # include <HTTP/Request.hpp>
 # include <HTTP/Response.hpp>
 # include <Parser/HTTP/Lexer.hpp>
+# include <Parser/Config/Config.hpp>
 # include <Parser/HTTP/HttpParser.hpp>
 # include <iostream>
 # include <errno.h>
