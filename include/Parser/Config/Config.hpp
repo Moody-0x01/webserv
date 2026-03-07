@@ -100,3 +100,4 @@ class ConfigParser {
 
 std::string configReadFile(std::string fileName);
 std::vector<ConfigToken> configLexer(std::string fileName);
+Config parse_config_file(const std::string& fileName);

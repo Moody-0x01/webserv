@@ -379,8 +379,8 @@ Config ConfigParser::parse() {
     return _mainConfig;
 }
 
-Config parse_config_file(const std::string& filename) {
-    std::vector<ConfigToken> tokens = configLexer(filename);
+Config parse_config_file(const std::string& fileName) {
+    std::vector<ConfigToken> tokens = configLexer(fileName);
     ConfigParser parser(tokens);
     return parser.parse();
 }
