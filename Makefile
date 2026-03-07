@@ -1,4 +1,4 @@
-CXX=c++
+CXX=clang++
 SOURCE_DIR=./src
 NAME=./webserv
 OBJDIR = .build
