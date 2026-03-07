@@ -1,4 +1,4 @@
-CXX=c++
+CXX=clang++
 SOURCE_DIR=./src
 NAME=./webserv
 OBJDIR = .build
@@ -9,7 +9,8 @@ RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/SocketContext.cpp \
-	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp
+	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp $(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
+	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp
 
 all: $(NAME)
 
@@ -32,4 +33,4 @@ run: $(NAME)
 
 re: fclean all
 
-.PHONY: re fclean clean bonus $(NAME) r run
+.PHONY: re fclean clean bonus $(NAME) run
