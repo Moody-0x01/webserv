@@ -378,3 +378,9 @@ Config ConfigParser::parse() {
         throw std::runtime_error("Error: Unexpected end of stream.");
     return _mainConfig;
 }
+
+Config parse_config_file(const std::string& filename) {
+    std::vector<ConfigToken> tokens = configLexer(filename);
+    ConfigParser parser(tokens);
+    return parser.parse();
+}
