@@ -10,7 +10,8 @@ MAIN=$(SOURCE_DIR)/main.cpp
 
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/SocketContext.cpp \
 	$(SOURCE_DIR)/multiplexing/SocketHandlers.cpp $(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
-	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp
+	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp\
+	$(SOURCE_DIR)/Parser/Config/Lexer.cpp $(SOURCE_DIR)/Parser/Config/ConfigParser.cpp
 
 all: $(NAME)
 

@@ -1,4 +1,4 @@
-#include "Config.hpp"
+#include <Parser/Config/Config.hpp>
 
 LocationConfig::LocationConfig() : uri(""), root(""), index(""), upload_path(""), autoindex(false), upload_enabled(true) {}
 

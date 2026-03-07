@@ -1,4 +1,4 @@
-#include "Config.hpp"
+#include <Parser/Config/Config.hpp>
 
 ConfigToken::ConfigToken(std::string v, ConfigTokenType t) : value(v), type(t) {}
 
