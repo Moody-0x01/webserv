@@ -12,6 +12,7 @@ typedef struct SocketContext SocketContext;
 typedef SocketContext Client;
 typedef SocketContext Server;
 typedef void (*SocketHandler)(uint32_t , SocketContext *);
+typedef ssize_t (*IoFunc)(int, void*, size_t);
 
 typedef struct SocketContext
 {

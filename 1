@@ -1,7 +1,6 @@
 #include <Server.hpp>
 #include <cerrno>
 #include <cstdio>
-#include <iostream>
 #include <netdb.h>
 #include <stdint.h>
 #include <cstring>
@@ -141,26 +140,21 @@ int Multiplexer::loop(void)
 		for (int index = 0; index < ready; ++index)
 		{
 			SocketContext *handle = (SocketContext *)(Multiplexer::events[index].data.ptr);
-			try {
-				handle->action(Multiplexer::events[index].events, handle);
-			} catch (const char *error) {
-				std::cerr << "[ handle->action ] " << error << "\n";
-			}
+			handle->action(Multiplexer::events[index].events, handle);
+			// TODO: Check syscall errors. print using strerror(0)
 		}
     }
 	return (0);
 }
 
-ssize_t Multiplexer::read(int fd, void *buf, size_t size) throw (const char *)
+ssize_t Multiplexer::read(int fd, void *buf, size_t size)
 {
 	ssize_t count = ::read(fd, buf, size);
-	if (count == -1) throw strerror(errno);
 	return (count);
 }
 
-ssize_t Multiplexer::write(int fd, const void *buf, size_t size) throw (const char *)
+ssize_t Multiplexer::write(int fd, const void *buf, size_t size)
 {
 	ssize_t count = ::write(fd, buf, size);
-	if (count == -1) throw strerror(errno);
 	return (count);
 }

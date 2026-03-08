@@ -6,7 +6,7 @@ void client_request(Client *client)
 	HttpParser &clientP = client->getParser();
 	char buff[BUFFER_SIZE];
 
-	ssize_t count = read(conn, buff, BUFFER_SIZE);
+	ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
 	std::cout << "Read: " << count << "\n";
 	if (count > 0)
 	{
@@ -29,6 +29,7 @@ void client_request(Client *client)
 		cev.data.ptr = client;
 		if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
 		{
+			// NOTE: If an epoll_ctl fails it should throw. haha throw up something. whatever
 			std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
 			client->free();
 		}
@@ -45,11 +46,11 @@ void client_response(Client *client)
 
 	// Response
 	std::cout << "Writing to conn: " << conn << "\n";
-	ssize_t count = read(conn, buff, BUFFER_SIZE);
+	ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
 	if (count > 0)
 		client->request_buffer.append(buff);
 	client->response_buffer = http10_ok_header + client->request_buffer;
-	count = write(conn, client->response_buffer.c_str(), client->response_buffer.size());
+	count = Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
 	if (count == -1)
 		std::cerr << "write: " << strerror(errno) << "\n";
 	client->free();
@@ -57,6 +58,7 @@ void client_response(Client *client)
 
 void client_handler(uint32_t e, Client *Self)
 {
+	// NOTE: Any syscall that fails here should raise an exception;
 	if (e & EPOLLOUT)
 		client_response(Self);
 	else if (e & EPOLLIN)
@@ -75,6 +77,6 @@ void server_handler(uint32_t e, Server *Self)
 	if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, conn->get_socket(), &cev) == -1)
 	{
 		Multiplexer::servers[Self->get_socket()].second.erase(conn->get_socket());
-		throw std::runtime_error(strerror(errno));
+		throw strerror(errno);
 	}
 }
