@@ -1,5 +1,7 @@
 #include <Server.hpp>
+#include <cerrno>
 #include <cstdio>
+#include <netdb.h>
 #include <stdint.h>
 #include <cstring>
 #include <stdexcept>
@@ -37,9 +39,23 @@ std::string Multiplexer::resolve_host(const std::string &host)
 void Multiplexer::init(std::vector<ServerConfig> &confs)
 {
 	Multiplexer::epoll_fd = epoll_create(1024);
+	size_t alive;
+
+	alive = 0;
 	if (Multiplexer::epoll_fd < 0)
 		throw std::runtime_error(std::strerror(errno));
-	for (size_t c = 0; c < confs.size(); c++) Multiplexer::register_server(confs[c]);
+	for (size_t c = 0; c < confs.size(); c++)
+	{
+		try {
+			Multiplexer::register_server(confs[c]);
+			alive++;
+		} catch (const char *error) {
+			std::cerr << "[ Multiplexer::register_server ] " << error << "\n";
+		}
+	}
+	if (alive > 0)
+		return ;
+	throw std::runtime_error("There are no hosts to continue further.");
 }
 
 void Multiplexer::deinit(void)
@@ -52,10 +68,10 @@ void Multiplexer::unregister_client(int owner, int client)
 	Multiplexer::servers[owner].second.erase(client);
 }
 
-Server *Multiplexer::register_server(ServerConfig &conf)
+void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
 {
 	Server server(server_handler);
-	int server_fd, opt;
+	int server_fd, opt, code;
 	struct epoll_event event;
 	struct addrinfo hints, *res;
 
@@ -66,13 +82,10 @@ Server *Multiplexer::register_server(ServerConfig &conf)
     hints.ai_socktype = SOCK_STREAM;
 
     opt = 1;
-	if (getaddrinfo(conf.host.c_str(), conf.port.c_str(), &hints, &res))
-    {
-        /*  std::cerr << gai_strerror(status) << std::endl; // gai_strerror is allowed!  */
-        return NULL;
-    }
+	code = getaddrinfo(conf.host.c_str(), conf.port.c_str(), &hints, &res);
+	if (code != 0) throw gai_strerror(code);
 	server_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (server_fd < 0) return (NULL);
+	if (server_fd < 0) throw strerror(errno);
 	server.set_socket(server_fd);
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     std::memset(&event, 0, sizeof(event));
@@ -80,23 +93,24 @@ Server *Multiplexer::register_server(ServerConfig &conf)
     {
         freeaddrinfo(res);
         close(server_fd);
-        return NULL;
+		throw strerror(errno);
     }
-	if (set_nonblocking(server.get_socket()) == -1) return (NULL);
-    if (listen(server.get_socket(), 3) < 0) return (NULL);
+	if (set_nonblocking(server.get_socket()) == -1)
+		throw strerror(errno);
+    if (listen(server.get_socket(), 3) < 0)
+		throw strerror(errno);
 	server.disown(); // So it does not close the socket at exit
 	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
 	Multiplexer::servers[server_fd].first.conf = conf;
 	event.events = EPOLLIN;
 	event.data.ptr = &Multiplexer::servers[server_fd].first;
-	int code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
+	code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
 	if (code < 0)
 	{
-		Multiplexer::servers.erase(server_fd); // TODO: closing
-		return (NULL); // TODO: raise an exception if this shit fails, do not return an error code
+		Multiplexer::servers.erase(server_fd);
+		throw strerror(errno);
 	}
 	printf("Created server with fd=%d\n", server_fd);
-	return ((Server*)event.data.ptr);
 }
 
 Client *Multiplexer::register_client(uint32_t e, Server *server)
@@ -126,7 +140,7 @@ int Multiplexer::loop(void)
 						 Multiplexer::events, EVENT_MAX, 100);
 		if (ready < 0)
 		{
-			std::cerr << "epoll_wait: " << strerror(errno) << "\n";
+			std::cerr << "[ Multiplexer::loop ] epoll_wait: " << strerror(errno) << "\n";
 			return 1;
 		}
 		for (int index = 0; index < ready; ++index)

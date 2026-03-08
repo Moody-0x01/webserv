@@ -15,7 +15,7 @@ public:
 	static EpollEvent events[EVENT_MAX];
 	static std::map<int, std::pair<Server, Clients> > servers;
 	// TODO: Implement, registration of a new server
-	static Server *register_server(ServerConfig &conf);
+	static void  register_server(ServerConfig &conf) throw(const char *);
 	// TODO: Implement, registration of a new client
 	static Client *register_client(uint32_t e, Server *server);
 	static void   unregister_client(int owner, int client);
