@@ -6,6 +6,9 @@
 # include <Parser/HTTP/Lexer.hpp>
 # include <Parser/Config/Config.hpp>
 # include <Parser/HTTP/HttpParser.hpp>
+# include <sys/types.h>
+# include <sys/socket.h>
+# include <netdb.h>
 # include <iostream>
 # include <errno.h>
 # include <cstddef>

@@ -1,8 +1,24 @@
 # include <Server.hpp>
+#include <exception>
+#include <iostream>
 
-int main() {	 
-	Multiplexer::init();
-	Multiplexer::loop();
-	Multiplexer::deinit();
-    return 0;
+# define DEFAULT_CONF "./conf/default.conf"
+
+// TODO: For ServerConfig make a suitable copy assignement that copies everything.
+int main(int ac, char **av)
+{
+	std::string config_file = DEFAULT_CONF;
+
+	if (ac > 1) config_file = av[1];
+	try {
+		Config conf = parse_config_file(config_file);
+		std::vector<ServerConfig> servers = conf.getservers();
+		Multiplexer::init(servers);
+		Multiplexer::loop();
+		Multiplexer::deinit();
+	} catch (std::exception &e) {
+		std::cerr << e.what() << "\n";
+		return (1);
+	}
+    return (0);
 }

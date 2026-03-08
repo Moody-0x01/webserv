@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 int Multiplexer::epoll_fd = 0;
 EpollEvent Multiplexer::events[EVENT_MAX];
@@ -23,19 +24,22 @@ int set_nonblocking(int sockfd)
     return 0;
 }
 
+std::string Multiplexer::resolve_host(const std::string &host)
+{
+    if (host.empty())
+        return "0.0.0.0";
+    if (host == "localhost")
+        return "127.0.0.1";
+    return host;
+}
+
 // Supposed to init all the servers + configure 
-void Multiplexer::init(void)
+void Multiplexer::init(std::vector<ServerConfig> &confs)
 {
 	Multiplexer::epoll_fd = epoll_create(1024);
 	if (Multiplexer::epoll_fd < 0)
 		throw std::runtime_error(std::strerror(errno));
-	/*
-	 * How it should be used:
-	 * 
-	 * for (conf in configs) 
-	 *		Multiplexer::register_server(conf);
-	 * */
-	Multiplexer::register_server();
+	for (size_t c = 0; c < confs.size(); c++) Multiplexer::register_server(confs[c]);
 }
 
 void Multiplexer::deinit(void)
@@ -48,33 +52,41 @@ void Multiplexer::unregister_client(int owner, int client)
 	Multiplexer::servers[owner].second.erase(client);
 }
 
-Server *Multiplexer::register_server(void)
+Server *Multiplexer::register_server(ServerConfig &conf)
 {
-	int server_fd;
-	int opt;
-	struct epoll_event event;
-    struct sockaddr_in address;
 	Server server(server_handler);
+	int server_fd, opt;
+	struct epoll_event event;
+	struct addrinfo hints, *res;
+
+
+	conf.host = Multiplexer::resolve_host(conf.host);
+	std::memset(&hints, 0, sizeof(hints));
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
 
     opt = 1;
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if (getaddrinfo(conf.host.c_str(), conf.port.c_str(), &hints, &res))
+    {
+        /*  std::cerr << gai_strerror(status) << std::endl; // gai_strerror is allowed!  */
+        return NULL;
+    }
+	server_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (server_fd < 0) return (NULL);
 	server.set_socket(server_fd);
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-    std::memset(&address, 0, sizeof(address));
     std::memset(&event, 0, sizeof(event));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(8080);
-
-    if (bind(server.get_socket(), (struct sockaddr*)&address, sizeof(address)) < 0) return (NULL);
+    if (bind(server_fd, res->ai_addr, res->ai_addrlen) < 0)
+    {
+        freeaddrinfo(res);
+        close(server_fd);
+        return NULL;
+    }
 	if (set_nonblocking(server.get_socket()) == -1) return (NULL);
     if (listen(server.get_socket(), 3) < 0) return (NULL);
 	server.disown(); // So it does not close the socket at exit
 	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
-
-    /*  std::cout <<   */
-	printf("Created server with fd=%d\n", server_fd);
+	Multiplexer::servers[server_fd].first.conf = conf;
 	event.events = EPOLLIN;
 	event.data.ptr = &Multiplexer::servers[server_fd].first;
 	int code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
@@ -83,7 +95,7 @@ Server *Multiplexer::register_server(void)
 		Multiplexer::servers.erase(server_fd); // TODO: closing
 		return (NULL); // TODO: raise an exception if this shit fails, do not return an error code
 	}
-
+	printf("Created server with fd=%d\n", server_fd);
 	return ((Server*)event.data.ptr);
 }
 

@@ -17,7 +17,7 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     return *this;
 }
 
-ServerConfig::ServerConfig() : port(std::string::npos), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
+ServerConfig::ServerConfig() : port(NO_PORT), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     if (this != &other) {
@@ -135,12 +135,12 @@ void ConfigParser::handleListen() {
     std::string host = t.value.substr(0, colInd);
     std::string port = t.value.substr(colInd + 1, t.value.size());
     _currentServer.host = host;
-    if (!isdigits(port))
-        throw std::runtime_error("Unexpected Value At host:port");
-    size_t tmp = parseNumber(port);
-    if (tmp > 65535 || tmp < 1)
-        throw std::runtime_error("Unexpected Value At host:port");
-    _currentServer.port = tmp;
+    if (!isdigits(port)) throw std::runtime_error("Unexpected Value At host:port");
+    /*  size_t tmp = parseNumber(port);  */
+    /*  if (tmp > 65535 || tmp < 1)  */
+    /*      throw std::runtime_error("Unexpected Value At host:port");  */
+    /*  _currentServer.port = tmp;  */
+	_currentServer.port = port;
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -312,7 +312,7 @@ void ConfigParser::handleCgiPass() {
 }
 
 void validateServer(const ServerConfig &server) {
-    if (server.host.empty() || server.port == std::string::npos)
+    if (server.host.empty() || server.port == NO_PORT)
         throw std::runtime_error("Error: Invalid or not existed listen rule.");
     // else if () to-do
 }

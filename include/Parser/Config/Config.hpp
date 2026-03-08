@@ -8,6 +8,7 @@
 #include <cctype>
 #include <algorithm>
 
+# define NO_PORT "XXX"
 enum ConfigTokenType {
     CONFIG_TOKEN_TYPE_WORD,
     CONFIG_TOKEN_TYPE_LBRACE,
@@ -43,7 +44,7 @@ struct LocationConfig {
 };
 
 struct ServerConfig {
-    size_t                       port;
+	std::string                  port;
     std::string                  host;
     std::string                  server_name;
     size_t                       client_max_body_size;
