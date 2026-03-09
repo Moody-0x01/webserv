@@ -1,4 +1,6 @@
 #include <Server.hpp>
+#include <cstddef>
+#include <unistd.h>
 
 void client_request(Client *client)
 {
@@ -6,54 +8,54 @@ void client_request(Client *client)
 	HttpParser &clientP = client->getParser();
 	char buff[BUFFER_SIZE];
 
-	ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
-	std::cout << "Read: " << count << "\n";
-	if (count > 0)
-	{
+	try {
+		ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
+		std::cout << "Read: " << count << "\n";
 		client->request_buffer.append(buff, count);
 		clientP.handle();
-	}
-	else
-	{
-		if (count < 0)
-			std::cerr << "read: " << strerror(errno) << "\n";
-		client->free();
-		return;
-	}
-
-	if (clientP.state() == READY)
-	{
-		//  TODO: check the request code ... 
-		struct epoll_event cev;
-		cev.events = EPOLLOUT;
-		cev.data.ptr = client;
-		if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+		if (clientP.state() == READY)
 		{
-			// NOTE: If an epoll_ctl fails it should throw. haha throw up something. whatever
-			std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-			client->free();
+			struct epoll_event cev;
+			cev.events = EPOLLOUT;
+			cev.data.ptr = client;
+			if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+			{
+				// NOTE: If an epoll_ctl fails it should throw. haha throw up something. whatever
+				std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
+				client->free();
+			}
 		}
+	} catch (const char *e) {
+		client->free();
+		throw e;
 	}
 }
 
 void client_response(Client *client)
 {
-	const char *http10_ok_header =
+	std::string http10_ok_header =
 		"HTTP/1.0 200 OK\r\n"
-		"Content-Type: text/plain\r\n\r\n";
+		"Content-Type: text/html\r\n\r\n";
 	int conn = client->get_socket();
-	char buff[BUFFER_SIZE];
-
 	// Response
 	std::cout << "Writing to conn: " << conn << "\n";
-	ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
-	if (count > 0)
-		client->request_buffer.append(buff);
-	client->response_buffer = http10_ok_header + client->request_buffer;
-	count = Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
-	if (count == -1)
-		std::cerr << "write: " << strerror(errno) << "\n";
-	client->free();
+	try {
+		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !";
+		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
+		int out = dup(1);
+		dup2(conn, 1);
+		{
+			Config c;
+			c.addServer(client->get_server()->conf);
+			c.debug();
+		}
+		dup2(out, 1);
+		Multiplexer::write(conn, "</p>", 4); // NOTE: if a write fails,
+		client->free();
+	} catch (const char *e) {
+		client->free();
+		throw e;
+	}
 }
 
 void client_handler(uint32_t e, Client *Self)

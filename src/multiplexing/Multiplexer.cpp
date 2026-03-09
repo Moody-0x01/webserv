@@ -70,7 +70,6 @@ void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
 	struct epoll_event event;
 	struct addrinfo hints, *res;
 
-
 	conf.host = Multiplexer::resolve_host(conf.host);
 	std::memset(&hints, 0, sizeof(hints));
     hints.ai_family   = AF_INET;
@@ -87,9 +86,9 @@ void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
     if (bind(server_fd, res->ai_addr, res->ai_addrlen) < 0)
     {
         freeaddrinfo(res);
-        close(server_fd);
 		throw strerror(errno);
     }
+    freeaddrinfo(res);
 	if (set_nonblocking(server.get_socket()) == -1)
 		throw strerror(errno);
     if (listen(server.get_socket(), 3) < 0)
@@ -154,13 +153,13 @@ int Multiplexer::loop(void)
 ssize_t Multiplexer::read(int fd, void *buf, size_t size) throw (const char *)
 {
 	ssize_t count = ::read(fd, buf, size);
-	if (count == -1) throw strerror(errno);
+	if (count <= 0) throw strerror(errno);
 	return (count);
 }
 
 ssize_t Multiplexer::write(int fd, const void *buf, size_t size) throw (const char *)
 {
 	ssize_t count = ::write(fd, buf, size);
-	if (count == -1) throw strerror(errno);
+	if (count <= 0) throw strerror(errno);
 	return (count);
 }

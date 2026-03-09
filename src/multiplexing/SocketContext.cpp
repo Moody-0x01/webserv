@@ -48,6 +48,7 @@ void SocketContext::set_socket(int sockfd) { _sockfd = sockfd; }
 int SocketContext::get_socket(void) const { return _sockfd; }
 void SocketContext::set_owner(int owner) { _owner = owner; }
 int SocketContext::get_owner(void) const { return _owner; }
+Server *SocketContext::get_server(void) const { return &Multiplexer::servers[_owner].first; }
 void SocketContext::disown(void) { _owns_fd = false; }
 
 void SocketContext::free()

@@ -29,6 +29,7 @@ public:
 	int get_socket(void) const;
 	void set_owner(int owner);
 	int get_owner(void) const;
+	Server *get_server(void) const;
 	void disown(void);
 
 	std::string request_buffer;

@@ -16,6 +16,7 @@ void HttpParser::handle()
         {
             endOfHeaders += 4;
             std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
+			// Why??
             parent->request_buffer.erase(0, endOfHeaders);
             this->lexerInstence.tokenize(headersOnly);
             this->currentState = HEADERS_DONE;
