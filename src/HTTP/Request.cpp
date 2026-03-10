@@ -19,7 +19,7 @@ void Request::setHttpVersion(const std::string &v)
     this->httpVersion = v;
 }
 
-voi Request::setBody(const std::string &b)
+void Request::setBody(const std::string &b)
 {
     this->body = b;
 }
