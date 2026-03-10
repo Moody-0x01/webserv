@@ -17,7 +17,7 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     return *this;
 }
 
-ServerConfig::ServerConfig() : port(std::string::npos), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
+ServerConfig::ServerConfig() : port(""), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     if (this != &other) {
@@ -33,7 +33,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     return *this;
 }
 
-ConfigParser::ConfigParser(std::vector<ConfigToken> tokens) : _tokens(tokens), _pos(0), _state(CONFIG_STATE_GLOBAL) {}
+ConfigParser::ConfigParser(std::vector<ConfigToken> tokens, std::string &fn) : _tokens(tokens), _pos(0), _state(CONFIG_STATE_GLOBAL), _fn(fn) {}
 
 void Config::addServer(const ServerConfig& server) {
     _servers.push_back(server);
@@ -102,7 +102,7 @@ size_t parseNumber(const std::string &value) {
     iss >> parsedNumber;
 
     if (iss.fail() || !iss.eof())
-        throw std::runtime_error("client_max_body_size: numeric conversion failed");
+        return std::string::npos;
     return parsedNumber;
 }
 
@@ -116,13 +116,13 @@ bool isdigits(const std::string &str) {
 }
 
 ConfigToken ConfigParser::consume(ConfigTokenType expected) {
-    if (_pos >= _tokens.size()) throw std::runtime_error("Unexpected End of Stream");
-    if (_tokens[_pos].type != expected) throw std::runtime_error("Syntax Error: Unexpected token " + _tokens[_pos].value);
+    if (_pos >= _tokens.size()) errorLogger("Unexpected End of Stream", _tokens[_tokens.size() - 1].line);
+    if (_tokens[_pos].type != expected) errorLogger("Unexpected token \"" + _tokens[_pos].value + "\"", _tokens[_pos].line);
     return _tokens[_pos++];
 }
 
 ConfigToken ConfigParser::peek() {
-     if (_pos >= _tokens.size()) throw std::runtime_error("Unexpected End of Stream");
+     if (_pos >= _tokens.size()) errorLogger("Unexpected End of Stream", _tokens[_tokens.size() - 1].line);
      return _tokens[_pos];
 }
 
@@ -131,16 +131,13 @@ void ConfigParser::handleListen() {
     ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     size_t colInd = t.value.find(':');
     if (colInd == std::string::npos)
-        throw std::runtime_error("Unexpected Value At host:port");
+        errorLogger("Unexpected Parameter in listen \"" + t.value + "\"", t.line);
     std::string host = t.value.substr(0, colInd);
     std::string port = t.value.substr(colInd + 1, t.value.size());
-    _currentServer.host = host;
     if (!isdigits(port))
-        throw std::runtime_error("Unexpected Value At host:port");
-    size_t tmp = parseNumber(port);
-    if (tmp > 65535 || tmp < 1)
-        throw std::runtime_error("Unexpected Value At host:port");
-    _currentServer.port = tmp;
+        errorLogger("Unexpected Parameter in listen \"" + t.value + "\"", t.line);
+    _currentServer.host = host;
+    _currentServer.port = port;
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -159,14 +156,14 @@ void ConfigParser::handleErrorPage() {
             consume(CONFIG_TOKEN_TYPE_WORD);
             size_t tmp = parseNumber(t.value);
             if (tmp < 400 || tmp > 599)
-                throw std::runtime_error("Error: invalid html error code.");
+                errorLogger("Invalid HTML Error Code.", t.line);
             codes.push_back(tmp);
         }
         else
             break;
     }
     if (codes.empty())
-        throw std::runtime_error("Error: error_page missing codes.");
+        errorLogger("error_page Missing Codes.", _tokens[_pos].line);
     ConfigToken pathToken = consume(CONFIG_TOKEN_TYPE_WORD);
     for (size_t i = 0; i < codes.size(); ++i) {
         _currentServer.error_pages[codes[i]] = pathToken.value;
@@ -174,9 +171,9 @@ void ConfigParser::handleErrorPage() {
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-size_t parseMaxBodySize(const std::string &value) {
+size_t ConfigParser::parseMaxBodySize(const std::string &value, size_t line) {
     if (value.empty())
-        throw std::runtime_error("client_max_body_size: empty value provided");
+        errorLogger("Invalid Token in \"client_max_body_size\"", line);
     std::string numberPart = value;
     size_t multiplier = 1;
     char lastChar = value[value.size() - 1];
@@ -193,25 +190,26 @@ size_t parseMaxBodySize(const std::string &value) {
                 multiplier = 1024UL * 1024UL * 1024UL;
                 break;
             default:
-                throw std::runtime_error(std::string("client_max_body_size: invalid suffix '") + lastChar + "'");
+                errorLogger(std::string("client_max_body_size: Invalid Suffix '") + lastChar + "'", line);
         }
         numberPart = value.substr(0, value.size() - 1);
     }
     if (numberPart.empty())
-        throw std::runtime_error("client_max_body_size: missing numeric value before suffix");
+        errorLogger("Invalid Token in \"client_max_body_size\"", line);
     if (!isdigits(numberPart))
-        throw std::runtime_error("client_max_body_size: invalid characters in numeric portion");
+        errorLogger("Invalid Token in \"client_max_body_size\"", line);
 
     size_t number = parseNumber(numberPart);
     size_t max_size = -1;
     if (number > max_size / multiplier)
-        throw std::runtime_error("client_max_body_size: value is too large and exceeds system limits");
+        errorLogger("Invalid Token in \"client_max_body_size\"", line);
     return number * multiplier;
 }
 
 void ConfigParser::handleClientMaxBodySize() {
     consume(CONFIG_TOKEN_TYPE_WORD);
-    _currentServer.client_max_body_size = parseMaxBodySize(consume(CONFIG_TOKEN_TYPE_WORD).value);
+    ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
+    _currentServer.client_max_body_size = parseMaxBodySize(t.value, t.line);
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -239,7 +237,7 @@ void ConfigParser::handleAutoIndex() {
     else if (t.value == "off")
         _currentLocation.autoindex = false;
     else
-        throw std::runtime_error("Invalid Auto Index value: " + t.value);
+        errorLogger("Invalid Auto Index value \"" + t.value + "\"", t.line);
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -251,7 +249,7 @@ void ConfigParser::handleUploadEnabled() {
     else if (t.value == "off")
         _currentLocation.upload_enabled = false;
     else
-        throw std::runtime_error("Invalid Upload_Enabled value: " + t.value);
+        errorLogger("Invalid Upload_Enabled value \"" + t.value + "\"", t.line);
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -263,15 +261,16 @@ void ConfigParser::handleUploadPath() {
 
 void ConfigParser::handleAllowMethods() {
     consume(CONFIG_TOKEN_TYPE_WORD);
+    ConfigToken t = peek();
     while (_pos < _tokens.size() && _tokens[_pos].type == CONFIG_TOKEN_TYPE_WORD) {
-        ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
+        t = consume(CONFIG_TOKEN_TYPE_WORD);
         if (t.value != "GET" && t.value != "POST" && t.value != "DELETE")
-            throw std::runtime_error("Invalid method: " + t.value);
+            errorLogger("Invalid method \"" + t.value + "\"", t.line);
         if (std::find(_currentLocation.methods.begin(), _currentLocation.methods.end(), t.value) == _currentLocation.methods.end())
             _currentLocation.methods.push_back(t.value);
     }
     if (_currentLocation.methods.empty())
-        throw std::runtime_error("Error: allow_methods empty.");
+        errorLogger("allow_methods can't be empty.", t.line);
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
@@ -284,7 +283,7 @@ void ConfigParser::handleReturn() {
     if (isdigits(t.value)) {
         code = parseNumber(t.value);
         if (code > 399 || code < 300)
-            throw std::runtime_error("Error: invalid redirect codes at return.");
+            errorLogger("Invalid Redirect Codes \"" + t.value + "\"", t.line);
         url = consume(CONFIG_TOKEN_TYPE_WORD).value;
     }
     else
@@ -293,27 +292,35 @@ void ConfigParser::handleReturn() {
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void verifyExt(const std::string &path) {
+void ConfigParser::verifyExt(ConfigToken &t) {
+    std::string path = t.value;
     size_t i = path.find_last_of('.');
     if (i == std::string::npos)
-        throw std::runtime_error("Error: Invalid CGI file.");
+        errorLogger("Invalid CGI file \"" + t.value + "\"", t.line);
     std::string ext = path.substr(i, path.size() - i);
     if (ext != ".php" && ext != ".py")
-        throw std::runtime_error("Error: Unsupported CGI extension.");
+        errorLogger("Unsupported CGI extension \"" + ext + "\"", t.line);
 }
 
 void ConfigParser::handleCgiPass() {
     consume(CONFIG_TOKEN_TYPE_WORD);
     ConfigToken ext = consume(CONFIG_TOKEN_TYPE_WORD);
     ConfigToken bin = consume(CONFIG_TOKEN_TYPE_WORD);
-    verifyExt(ext.value);
+    verifyExt(ext);
     _currentLocation.cgi_path[ext.value] = bin.value;
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void validateServer(const ServerConfig &server) {
-    if (server.host.empty() || server.port == std::string::npos)
-        throw std::runtime_error("Error: Invalid or not existed listen rule.");
+void ConfigParser::errorLogger(std::string specs, size_t line) {
+    std::stringstream ss;
+    ss << line;
+
+    throw std::runtime_error("[Config-Error] " + specs + " in " + _fn + ":" + ss.str());
+}
+
+void ConfigParser::validateServer(const ServerConfig &server) {
+    if (server.host.empty() || server.port.empty())
+        errorLogger("Invalid or not existed listen rule.", 0);
     // else if () to-do
 }
 
@@ -330,7 +337,7 @@ Config ConfigParser::parse() {
                     _currentServer = ServerConfig();
                 }
                 else
-                    throw std::runtime_error("Configuration Error:Unexpected token in Global: " + t.value);
+                    errorLogger("Unexpected token in Global \"" + t.value + "\"", t.line);
                 break;
 
             case CONFIG_STATE_IN_SERVER:
@@ -353,7 +360,7 @@ Config ConfigParser::parse() {
                     consume(CONFIG_TOKEN_TYPE_LBRACE);
                     _state = CONFIG_STATE_IN_LOCATION;
                 }
-                else throw std::runtime_error("Unknown directive in Server: " + t.value);
+                else errorLogger("Unexpected token in Server \"" + t.value + "\"", t.line);
                 break;
 
             case CONFIG_STATE_IN_LOCATION:
@@ -370,17 +377,17 @@ Config ConfigParser::parse() {
                 else if (t.value == "allow_methods")   handleAllowMethods();
                 else if (t.value == "return")          handleReturn();
                 else if (t.value == "cgi_pass")        handleCgiPass();
-                else throw std::runtime_error("Unknown directive in Location: " + t.value);
+                else errorLogger("Unexpected token in Location \"" + t.value + "\"", t.line);
                 break;
         }
     }
     if (_state != CONFIG_STATE_GLOBAL)
-        throw std::runtime_error("Error: Unexpected end of stream.");
+        errorLogger("Unexpected end of stream", _tokens[_tokens.size() - 1].line);
     return _mainConfig;
 }
 
-Config parse_config_file(const std::string& fileName) {
+Config parse_config_file(std::string fileName) {
     std::vector<ConfigToken> tokens = configLexer(fileName);
-    ConfigParser parser(tokens);
+    ConfigParser parser(tokens, fileName);
     return parser.parse();
 }
