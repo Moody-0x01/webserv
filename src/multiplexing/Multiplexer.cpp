@@ -32,9 +32,9 @@ std::string Multiplexer::resolve_host(const std::string &host)
     return host;
 }
 
-void Multiplexer::init(std::vector<ServerConfig> &confs)
+void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error)
 {
-	Multiplexer::epoll_fd = epoll_create(1024);
+	Multiplexer::epoll_fd = epoll_create(IGNORED);
 	size_t alive;
 
 	alive = 0;
@@ -63,7 +63,7 @@ void Multiplexer::unregister_client(int owner, int client)
 	Multiplexer::servers[owner].second.erase(client);
 }
 
-void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
+void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 {
 	Server server(server_handler);
 	int server_fd, opt, code;
@@ -91,7 +91,7 @@ void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
     freeaddrinfo(res);
 	if (set_nonblocking(server.get_socket()) == -1)
 		throw strerror(errno);
-    if (listen(server.get_socket(), 3) < 0)
+    if (listen(server.get_socket(), SOMAXCONN) < 0)
 		throw strerror(errno);
 	server.disown(); // So it does not close the socket at exit
 	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
@@ -104,10 +104,10 @@ void Multiplexer::register_server(ServerConfig &conf) throw(const char *)
 		Multiplexer::servers.erase(server_fd);
 		throw strerror(errno);
 	}
-	printf("Created server with fd=%d\n", server_fd);
+	/*  Multiplexer::servers[server_fd].first  */
 }
 
-Client *Multiplexer::register_client(uint32_t e, Server *server) throw(const char *)
+Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
 {
 	struct sockaddr_in addr;
 	int conn;
@@ -150,14 +150,14 @@ int Multiplexer::loop(void)
 	return (0);
 }
 
-ssize_t Multiplexer::read(int fd, void *buf, size_t size) throw (const char *)
+ssize_t Multiplexer::read(int fd, void *buf, size_t size) __THROWS_STRERROR
 {
 	ssize_t count = ::read(fd, buf, size);
 	if (count <= 0) throw strerror(errno);
 	return (count);
 }
 
-ssize_t Multiplexer::write(int fd, const void *buf, size_t size) throw (const char *)
+ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERROR
 {
 	ssize_t count = ::write(fd, buf, size);
 	if (count <= 0) throw strerror(errno);
