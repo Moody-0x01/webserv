@@ -16,9 +16,10 @@ enum ConfigTokenType {
 };
 
 struct ConfigToken {
-    std::string value;
-    ConfigTokenType type;
-    ConfigToken(std::string v, ConfigTokenType t);
+    std::string         value;
+    ConfigTokenType     type;
+    size_t              line;
+    ConfigToken(std::string v, ConfigTokenType t, size_t l);
 };
 
 enum ConfigParserState {
@@ -43,7 +44,7 @@ struct LocationConfig {
 };
 
 struct ServerConfig {
-    size_t                       port;
+    std::string                  port;
     std::string                  host;
     std::string                  server_name;
     size_t                       client_max_body_size;
@@ -78,26 +79,32 @@ class ConfigParser {
         ServerConfig        _currentServer;
         LocationConfig      _currentLocation;
 
+        std::string& _fn;
+
         ConfigToken consume(ConfigTokenType expected);
         ConfigToken peek();
-        void handleListen();
-        void handleServerName();
-        void handleErrorPage();
-        void handleClientMaxBodySize();
-        void handleRoot(bool inLocation);
-        void handleIndex(bool inLocation);
-        void handleAutoIndex();
-        void handleUploadEnabled();
-        void handleUploadPath();
-        void handleAllowMethods();
-        void handleReturn();
-        void handleCgiPass();
+        void        handleListen();
+        void        handleServerName();
+        void        handleErrorPage();
+        size_t      parseMaxBodySize(const std::string &value, size_t line);
+        void        handleClientMaxBodySize();
+        void        handleRoot(bool inLocation);
+        void        handleIndex(bool inLocation);
+        void        handleAutoIndex();
+        void        handleUploadEnabled();
+        void        handleUploadPath();
+        void        handleAllowMethods();
+        void        handleReturn();
+        void        verifyExt(ConfigToken &t);
+        void        handleCgiPass();
+        void        errorLogger(std::string specs, size_t line);
+        void        validateServer(const ServerConfig &server);
 
     public:
-        ConfigParser(std::vector<ConfigToken> tokens);
+        ConfigParser(std::vector<ConfigToken> tokens, std::string &fn);
         Config parse();
 };
 
-std::string configReadFile(std::string fileName);
-std::vector<ConfigToken> configLexer(std::string fileName);
-Config parse_config_file(const std::string& fileName);
+std::string configReadFile(const std::string& fileName);
+std::vector<ConfigToken> configLexer(const std::string& fileName);
+Config parse_config_file(std::string fileName);
