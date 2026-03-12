@@ -17,9 +17,10 @@ std::map<int, std::pair<Server, Clients> > Multiplexer::servers;
 int set_nonblocking(int sockfd)
 {
 	errno = 0;
-    int flags = fcntl(sockfd, F_GETFL, 0);
+    int flags = fcntl(sockfd, F_GETFL);
     if (flags == -1) return -1;
-    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1) return -1;
+	flags |= O_NONBLOCK;
+    if (fcntl(sockfd, F_SETFL, flags) == -1) return -1;
     return 0;
 }
 
@@ -48,8 +49,7 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 			std::cerr << "[ Multiplexer::register_server ] " << error << "\n";
 		}
 	}
-	if (alive > 0)
-		return ;
+	if (alive > 0) return ;
 	throw std::runtime_error("There are no hosts to continue further.");
 }
 
@@ -104,7 +104,6 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 		Multiplexer::servers.erase(server_fd);
 		throw strerror(errno);
 	}
-	/*  Multiplexer::servers[server_fd].first  */
 }
 
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR

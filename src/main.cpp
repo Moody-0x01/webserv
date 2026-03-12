@@ -2,7 +2,6 @@
 #include <exception>
 #include <iostream>
 #include <stdexcept>
-# define DEFAULT_CONF "./conf/default.conf"
 
 int main(int ac, char **av)
 {
@@ -13,6 +12,7 @@ int main(int ac, char **av)
 		Config conf = parse_config_file(config_file);
 		std::vector<ServerConfig> servers = conf.getservers();
 		Multiplexer::init(servers);
+		conf.debug();
 		Multiplexer::loop();
 		Multiplexer::deinit();
 	} catch (std::runtime_error &e) {

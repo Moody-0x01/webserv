@@ -8,7 +8,7 @@
 #include <cctype>
 #include <algorithm>
 
-# define NO_PORT "XXX"
+# define DEFAULT_CONF "./conf/default.conf"
 enum ConfigTokenType {
     CONFIG_TOKEN_TYPE_WORD,
     CONFIG_TOKEN_TYPE_LBRACE,

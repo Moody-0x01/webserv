@@ -1,5 +1,4 @@
 #include <Server.hpp>
-#include <sys/epoll.h>
 #include <unistd.h>
 
 void client_request(Client *client)
@@ -16,7 +15,7 @@ void client_request(Client *client)
 		if (clientP.state() == READY)
 		{
 			struct epoll_event cev;
-			cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
+			cev.events = EPOLLOUT;
 			cev.data.ptr = client;
 			if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
 			{
@@ -66,17 +65,8 @@ void client_handler(uint32_t e, Client *Self)
 	/*  EPOLLERR    */
 	/*  EPOLLHUP  : Client complete closed the connexion. */
 	/*  EPOLLRDHUP: Client finished sending data. */
-	if (e & (EPOLLERR | EPOLLHUP))
-    {
-        Self->free(); return ;
-    }
-
-    if (e & EPOLLIN)
-        client_request(Self);
-    if (e & EPOLLOUT)
-        client_response(Self);
-    if (e & EPOLLRDHUP)
-        client_response(Self);
+	if (e & EPOLLIN)  client_request(Self);
+	if (e & EPOLLOUT) client_response(Self);
 }
 
 void server_handler(uint32_t e, Server *Self)
@@ -85,7 +75,7 @@ void server_handler(uint32_t e, Server *Self)
 
 	conn = Multiplexer::register_client(e, Self);
 	struct epoll_event cev;
-	cev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+	cev.events = EPOLLIN;
 	cev.data.ptr = conn;
 	std::cout << "Accepted a conn: " << conn << "\n";
 	if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, conn->get_socket(), &cev) == -1)
