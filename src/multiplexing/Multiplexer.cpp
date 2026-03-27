@@ -13,6 +13,7 @@
 int Multiplexer::epoll_fd = 0;
 EpollEvent Multiplexer::events[EVENT_MAX];
 std::map<int, std::pair<Server, Clients> > Multiplexer::servers;
+std::map<int, std::string> Multiplexer::status_lines;
 
 int set_nonblocking(int sockfd)
 {
@@ -33,11 +34,32 @@ std::string Multiplexer::resolve_host(const std::string &host)
     return host;
 }
 
+void init_status_lines()
+{
+    Multiplexer::status_lines[OK                 ] = "HTTP/1.0 200 OK\r\n";
+    Multiplexer::status_lines[Created            ] = "HTTP/1.0 201 Created\r\n";
+    Multiplexer::status_lines[NoContent          ] = "HTTP/1.0 204 No Content\r\n";
+    Multiplexer::status_lines[MovedPermanently   ] = "HTTP/1.0 301 Moved Permanently\r\n";
+    Multiplexer::status_lines[Found              ] = "HTTP/1.0 302 Found\r\n";
+    Multiplexer::status_lines[NotModified        ] = "HTTP/1.0 304 Not Modified\r\n";
+    Multiplexer::status_lines[BadRequest         ] = "HTTP/1.0 400 Bad Request\r\n";
+    Multiplexer::status_lines[Unauthorized       ] = "HTTP/1.0 401 Unauthorized\r\n";
+    Multiplexer::status_lines[Forbidden          ] = "HTTP/1.0 403 Forbidden\r\n";
+    Multiplexer::status_lines[NotFound           ] = "HTTP/1.0 404 Not Found\r\n";
+    Multiplexer::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed\r\n";
+    Multiplexer::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout\r\n";
+    Multiplexer::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error\r\n";
+    Multiplexer::status_lines[NotImplemented     ] = "HTTP/1.0 501 Not Implemented\r\n";
+    Multiplexer::status_lines[BadGateway         ] = "HTTP/1.0 502 Bad Gateway\r\n";
+    Multiplexer::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable\r\n";
+}
+
 void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error)
 {
 	Multiplexer::epoll_fd = epoll_create(IGNORED);
 	size_t alive;
 
+	init_status_lines();
 	alive = 0;
 	if (Multiplexer::epoll_fd < 0) throw std::runtime_error(std::strerror(errno));
 	for (size_t c = 0; c < confs.size(); c++)

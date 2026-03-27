@@ -8,6 +8,7 @@
 # include <Parser/HTTP/HttpParser.hpp>
 # include <Parser/Config/Config.hpp>
 
+# define __THROWS_STRERROR throw(const char *)
 typedef struct SocketContext SocketContext;
 typedef SocketContext Client;
 typedef SocketContext Server;
