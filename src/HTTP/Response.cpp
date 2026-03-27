@@ -13,11 +13,13 @@ Response::~Response()
 
 void Response::serialize()
 {
-	// TODO: Doing this later
+	// TODO: Doing this later.
 }
 
 bool Response::isdone(void)
 {
+	// TODO: What if the body was not sent yet??
+	// what if it is a file? cgi?..
 	return (this->__is_serialized && this->sent == this->__serialized_response.size());
 }
 
@@ -44,20 +46,30 @@ void Response::write(int conn) __THROWS_STRERROR
 
 void Response::init_status_lines()
 {
-    Response::status_lines[OK                 ] = "HTTP/1.0 200 OK\r\n";
-    Response::status_lines[Created            ] = "HTTP/1.0 201 Created\r\n";
-    Response::status_lines[NoContent          ] = "HTTP/1.0 204 No Content\r\n";
-    Response::status_lines[MovedPermanently   ] = "HTTP/1.0 301 Moved Permanently\r\n";
-    Response::status_lines[Found              ] = "HTTP/1.0 302 Found\r\n";
-    Response::status_lines[NotModified        ] = "HTTP/1.0 304 Not Modified\r\n";
-    Response::status_lines[BadRequest         ] = "HTTP/1.0 400 Bad Request\r\n";
-    Response::status_lines[Unauthorized       ] = "HTTP/1.0 401 Unauthorized\r\n";
-    Response::status_lines[Forbidden          ] = "HTTP/1.0 403 Forbidden\r\n";
-    Response::status_lines[NotFound           ] = "HTTP/1.0 404 Not Found\r\n";
-    Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed\r\n";
-    Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout\r\n";
-    Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error\r\n";
-    Response::status_lines[NotImplemented     ] = "HTTP/1.0 501 Not Implemented\r\n";
-    Response::status_lines[BadGateway         ] = "HTTP/1.0 502 Bad Gateway\r\n";
-    Response::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable\r\n";
+    Response::status_lines[OK                 ] = "HTTP/1.0 200 OK";
+    Response::status_lines[Created            ] = "HTTP/1.0 201 Created";
+    Response::status_lines[NoContent          ] = "HTTP/1.0 204 No Content";
+    Response::status_lines[MovedPermanently   ] = "HTTP/1.0 301 Moved Permanently";
+    Response::status_lines[Found              ] = "HTTP/1.0 302 Found";
+    Response::status_lines[NotModified        ] = "HTTP/1.0 304 Not Modified";
+    Response::status_lines[BadRequest         ] = "HTTP/1.0 400 Bad Request";
+    Response::status_lines[Unauthorized       ] = "HTTP/1.0 401 Unauthorized";
+    Response::status_lines[Forbidden          ] = "HTTP/1.0 403 Forbidden";
+    Response::status_lines[NotFound           ] = "HTTP/1.0 404 Not Found";
+    Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
+    Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
+    Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
+    Response::status_lines[NotImplemented     ] = "HTTP/1.0 501 Not Implemented";
+    Response::status_lines[BadGateway         ] = "HTTP/1.0 502 Bad Gateway";
+    Response::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable";
+}
+
+void Response::appendheader(const std::string key, const std::string value)
+{
+	this->headers[key] = value + "\r\n";
+}
+
+void Response::appendbody(const std::string _body)
+{
+	this->body += _body;
 }

@@ -96,4 +96,6 @@ public:
 	void write(int conn) __THROWS_STRERROR; // NOTE: writes the wrapped response into the the client connexion
 	bool isdone();
 	void serialize(void);
+	void appendheader(const std::string key, const std::string value);
+	void appendbody(const std::string _body);
 };
