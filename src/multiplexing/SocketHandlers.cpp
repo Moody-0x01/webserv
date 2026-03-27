@@ -6,10 +6,10 @@ void client_request(Client *client) __THROWS_STRERROR
 {
 	int conn = client->get_socket();
 	HttpParser &clientP = client->getParser();
-	char buff[BUFFER_SIZE];
+	char buff[READ_CHUNK_SIZE];
 
 	try {
-		ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
+		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 		std::cout << "Read: " << count << "\n";
 		client->request_buffer.append(buff, count);
 		clientP.handle();
@@ -41,6 +41,7 @@ void client_response(Client *client) __THROWS_STRERROR
 	//     2.2 - if it is a file, then serve the file. generate a mime type then hande it over.
 	//     2.3 - if it is not found, then return 404.html as a backup, and if any syscall fails then then return 5xx.html
 	// 3 - if the request is trying to post something, then get the mime type.
+	Response generated;
 	
 	std::string http10_ok_header =
 		"HTTP/1.0 200 OK\r\n"

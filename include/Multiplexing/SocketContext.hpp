@@ -7,8 +7,9 @@
 # include <netinet/in.h>
 # include <Parser/HTTP/HttpParser.hpp>
 # include <Parser/Config/Config.hpp>
+# include <HTTP/Response.hpp>
+# include <HTTP/Request.hpp>
 
-# define __THROWS_STRERROR throw(const char *)
 typedef struct SocketContext SocketContext;
 typedef SocketContext Client;
 typedef SocketContext Server;

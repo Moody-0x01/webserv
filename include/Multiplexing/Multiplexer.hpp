@@ -18,7 +18,6 @@ public:
 	static int epoll_fd;
 	static EpollEvent events[EVENT_MAX];
 	static std::map<int, std::pair<Server, Clients> > servers;
-	static std::map<int, std::string> status_lines;
 	// TODO: Implement, registration of a new server
 	static void  register_server(ServerConfig &conf) __THROWS_STRERROR;
 	static Client   *register_client(uint32_t e, Server *server) __THROWS_STRERROR;

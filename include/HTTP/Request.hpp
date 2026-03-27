@@ -3,6 +3,9 @@
 #include <string>
 #include <map>
 
+#define READ_CHUNK_SIZE 4096
+
+# define __THROWS_STRERROR throw(const char *)
 class Request
 {
 private:
