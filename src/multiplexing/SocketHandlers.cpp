@@ -5,6 +5,7 @@
 void client_request(Client *client) __THROWS_STRERROR
 {
 	int conn = client->get_socket();
+	// ServerConfig &config;
 	HttpParser &clientP = client->getParser();
 	char buff[READ_CHUNK_SIZE];
 
@@ -33,31 +34,28 @@ void client_request(Client *client) __THROWS_STRERROR
 
 void client_response(Client *client) __THROWS_STRERROR
 {
-	// NOTE: The work is here, I need to create a meaningful and straigh forward way to handle http methods.
-	// but the order of this is as follows.
-	// 1 - check the validity of the request. if it is not valid then throw something meaningful to the client instead of going forward.
-	// 2 - if the request is trying to get something. then go to the root of the server and look for it.
-	//     2.1 - if it is a dir, then list it and forward the listing to the client.
-	//     2.2 - if it is a file, then serve the file. generate a mime type then hande it over.
-	//     2.3 - if it is not found, then return 404.html as a backup, and if any syscall fails then then return 5xx.html
-	// 3 - if the request is trying to post something, then get the mime type.
-	Response generated;
+	// TODO: ok! Now i have got a request. it needs to be processed that way.
+	// An example of the request:
+	// <Method> <URI> <HTTP-Version>\r\n
+	// <Header-Name>: <Header-Value>\r\n
+	// ...
+	// \r\n
+	// <optional body>
+	// Response
+	// Response R(client->request);
+	// Now: handling the response and saving its state will be done by using this field. client->response
 	
 	std::string http10_ok_header =
 		"HTTP/1.0 200 OK\r\n"
 		"Content-Type: text/html\r\n\r\n";
 	int conn = client->get_socket();
-	// Response
-	std::cout << "Writing to conn: " << conn << "\n";
 	try {
 		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !";
 		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
 		int out = dup(STDOUT_FILENO);
 		dup2(conn, STDOUT_FILENO);
 		{
-			Config c;
-			c.addServer(client->get_server()->conf);
-			c.debug();
+			printf("%s:%s\n", Multiplexer::confs[client->get_owner()].host.c_str(), Multiplexer::confs[client->get_owner()].port.c_str());
 		}
 		dup2(out, STDOUT_FILENO);
 		Multiplexer::write(conn, "</p>", 4); // NOTE: if a write fails,

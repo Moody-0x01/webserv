@@ -42,9 +42,8 @@ public:
 	// Request request;
     // Response response;
 	// For the client instances:
-		HttpParser parserInstance;
-	// For the server instances:
-		ServerConfig conf;
+	HttpParser parserInstance;
+	Response   response;
 	void free();
 	HttpParser &getParser();
 private:

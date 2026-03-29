@@ -80,7 +80,8 @@ void Lexer::handleRequstline(std::string &buff)
         {
             dd("missing HTTP version");
             // throw BadRequestException();
-        }
+		}
+		// method uri version
         else
         {
             std::string uri = buff.substr(fspace + 1, sspace - (fspace + 1));

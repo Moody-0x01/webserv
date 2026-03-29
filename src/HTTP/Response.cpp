@@ -1,49 +1,136 @@
 #include <Server.hpp>
-#include <algorithm>
+#include <cstdlib>
 
 std::map<int, std::string> Response::status_lines;
+std::map<std::string, std::string> Response::mimes;
+
+static bool is_methodvalid(const std::string &method)
+{
+	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
+}
+
+
+void Response::init_mimes()
+{
+	if (!mimes.empty()) return ;
+	Response::mimes["html"]  =  TextHtml          ;
+	Response::mimes["txt"]   =  TextPlain         ;
+	Response::mimes["css"]   =  TextCss           ;
+	Response::mimes["js"]    =  TextJavascript    ;
+	Response::mimes["xml"]   =  TextXml           ;
+	Response::mimes["csv"]   =  TextCsv           ;
+	Response::mimes["jpg"]   =  ImageJpeg         ;
+	Response::mimes["png"]   =  ImagePng          ;
+	Response::mimes["gif"]   =  ImageGif          ;
+	Response::mimes["webp"]  =  ImageWebp         ;
+	Response::mimes["svg"]   =  ImageSvg          ;
+	Response::mimes["ico"]   =  ImageIco          ;
+	Response::mimes["json"]  =  ApplicationJson   ;
+	Response::mimes["xml"]   =  ApplicationXml    ;
+	Response::mimes["pdf"]   =  ApplicationPdf    ;
+	Response::mimes["zip"]   =  ApplicationZip    ;
+	Response::mimes["bin"]   =  ApplicationOctet  ;
+	Response::mimes["form"]  =  ApplicationForm   ;
+	Response::mimes["js"]    =  ApplicationJs     ;
+	Response::mimes["mp3"]   =  AudioMpeg         ;
+	Response::mimes["ogg"]   =  AudioOgg          ;
+	Response::mimes["mp3"]   =  AudioMp3          ;
+	Response::mimes["mp4"]   =  VideoMp4          ;
+	Response::mimes["webm"]  =  VideoWebm         ;
+}
 
 Response::Response()
 {
+	this->stage = Setup;
+}
+
+void Response::continue_processing(const HttpRequest &request)
+{
+	// ServerConfig c = Multiplexer::confs[request.owner];
+
+	if (this->stage == Setup) this->setup_response(request);
+	this->stage = SendingHeaders;
+	switch (this->stage)
+	{
+		case Setup: 
+		case SendingHeaders: {
+			// setup_response: setup these
+			// 1) Resources that will be sent.
+			// 2) Headers that will be send
+			// 3) Status lines that will be send based off the availability if the requested stuff.
+			if (!this->headers_as_str.size()) // Not serialized yet it should be serialized first 
+				this->serialize_headers();
+			this->send_headers();
+		} break;
+		case SendingFile: {
+		} break;
+		// case SendingCgi: {} break;
+		default:
+			abort();
+	}
+}
+
+void Response::setup_response(const HttpRequest &request)
+{
+	// TODO: Validate everything here.
+	if (request.httpVersion != "HTTP/1.0" || !::is_methodvalid(request.method))
+	{
+		this->set_status(BadRequest);
+		return ;
+	}
+	// TODO: check if it is cgi.
 }
 
 Response::~Response()
 {
 }
 
-void Response::serialize()
+void Response::serialize_headers(void)
 {
-	// TODO: Doing this later.
+	this->headers_as_str += this->status_line;
+	for (std::map<std::string, std::string>::iterator it = this->headers.begin(); it != this->headers.end(); ++it)
+		this->headers_as_str += it->first + ": " + it->second;
+	this->headers_as_str += "\r\n";
+	this->bytes_sent = 0;
 }
 
-bool Response::isdone(void)
+
+void Response::send_headers(void) __THROWS_STRERROR
 {
-	// TODO: What if the body was not sent yet??
-	// what if it is a file? cgi?..
-	return (this->__is_serialized && this->sent == this->__serialized_response.size());
 }
 
-void Response::write(int conn) __THROWS_STRERROR
-{
-	ssize_t count;
-	size_t  write_size;
 
-	if (!this->__is_serialized)
-		this->serialize(); // NOTE: converts headers and body into client writable form in __serialized_response
-
-	write_size = WRITE_CHUNK_SIZE;
-	if (write_size > this->__serialized_response.size() - this->sent)
-		write_size = this->__serialized_response.size() - this->sent;
-
-	count = ::write(conn,
-		this->__serialized_response.c_str() + this->sent,
-		write_size);
-	if (count <= 0) throw strerror(errno);
-	this->sent += count;
-	// TODO: Well, lazy loading files is probably better.
-	// html files, audio, video files. should be loaded.
-}
-
+//
+// // status line // HTTP/1.0 200 OK
+//
+// bool Response::isdone(void)
+// {
+// 	// TODO: What if the body was not sent yet??
+// 	// what if it is a file? cgi?..
+// 	return (this->__is_serialized && this->sent == this->__serialized_response.size());
+// }
+//
+// void Response::write(int conn) __THROWS_STRERROR
+// {
+// 	ssize_t count;
+// 	size_t  write_size;
+//
+// 	if (!this->__is_serialized)
+// 		this->serialize(); // NOTE: converts headers and body into client writable form in __serialized_response
+//
+// 	write_size = WRITE_CHUNK_SIZE;
+// 	if (write_size > this->__serialized_response.size() - this->sent)
+// 		write_size = this->__serialized_response.size() - this->sent;
+//
+// 	count = ::write(conn,
+// 		this->__serialized_response.c_str() + this->sent,
+// 		write_size);
+// 	if (count <= 0) throw strerror(errno);
+// 	this->sent += count;
+// 	// TODO: Well, lazy loading files is probably better.
+// 	// html files, audio, video files. should be loaded.
+// }
+//
 void Response::init_status_lines()
 {
     Response::status_lines[OK                 ] = "HTTP/1.0 200 OK";
@@ -69,7 +156,20 @@ void Response::appendheader(const std::string key, const std::string value)
 	this->headers[key] = value + "\r\n";
 }
 
-void Response::appendbody(const std::string _body)
+void Response::set_status(int s)
 {
-	this->body += _body;
+	this->status = s;
+	this->status_line =
+		Response::status_lines[this->status] + "\r\n";
+	// TODO: fetch error page?
+}
+
+int Response::get_status(void) const
+{
+	return (this->status);
+}
+
+response_stage_t Response::getstage(void) const
+{
+	return (this->stage);
 }

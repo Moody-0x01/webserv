@@ -2,10 +2,12 @@
 #include <string>
 #include <map>
 #include <sys/types.h>
+#include <HTTP/Request.hpp>
 
 # define __THROWS_STRERROR throw(const char *)
 
 #define  WRITE_CHUNK_SIZE     4096 // 4kb each time.
+
 #define  OK                   200
 #define  Created              201
 #define  NoContent            204
@@ -60,42 +62,71 @@
 
 class Resource
 {
-	// int    __resource_fd;
-	// bool   __done;
-	// size_t sent;
-	// char   buffer[WRITE_CHUNK_SIZE];
-	// char  *type;
+	// resource_type_t 
+	std::ifstream *__rstream;
+	std::string __stream_buffer;
+	size_t       bytes_sent;
+	bool         __done;
+	bool         __isopen;
+	// char         buffer[WRITE_CHUNK_SIZE]; Well be used to send chuncks
+	std::string  type;
 
 
 	public:
 		Resource();
-		Resource(const char *path); // TODO: Init the Resource, 
+
+		void identify_type(const std::string &path);
+		int open(const std::string &path) __THROWS_STRERROR; // TODO: Init the Resource, 
 			// identify the mime type. if it is supported, if not then BadRequest error page should be set up and sent
 		~Resource();
 		bool isdone(void);
-		void sendchunk() __THROWS_STRERROR;
+		bool isopen(void);
+		std::string get_type(void);
+		void sendchunk(int who) __THROWS_STRERROR; // Sends the next chunck to `who`
+		void set_stream_buffer(const std::string &s);
 };
+
+typedef enum response_stage_e {
+	Setup = 0x0,
+	SendingHeaders,
+	SendingFile,
+	// SendingCgi,
+} response_stage_t;
 
 class Response
 {
 private:
 	// Note: well, a Response should most probably have a write method???  No??
-    std::map<std::string, std::string> headers;
-    std::string body;
-	std::string __serialized_response; // NOTE: builtup response. from headers and body into one full response.
-	bool        __is_serialized;
-	size_t      sent;
-	Resource    resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
+	// Note: I should most probably make methods for serializing the response headers, then the body...
+	// Once headers weere serialized and sent. then the state should be switched to sending the body... in that case 
+	int status;
+	// Will be generated last after headers and opening the file resource
+	std::string status_line; // HTTP/1.0 Code Message
+	// isfile?
 
+	std::map<std::string, std::string> headers;
+	response_stage_t stage;
+	std::string headers_as_str;
+	int bytes_sent;
+
+	Resource    resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
 public:
+	static std::map<std::string, std::string> mimes;
+	static void init_mimes();
     Response();
     ~Response();
 
 	static std::map<int, std::string> status_lines;
 	static void init_status_lines();
+
 	void write(int conn) __THROWS_STRERROR; // NOTE: writes the wrapped response into the the client connexion
+	void send_headers(void) __THROWS_STRERROR;
 	bool isdone();
-	void serialize(void);
+	void serialize_headers(void);
 	void appendheader(const std::string key, const std::string value);
-	void appendbody(const std::string _body);
+	void set_status(int s);
+	int  get_status(void) const;
+    void setup_response(const HttpRequest &request);
+	void continue_processing(const HttpRequest &request);
+	response_stage_t getstage(void) const;
 };

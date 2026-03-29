@@ -4,7 +4,7 @@ NAME=./webserv
 OBJDIR = .build
 OBJS=$(SRCS:%.cpp=$(OBJDIR)/%.o)
 INCLUDE=./include/
-CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE)
+CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE) -ggdb
 RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 

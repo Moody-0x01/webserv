@@ -12,6 +12,7 @@
 
 int Multiplexer::epoll_fd = 0;
 EpollEvent Multiplexer::events[EVENT_MAX];
+std::map<int, ServerConfig> Multiplexer::confs;
 std::map<int, std::pair<Server, Clients> > Multiplexer::servers;
 
 int set_nonblocking(int sockfd)
@@ -39,6 +40,9 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 	size_t alive;
 
 	Response::init_status_lines();
+	std::cout << "init_status_lines: Ok\n";
+	Response::init_mimes();
+	std::cout << "init_mimes: Ok\n";
 	alive = 0;
 	if (Multiplexer::epoll_fd < 0) throw std::runtime_error(std::strerror(errno));
 	for (size_t c = 0; c < confs.size(); c++)
@@ -96,7 +100,8 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 		throw strerror(errno);
 	server.disown(); // So it does not close the socket at exit
 	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
-	Multiplexer::servers[server_fd].first.conf = conf;
+	Multiplexer::confs[server_fd] = conf;
+
 	event.events = EPOLLIN;
 	event.data.ptr = &Multiplexer::servers[server_fd].first;
 	code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
@@ -118,8 +123,10 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	len = sizeof(addr);
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
+
 	client.set_owner(server->get_socket());
 	client.set_socket(conn);
+	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
 	if (set_nonblocking(conn) == -1) throw strerror(errno);
 	client.disown();
 	Multiplexer::servers[server->get_socket()].second[conn] = client;

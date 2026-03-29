@@ -16,7 +16,6 @@ void HttpParser::handle()
         {
             endOfHeaders += 4;
             std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
-			// Why??
             parent->request_buffer.erase(0, endOfHeaders);
             this->lexerInstence.tokenize(headersOnly);
             this->currentState = HEADERS_DONE;
@@ -48,30 +47,19 @@ void HttpParser::handle()
                 }
             }
         }
-        if (this->requestValidation())
-        {
-            // i need to check if the client is sending something
-            if (isHeaderValueExist("content-length"))
-            {
-                const std::map<std::string, std::string>& headers = this->request.getHeaders();
-                std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
-                unsigned int contentLenght = std::atoi(it->second.c_str());
-                this->targetBodySize = contentLenght;
-                if (this->targetBodySize > 0)
-                    this->currentState = BODY;
-                else
-                    this->currentState = READY;
-            }
-            else // Normal GET Request
-                this->currentState = READY;
-        }
-        else
-        {
-            // 400 Bad Request
-            this->request.setCode(400);
-            std::cout << "400 Bad Request" << std::endl;
-            this->currentState = READY;
-        }
+		if (isHeaderValueExist("content-length"))
+		{
+			const std::map<std::string, std::string>& headers = this->request.getHeaders();
+			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
+			unsigned int contentLenght = std::atoi(it->second.c_str());
+			this->targetBodySize = contentLenght;
+			if (this->targetBodySize > 0)
+				this->currentState = BODY;
+			else
+				this->currentState = READY;
+		}
+		else // Normal GET Request
+			this->currentState = READY;
     }
 
     if (state() == BODY)
@@ -128,25 +116,4 @@ bool HttpParser::validated()
 bool HttpParser::isHeaderValueExist(const std::string &key)
 {
     return this->request.getHeaders().count(key);
-}
-
-bool HttpParser::requestValidation()
-{
-    bool valid = false;
-
-    // Required for HTTP/1.1
-    valid = isHeaderValueExist("host");
-    if (!valid)
-        return valid;
-    // Only Supported Methods
-    std::string method = this->request.getMethod();
-    valid = (method == "GET") || (method == "POST") || (method == "DELETE");
-    if (!valid)
-        return valid;
-    // version checking
-    valid = this->request.getHttpVersion() == "HTTP/1.1";
-    if (!valid)
-        return valid;
-
-    return true;
 }
