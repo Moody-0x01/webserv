@@ -6,8 +6,6 @@
 #include <HTTP/Response.hpp>
 #include <algorithm>
 
-#define BUFFER_SIZE 4096
-
 // 
 //  METHOD,
 // HOST,
@@ -40,7 +38,6 @@ class HttpParser
 private:
     ParserState currentState;
     Lexer lexerInstence;
-    /*  char buffer[BUFFER_SIZE];  */
     SocketContext *parent;
     Request request;
 

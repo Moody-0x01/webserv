@@ -17,6 +17,7 @@ class Multiplexer {
 public:
 	static int epoll_fd;
 	static EpollEvent events[EVENT_MAX];
+	static std::map<int, ServerConfig> confs;
 	static std::map<int, std::pair<Server, Clients> > servers;
 	// TODO: Implement, registration of a new server
 	static void  register_server(ServerConfig &conf) __THROWS_STRERROR;

@@ -3,16 +3,22 @@
 #include <string>
 #include <map>
 
-class Request
-{
-private:
+#define READ_CHUNK_SIZE 4096
+
+typedef struct HttpRequest {
+	int owner, conn;
     std::string method;
     std::string uri;
     std::string httpVersion;
     std::map<std::string, std::string> headers;
     std::string body;
+} HttpRequest;
 
-    unsigned int code;
+# define __THROWS_STRERROR throw(const char *)
+class Request
+{
+private:
+	HttpRequest request;
 public:
     Request(/* args */);
     ~Request();
@@ -22,11 +28,12 @@ public:
     void setHttpVersion(const std::string &v);
     void addHeader(const std::string &key, const std::string &value);
     void setBody(const std::string &b);
-    void setCode(const unsigned int code);
 
     const std::string &getMethod() const;
     const std::string &getURI() const;
     const std::string &getHttpVersion() const;
     const std::map<std::string, std::string> &getHeaders() const;
     const std::string &getBody() const;
+	// TODO: This function sets up who are the server and client that are responsible for this current request aka owner and conn
+	void set_sockets(const int server, const int client);
 };

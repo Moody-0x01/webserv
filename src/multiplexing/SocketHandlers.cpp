@@ -2,14 +2,15 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
-void client_request(Client *client)
+void client_request(Client *client) __THROWS_STRERROR
 {
 	int conn = client->get_socket();
+	// ServerConfig &config;
 	HttpParser &clientP = client->getParser();
-	char buff[BUFFER_SIZE];
+	char buff[READ_CHUNK_SIZE];
 
 	try {
-		ssize_t count = Multiplexer::read(conn, buff, BUFFER_SIZE); // NOTE: If a read fails it should throw,
+		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 		std::cout << "Read: " << count << "\n";
 		client->request_buffer.append(buff, count);
 		clientP.handle();
@@ -31,23 +32,30 @@ void client_request(Client *client)
 	}
 }
 
-void client_response(Client *client)
+void client_response(Client *client) __THROWS_STRERROR
 {
+	// TODO: ok! Now i have got a request. it needs to be processed that way.
+	// An example of the request:
+	// <Method> <URI> <HTTP-Version>\r\n
+	// <Header-Name>: <Header-Value>\r\n
+	// ...
+	// \r\n
+	// <optional body>
+	// Response
+	// Response R(client->request);
+	// Now: handling the response and saving its state will be done by using this field. client->response
+	
 	std::string http10_ok_header =
 		"HTTP/1.0 200 OK\r\n"
 		"Content-Type: text/html\r\n\r\n";
 	int conn = client->get_socket();
-	// Response
-	std::cout << "Writing to conn: " << conn << "\n";
 	try {
 		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !";
 		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
 		int out = dup(STDOUT_FILENO);
 		dup2(conn, STDOUT_FILENO);
 		{
-			Config c;
-			c.addServer(client->get_server()->conf);
-			c.debug();
+			printf("%s:%s\n", Multiplexer::confs[client->get_owner()].host.c_str(), Multiplexer::confs[client->get_owner()].port.c_str());
 		}
 		dup2(out, STDOUT_FILENO);
 		Multiplexer::write(conn, "</p>", 4); // NOTE: if a write fails,
@@ -58,7 +66,7 @@ void client_response(Client *client)
 	}
 }
 
-void client_handler(uint32_t e, Client *Self)
+void client_handler(uint32_t e, Client *Self) __THROWS_STRERROR
 {
 	// NOTE(1): Any syscall that fails here should raise an exception;
 	// NOTE(2): Well gotta handle those too
@@ -71,20 +79,24 @@ void client_handler(uint32_t e, Client *Self)
         Self->free(); return ;
     }
 
+	try {
     if (e & EPOLLIN)
         client_request(Self);
     if (e & EPOLLOUT)
         client_response(Self);
     if (e & EPOLLRDHUP)
         client_response(Self);
+	} catch (const char *e) {
+		throw e;
+	}
 }
 
-void server_handler(uint32_t e, Server *Self)
+void server_handler(uint32_t e, Server *Self) __THROWS_STRERROR
 {
 	Client *conn;
+	struct epoll_event cev;
 
 	conn = Multiplexer::register_client(e, Self);
-	struct epoll_event cev;
 	cev.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
 	cev.data.ptr = conn;
 	std::cout << "Accepted a conn: " << conn << "\n";
