@@ -8,6 +8,7 @@ Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), type(std:
 {
 	this->__stream_buffer = "";
 	this->bytes_sent = 0;
+	this->resource_type = Text;
 }
 
 void Resource::identify_type(const std::string &path)
@@ -53,6 +54,7 @@ int Resource::open(const std::string &path) __THROWS_STRERROR
 	// this->__filename = path; // NOTE: Maybe we need it for logging errors?
 	Resource::identify_type(path);
 	this->__isopen = true;
+	this->resource_type = File;
 	// Note: returning from here means everything was okay. u may send the body as a file
 	return (OK);
 }
@@ -75,7 +77,22 @@ bool Resource::isopen(void)
 void Resource::sendchunk(int who) __THROWS_STRERROR
 {
 	// TODO: make type of the Resource..
+	// Note: Do i execute the cgi here, idk.
 	(void)who;
+	switch (this->resource_type)
+	{
+		// TODO: Depending on what we are sending as resource this function should take 3 different routes.
+		case File: {
+			// Send openned file? this->__rstream
+		} break;
+		case Text: {
+			// Send setup text ? this->__stream_buffer
+		} break;
+		case Cgi: {
+			// Idk? handle the cgi, execute it...
+		} break;
+		default: assert(0 && "Bro wtf??");
+	}
 }
 
 
@@ -87,4 +104,14 @@ std::string Resource::get_type(void)
 void Resource::set_stream_buffer(const std::string &s)
 {
 	this->__stream_buffer = s;
+}
+
+resource_type_t Resource::getresource_type(void) const
+{
+	return (this->resource_type);
+}
+
+void Resource::setresource_type(resource_type_t t)
+{
+	this->resource_type = t;
 }

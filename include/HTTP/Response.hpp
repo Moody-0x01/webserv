@@ -60,15 +60,24 @@
 #define  VideoMp4             "video/mp4\r\n"
 #define  VideoWebm            "video/webm\r\n"
 
+typedef enum resource_type_e
+{
+	File,
+	Text,
+	Dir,
+	Cgi
+} resource_type_t;
+
 class Resource
 {
-	// resource_type_t 
+
+	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
-	size_t       bytes_sent;
 	bool         __done;
 	bool         __isopen;
 	// char         buffer[WRITE_CHUNK_SIZE]; Well be used to send chuncks
+	size_t       bytes_sent;
 	std::string  type;
 
 
@@ -84,12 +93,14 @@ class Resource
 		std::string get_type(void);
 		void sendchunk(int who) __THROWS_STRERROR; // Sends the next chunck to `who`
 		void set_stream_buffer(const std::string &s);
+		resource_type_t getresource_type(void) const;
+		void setresource_type(resource_type_t t);
 };
 
 typedef enum response_stage_e {
 	Setup = 0x0,
 	SendingHeaders,
-	SendingFile,
+	SendingResource,
 	// SendingCgi,
 } response_stage_t;
 

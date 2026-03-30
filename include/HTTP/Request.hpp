@@ -36,4 +36,5 @@ public:
     const std::string &getBody() const;
 	// TODO: This function sets up who are the server and client that are responsible for this current request aka owner and conn
 	void set_sockets(const int server, const int client);
+	const HttpRequest &getHttpRequest(void) const;
 };

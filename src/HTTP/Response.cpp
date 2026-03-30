@@ -46,9 +46,10 @@ Response::Response()
 
 void Response::continue_processing(const HttpRequest &request)
 {
+	
 	// ServerConfig c = Multiplexer::confs[request.owner];
 
-	if (this->stage == Setup) this->setup_response(request);
+	if (this->stage == Setup) this->setup_response(request); // NOTE: a call to set_status(code) is mandatory before sending headers.
 	this->stage = SendingHeaders;
 	switch (this->stage)
 	{
@@ -62,7 +63,24 @@ void Response::continue_processing(const HttpRequest &request)
 				this->serialize_headers();
 			this->send_headers();
 		} break;
-		case SendingFile: {
+		case SendingResource: {
+			// if (this->resource.getresource_type() == Cgi)
+			// 	// execute: Params, bin
+			// if (this->requested.getresource_type() == File)
+			// this->resource.send_resource();
+			// NOTE: send_resource:
+	
+			// If (response != OK)
+			//      // send_error()
+			// If (req == cgi)
+			//      // Take paramas.
+			//		// execute bin with params
+			//		// send..
+			// If (req == File)
+			//      // send the file that was opened in the setup
+			// If (req == Text)
+			//      // Send the text
+
 		} break;
 		// case SendingCgi: {} break;
 		default:
@@ -79,6 +97,8 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}
 	// TODO: check if it is cgi.
+
+	
 }
 
 Response::~Response()
@@ -103,12 +123,12 @@ void Response::send_headers(void) __THROWS_STRERROR
 //
 // // status line // HTTP/1.0 200 OK
 //
-// bool Response::isdone(void)
-// {
-// 	// TODO: What if the body was not sent yet??
-// 	// what if it is a file? cgi?..
-// 	return (this->__is_serialized && this->sent == this->__serialized_response.size());
-// }
+bool Response::isdone(void)
+{
+	// TODO: What if the body was not sent yet??
+	// what if it is a file? cgi?..
+	return (true);
+}
 //
 // void Response::write(int conn) __THROWS_STRERROR
 // {
@@ -130,7 +150,7 @@ void Response::send_headers(void) __THROWS_STRERROR
 // 	// TODO: Well, lazy loading files is probably better.
 // 	// html files, audio, video files. should be loaded.
 // }
-//
+
 void Response::init_status_lines()
 {
     Response::status_lines[OK                 ] = "HTTP/1.0 200 OK";
@@ -146,6 +166,7 @@ void Response::init_status_lines()
     Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
+	// Cgi?
     Response::status_lines[NotImplemented     ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway         ] = "HTTP/1.0 502 Bad Gateway";
     Response::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable";

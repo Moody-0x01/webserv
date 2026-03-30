@@ -59,6 +59,14 @@ void client_response(Client *client) __THROWS_STRERROR
 		}
 		dup2(out, STDOUT_FILENO);
 		Multiplexer::write(conn, "</p>", 4); // NOTE: if a write fails,
+		// client->response.handle_cgi(client->getParser().getRequestObject().getHttpRequest());
+		// 		.getRequestObject()
+		// 		.getHttpRequest()
+		// client->response.continue_processing(
+		// 		client->getParser()
+		// 		.getRequestObject()
+		// 		.getHttpRequest());
+		// if (client->response.isdone())
 		client->free();
 	} catch (const char *e) {
 		client->free();

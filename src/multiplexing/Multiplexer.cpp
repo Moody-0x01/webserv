@@ -27,10 +27,8 @@ int set_nonblocking(int sockfd)
 
 std::string Multiplexer::resolve_host(const std::string &host)
 {
-    if (host.empty())
-        return "0.0.0.0";
-    if (host == "localhost")
-        return "127.0.0.1";
+    if (host.empty()) return "0.0.0.0";
+    if (host == "localhost") return "127.0.0.1";
     return host;
 }
 
@@ -40,9 +38,7 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 	size_t alive;
 
 	Response::init_status_lines();
-	std::cout << "init_status_lines: Ok\n";
 	Response::init_mimes();
-	std::cout << "init_mimes: Ok\n";
 	alive = 0;
 	if (Multiplexer::epoll_fd < 0) throw std::runtime_error(std::strerror(errno));
 	for (size_t c = 0; c < confs.size(); c++)

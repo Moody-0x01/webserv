@@ -4,6 +4,11 @@ Request::Request() {};
 
 Request::~Request() {};
 
+const HttpRequest &Request::getHttpRequest(void) const
+{
+	return (this->request);
+}
+
 void Request::set_sockets(const int server, const int client)
 {
 	this->request.owner = server;
