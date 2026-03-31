@@ -19,8 +19,8 @@ void Response::init_mimes()
 	Response::mimes["html"]  =  TextHtml          ;
 	Response::mimes["txt"]   =  TextPlain         ;
 	Response::mimes["css"]   =  TextCss           ;
-	Response::mimes["js"]    =  TextJavascript    ;
-	Response::mimes["xml"]   =  TextXml           ;
+	Response::mimes["js"]    =  TextJavascript    ;  // what
+	Response::mimes["xml"]   =  TextXml           ;  // what v2
 	Response::mimes["csv"]   =  TextCsv           ;
 	Response::mimes["jpg"]   =  ImageJpeg         ;
 	Response::mimes["png"]   =  ImagePng          ;
@@ -29,15 +29,15 @@ void Response::init_mimes()
 	Response::mimes["svg"]   =  ImageSvg          ;
 	Response::mimes["ico"]   =  ImageIco          ;
 	Response::mimes["json"]  =  ApplicationJson   ;
-	Response::mimes["xml"]   =  ApplicationXml    ;
+	Response::mimes["xml"]   =  ApplicationXml    ;  // what v2
 	Response::mimes["pdf"]   =  ApplicationPdf    ;
 	Response::mimes["zip"]   =  ApplicationZip    ;
 	Response::mimes["bin"]   =  ApplicationOctet  ;
 	Response::mimes["form"]  =  ApplicationForm   ;
-	Response::mimes["js"]    =  ApplicationJs     ;
-	Response::mimes["mp3"]   =  AudioMpeg         ;
+	Response::mimes["js"]    =  ApplicationJs     ;  // what
+	Response::mimes["mp3"]   =  AudioMpeg         ;  // what v3
 	Response::mimes["ogg"]   =  AudioOgg          ;
-	Response::mimes["mp3"]   =  AudioMp3          ;
+	Response::mimes["mp3"]   =  AudioMp3          ;  // what v3
 	Response::mimes["mp4"]   =  VideoMp4          ;
 	Response::mimes["webm"]  =  VideoWebm         ;
 }
