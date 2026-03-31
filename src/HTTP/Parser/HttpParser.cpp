@@ -90,11 +90,11 @@ void HttpParser::parseParams(std::string &uri)
     if (pos == std::string::npos)
         return;
     std::string query_string = uri.substr(pos + 1);
-    uri = uri.substr(0, pos); // keeping the uri only no params
+    uri = uri.substr(0, pos);
     size_t start = 0;
     while (start < query_string.length()) {
         size_t amp = query_string.find('&', start);
-        if (amp == std::string::npos) // last
+        if (amp == std::string::npos)
             amp = query_string.length();
         std::string pair = query_string.substr(start,  amp - start);
         size_t equalp = pair.find('=');
