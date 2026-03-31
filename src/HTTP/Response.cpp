@@ -1,14 +1,17 @@
+#include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <cstdlib>
+#include <map>
+#include <string>
+#include <utility>
 
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
 
-static bool is_methodvalid(const std::string &method)
-{
-	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
-}
-
+// static bool is_methodvalid(const std::string &method)
+// {
+// 	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
+// }
 
 void Response::init_mimes()
 {
@@ -91,14 +94,36 @@ void Response::continue_processing(const HttpRequest &request)
 void Response::setup_response(const HttpRequest &request)
 {
 	// TODO: Validate everything here.
-	if (request.httpVersion != "HTTP/1.0" || !::is_methodvalid(request.method))
-	{
-		this->set_status(BadRequest);
-		return ;
-	}
+	// if (request.httpVersion != "HTTP/1.0" || request.httpVersion != "HTTP/1.1"  || !::is_methodvalid(request.method))
+	// {
+	// 	this->set_status(BadRequest);
+	// 	return ;
+	// }
+	// this->resolve(); // Gets the interpreter path, gets the path to the script, query_string, identifies if it is cgi or a normal request..
+	// Suppose u have: interpreter_path, script_path, query_string (p1=0&p2=1...), iscgi
+	// NOTE: this is only to prevent double call bc am hardcoding it for now!
+	if (request.uri != "/images/main.py?param1=hello&param2=world")
+		return;
+	/*
+		getting the extantion -> check the config for the matching route if has the cgi block -> 
+										-> yes?: this is a cgi
+										-> no?: reads it as a raw text ? ofc it not exist 404.
+	*/
 	// TODO: check if it is cgi.
-
-	
+	std::string e = ".py";
+	std::string url = "main.py";
+	std::map<std::string, std::string> params;
+	params.insert(std::make_pair("param1", "hello"));
+    params.insert(std::make_pair("param2", "world"));
+	if(url.length() > e.length() && &url[url.length() - e.length()] == e)
+	{
+		std::cout << "------- CGI -------" << std::endl;
+		std::cout << "extension: " << e  << std::endl;
+		std::cout << "uri: " << request.uri  << std::endl;
+		std::cout << "param1: " << params.at("param1") << "\nparam2: " << params.at("param2")  << std::endl;
+		std::cout << "-------------------" << std::endl;
+	}
+	this->stage = SendingCgi;
 }
 
 Response::~Response()

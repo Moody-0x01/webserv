@@ -5,18 +5,8 @@
 #include <HTTP/Request.hpp>
 #include <HTTP/Response.hpp>
 #include <algorithm>
-
-// 
-//  METHOD,
-// HOST,
-// CONTENT_TYPE,
-// CONTENT_LENGTH,
-// SPACE,
-// PATH,
-// HTTP_VERSION,
-// CRLF,
-// KEY,
-// VALUE,
+#include <string>
+#include <vector>
 
 enum ParserState
 {
@@ -27,9 +17,7 @@ enum ParserState
     READY,
 };
 
-// For debugging only
-template<typename T>
-void dd(const T &s);
+typedef std::pair<std::string, std::string> Param;
 
 struct SocketContext;
 
@@ -40,14 +28,11 @@ private:
     Lexer lexerInstence;
     SocketContext *parent;
     Request request;
-
     unsigned int targetBodySize;
-
 public:
     HttpParser();
-
     void handle();
-
+    void parseParams(std::string  &uri);
     std::string &getRequestBuffer();
     std::string &getResponseBuffer();
     Request &getRequestObject();
@@ -56,6 +41,4 @@ public:
     SocketContext *getParent() const;
     void setParent(SocketContext *client);
     bool isHeaderValueExist(const std::string &key);
-    bool validated();
-    bool requestValidation();
 };

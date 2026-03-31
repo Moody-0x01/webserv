@@ -12,6 +12,7 @@ typedef struct HttpRequest {
     std::string httpVersion;
     std::map<std::string, std::string> headers;
     std::string body;
+     std::map<std::string, std::string> params;
 } HttpRequest;
 
 # define __THROWS_STRERROR throw(const char *)
@@ -37,4 +38,7 @@ public:
 	// TODO: This function sets up who are the server and client that are responsible for this current request aka owner and conn
 	void set_sockets(const int server, const int client);
 	const HttpRequest &getHttpRequest(void) const;
+	HttpRequest &getHttpRequest(void) {
+        return (this->request);
+    }
 };

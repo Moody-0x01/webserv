@@ -26,8 +26,6 @@ private:
     std::string content;
     std::vector<Token> tokens;
     unsigned int pos;
-    /*  unsigned int lpos;  */
-
     void increment();
     void decrement();
     char &current();
@@ -58,9 +56,3 @@ public:
         }
     }
 };
-
-template <typename T>
-void dd(const T &s)
-{
-    std::cout << s << std::endl;
-}

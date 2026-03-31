@@ -68,7 +68,7 @@ void Lexer::handleRequstline(std::string &buff)
 
     if (fspace == std::string::npos)
     {
-        dd("no spaces on the request line? ??????");
+        // dd("no spaces on the request line? ??????");
         // throw BadRequestException();
     }
     else
@@ -78,7 +78,7 @@ void Lexer::handleRequstline(std::string &buff)
         size_t sspace = buff.find(' ', fspace + 1);
         if (sspace == std::string::npos)
         {
-            dd("missing HTTP version");
+            // dd("missing HTTP version");
             // throw BadRequestException();
 		}
 		// method uri version
@@ -123,15 +123,4 @@ unsigned int Lexer::getPos() const
 std::vector<Token> &Lexer::getTokens()
 {
     return tokens;
-}
-
-// Debug
-void Lexer::debug()
-{
-    for (size_t i = 0; i < tokens.size(); ++i)
-    {
-        std::string name = getTypeName(tokens.at(i));
-        std::string val = tokens.at(i).second;
-        dd("Token Type: [" + name + "] | Value: [" + val + "]");
-    }
 }

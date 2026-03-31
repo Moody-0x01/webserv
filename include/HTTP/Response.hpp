@@ -70,7 +70,6 @@ typedef enum resource_type_e
 
 class Resource
 {
-
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
@@ -101,7 +100,7 @@ typedef enum response_stage_e {
 	Setup = 0x0,
 	SendingHeaders,
 	SendingResource,
-	// SendingCgi,
+	SendingCgi,
 } response_stage_t;
 
 class Response

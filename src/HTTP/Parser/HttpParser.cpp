@@ -1,4 +1,10 @@
+#include "Parser/HTTP/HttpParser.hpp"
+#include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
+#include <cstddef>
+#include <iostream>
+#include <string>
+#include <utility>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(0)
 {
@@ -6,7 +12,7 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 
 void HttpParser::handle()
 {
-    if (!this->validated())
+    if (this->parent == NULL)
         return;
 
     if (state() == IDLE)
@@ -32,7 +38,10 @@ void HttpParser::handle()
             if (key == METHOD)
                 this->request.setMethod(val);
             else if (key == URI)
-                this->request.setURI(val);
+            {
+                this->parseParams(tokens[i].second);
+                this->request.setURI(val); 
+            }
             else if (key == VERSION)
                 this->request.setHttpVersion(val);
             else if (key == HEADER_NAME)
@@ -73,6 +82,32 @@ void HttpParser::handle()
     }
 }
 
+void HttpParser::parseParams(std::string &uri)
+{
+    std::map<std::string, std::string> &params = this->getRequestObject().getHttpRequest().params;
+    params.clear();
+    size_t pos = uri.find('?');
+    if (pos == std::string::npos)
+        return;
+    std::string query_string = uri.substr(pos + 1);
+    uri = uri.substr(0, pos); // keeping the uri only no params
+    size_t start = 0;
+    while (start < query_string.length()) {
+        size_t amp = query_string.find('&', start);
+        if (amp == std::string::npos) // last
+            amp = query_string.length();
+        std::string pair = query_string.substr(start,  amp - start);
+        size_t equalp = pair.find('=');
+        if (equalp != std::string::npos)
+        {
+            std::string key = pair.substr(0, equalp);
+            std::string value = pair.substr(equalp + 1);
+            params[key] = value;
+        }
+        start = amp + 1;
+    }
+}
+
 std::string &HttpParser::getRequestBuffer()
 {
     return parent->request_buffer;
@@ -103,15 +138,6 @@ Request &HttpParser::getRequestObject()
     return this->request;
 }
 
-bool HttpParser::validated()
-{
-    bool validated = false;
-
-    validated = (parent != NULL);
-    // more validation shit here idk i may need it :) ...
-
-    return validated;
-}
 
 bool HttpParser::isHeaderValueExist(const std::string &key)
 {
