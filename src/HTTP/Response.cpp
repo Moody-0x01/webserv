@@ -1,6 +1,7 @@
 #include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <cstdlib>
+#include <iostream>
 #include <map>
 #include <string>
 #include <utility>
@@ -101,9 +102,6 @@ void Response::setup_response(const HttpRequest &request)
 	// }
 	// this->resolve(); // Gets the interpreter path, gets the path to the script, query_string, identifies if it is cgi or a normal request..
 	// Suppose u have: interpreter_path, script_path, query_string (p1=0&p2=1...), iscgi
-	// NOTE: this is only to prevent double call bc am hardcoding it for now!
-	if (request.uri != "/images/main.py?param1=hello&param2=world")
-		return;
 	/*
 		getting the extantion -> check the config for the matching route if has the cgi block -> 
 										-> yes?: this is a cgi
@@ -111,16 +109,16 @@ void Response::setup_response(const HttpRequest &request)
 	*/
 	// TODO: check if it is cgi.
 	std::string e = ".py";
-	std::string url = "main.py";
-	std::map<std::string, std::string> params;
-	params.insert(std::make_pair("param1", "hello"));
-    params.insert(std::make_pair("param2", "world"));
-	if(url.length() > e.length() && &url[url.length() - e.length()] == e)
+	if(request.uri.length() > e.length() && &request.uri[request.uri.length() - e.length()] == e)
 	{
 		std::cout << "------- CGI -------" << std::endl;
-		std::cout << "extension: " << e  << std::endl;
+		std::cout << "extension: " << e << std::endl;
 		std::cout << "uri: " << request.uri  << std::endl;
-		std::cout << "param1: " << params.at("param1") << "\nparam2: " << params.at("param2")  << std::endl;
+		std::map<std::string, std::string>::iterator it;
+		std::map<std::string, std::string> params = request.params;
+		for (it = params.begin(); it != params.end(); ++it) {
+			std::cout << "Key: " << it->first << " |  Value: " << it->second << std::endl;
+		}
 		std::cout << "-------------------" << std::endl;
 	}
 	this->stage = SendingCgi;

@@ -12,7 +12,7 @@ typedef struct HttpRequest {
     std::string httpVersion;
     std::map<std::string, std::string> headers;
     std::string body;
-     std::map<std::string, std::string> params;
+    std::map<std::string, std::string> params;
 } HttpRequest;
 
 # define __THROWS_STRERROR throw(const char *)
