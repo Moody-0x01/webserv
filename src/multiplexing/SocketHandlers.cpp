@@ -50,7 +50,9 @@ void client_response(Client *client) __THROWS_STRERROR
 		"Content-Type: text/html\r\n\r\n";
 	int conn = client->get_socket();
 	try {
-		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !";
+		const HttpRequest &request = client->getParser().getRequestObject().getHttpRequest();
+		UriResolutionResult resolved = Response::resolve_uri_to_path(request);
+		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !<br>Resolved path: " + resolved.filesystem_path + "\n";
 		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
 		int out = dup(STDOUT_FILENO);
 		dup2(conn, STDOUT_FILENO);
