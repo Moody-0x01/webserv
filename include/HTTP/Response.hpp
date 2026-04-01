@@ -103,6 +103,14 @@ typedef enum response_stage_e {
 	SendingCgi,
 } response_stage_t;
 
+struct UriResolutionResult {
+	std::string matched_location;
+	std::string request_path;
+	std::string root;
+	std::string index;
+	std::string filesystem_path;
+};
+
 class Response
 {
 private:
@@ -120,6 +128,7 @@ private:
 	int bytes_sent;
 
 	Resource    resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
+	std::string resolved_path;
 public:
 	static std::map<std::string, std::string> mimes;
 	static void init_mimes();
@@ -136,7 +145,9 @@ public:
 	void appendheader(const std::string key, const std::string value);
 	void set_status(int s);
 	int  get_status(void) const;
-    void setup_response(const HttpRequest &request);
+	const std::string &get_resolved_resource_path(void) const;
+	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
+  void setup_response(const HttpRequest &request);
 	void continue_processing(const HttpRequest &request);
 	response_stage_t getstage(void) const;
 };

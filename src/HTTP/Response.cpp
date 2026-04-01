@@ -9,10 +9,59 @@
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
 
-// static bool is_methodvalid(const std::string &method)
-// {
-// 	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
-// }
+static std::string trim_uri_to_path(const std::string &uri)
+{
+	if (uri.empty()) return "/";
+	size_t end = uri.find_first_of("?#");
+	std::string path = uri.substr(0, end);
+	if (path.empty()) return "/";
+	if (path[0] != '/') path = "/" + path;
+
+	std::string normalized;
+	normalized.reserve(path.size());
+	bool last_was_slash = false;
+	for (size_t index = 0; index < path.size(); ++index)
+	{
+		if (path[index] == '/')
+		{
+			if (last_was_slash) continue;
+			last_was_slash = true;
+		}
+		else
+			last_was_slash = false;
+		normalized.push_back(path[index]);
+	}
+
+	if (normalized.empty()) return "/";
+	return normalized;
+}
+
+static bool location_matches(const std::string &request_path, const std::string &location_uri)
+{
+	if (location_uri.empty()) return false;
+	if (location_uri == "/") return true;
+	if (request_path.compare(0, location_uri.size(), location_uri) != 0) return false;
+	if (request_path.size() == location_uri.size()) return true;
+	if (location_uri[location_uri.size() - 1] == '/') return true;
+	return request_path[location_uri.size()] == '/';
+}
+
+static std::string join_fs_path(const std::string &root, const std::string &suffix)
+{
+	std::string base = root.empty() ? "." : root;
+	if (suffix.empty()) return base;
+
+	if (base[base.size() - 1] == '/' && suffix[0] == '/')
+		return base + suffix.substr(1);
+	if (base[base.size() - 1] != '/' && suffix[0] != '/')
+		return base + "/" + suffix;
+	return base + suffix;
+}
+
+static bool is_methodvalid(const std::string &method)
+{
+	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
+}
 
 void Response::init_mimes()
 {
@@ -46,6 +95,7 @@ void Response::init_mimes()
 Response::Response()
 {
 	this->stage = Setup;
+	this->resolved_path = "";
 }
 
 void Response::continue_processing(const HttpRequest &request)
@@ -95,18 +145,15 @@ void Response::continue_processing(const HttpRequest &request)
 void Response::setup_response(const HttpRequest &request)
 {
 	// TODO: Validate everything here.
-	// if (request.httpVersion != "HTTP/1.0" || request.httpVersion != "HTTP/1.1"  || !::is_methodvalid(request.method))
-	// {
-	// 	this->set_status(BadRequest);
-	// 	return ;
-	// }
-	// this->resolve(); // Gets the interpreter path, gets the path to the script, query_string, identifies if it is cgi or a normal request..
-	// Suppose u have: interpreter_path, script_path, query_string (p1=0&p2=1...), iscgi
-	/*
-		getting the extantion -> check the config for the matching route if has the cgi block -> 
-										-> yes?: this is a cgi
-										-> no?: reads it as a raw text ? ofc it not exist 404.
-	*/
+	if (request.httpVersion != "HTTP/1.0" || !::is_methodvalid(request.method))
+	{
+		this->set_status(BadRequest);
+		return ;
+	}
+
+	UriResolutionResult resolved = Response::resolve_uri_to_path(request);
+	this->resolved_path = resolved.filesystem_path;
+	this->set_status(OK);
 	// TODO: check if it is cgi.
 	std::string e = ".py";
 	if(request.uri.length() > e.length() && &request.uri[request.uri.length() - e.length()] == e)
@@ -211,6 +258,64 @@ void Response::set_status(int s)
 int Response::get_status(void) const
 {
 	return (this->status);
+}
+
+const std::string &Response::get_resolved_resource_path(void) const
+{
+	return this->resolved_path;
+}
+
+UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
+{
+	UriResolutionResult resolved;
+	resolved.matched_location = "";
+	resolved.request_path = trim_uri_to_path(request.uri);
+	resolved.filesystem_path = resolved.request_path;
+
+	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	resolved.root = server_conf.root;
+	resolved.index = server_conf.index;
+
+	const LocationConfig *best_location = NULL;
+	for (size_t i = 0; i < server_conf.locations.size(); ++i)
+	{
+		const LocationConfig &current = server_conf.locations[i];
+		if (!location_matches(resolved.request_path, current.uri)) continue;
+		if (!best_location || current.uri.size() > best_location->uri.size())
+			best_location = &current;
+	}
+
+	std::string relative_uri = resolved.request_path;
+	if (best_location)
+	{
+		resolved.matched_location = best_location->uri;
+		if (!best_location->root.empty()) resolved.root = best_location->root;
+		if (!best_location->index.empty()) resolved.index = best_location->index;
+
+		if (best_location->uri != "/")
+		{
+			if (resolved.request_path.size() <= best_location->uri.size())
+				relative_uri = "/";
+			else
+				relative_uri = resolved.request_path.substr(best_location->uri.size());
+		}
+	}
+
+	if (relative_uri.empty() || relative_uri[0] != '/')
+		relative_uri = "/" + relative_uri;
+
+	resolved.filesystem_path = join_fs_path(resolved.root, relative_uri);
+	if (!resolved.index.empty())
+	{
+		bool needs_index = false;
+		if (relative_uri == "/") needs_index = true;
+		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
+			needs_index = true;
+		if (needs_index)
+			resolved.filesystem_path = join_fs_path(resolved.filesystem_path, resolved.index);
+	}
+
+	return resolved;
 }
 
 response_stage_t Response::getstage(void) const
