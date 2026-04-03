@@ -46,14 +46,17 @@ void client_response(Client *client) __THROWS_STRERROR
 	// Now: handling the response and saving its state will be done by using this field. client->response
 	
 	std::string http10_ok_header =
-		"HTTP/1.0 200 OK\r\n"
+		"HTTP/1.0 404 Not Found\r\n"
 		"Content-Type: text/html\r\n\r\n";
 	int conn = client->get_socket();
 	try {
 		const HttpRequest &request = client->getParser().getRequestObject().getHttpRequest();
 		UriResolutionResult resolved = Response::resolve_uri_to_path(request);
-		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !<br>Resolved path: " + resolved.filesystem_path + "\n";
-		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
+		Response resp;
+		const std::string buff_mf_test = resp.get_error_page_html(request, 404);
+		client->response_buffer = http10_ok_header + buff_mf_test;
+/* 		client->response_buffer = http10_ok_header + "<p style='background: #191919; color: white;'> Hello from server !<br>Resolved path: " + resolved.filesystem_path + "\n";
+ */		Multiplexer::write(conn, client->response_buffer.c_str(), client->response_buffer.size()); // NOTE: if a write fails,
 		int out = dup(STDOUT_FILENO);
 		dup2(conn, STDOUT_FILENO);
 		{

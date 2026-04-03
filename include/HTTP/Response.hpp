@@ -93,6 +93,7 @@ class Resource
 		std::string get_type(void);
 		void sendchunk(int who) __THROWS_STRERROR; // Sends the next chunck to `who`
 		void set_stream_buffer(const std::string &s);
+		const std::string &get_stream_buffer(void) const;
 		resource_type_t getresource_type(void) const;
 		void setresource_type(resource_type_t t);
 };
@@ -148,6 +149,7 @@ public:
 	int  get_status(void) const;
 	const std::string &get_resolved_resource_path(void) const;
 	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
+	const std::string get_error_page_html(const HttpRequest &request, int code);
   void setup_response(const HttpRequest &request);
 	void continue_processing(const HttpRequest &request);
 	response_stage_t getstage(void) const;
