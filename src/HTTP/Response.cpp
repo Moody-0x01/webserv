@@ -58,6 +58,87 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 	return base + suffix;
 }
 
+static std::string reason_phrase_for_status(int code)
+{
+	std::map<int, std::string>::iterator it = Response::status_lines.find(code);
+	if (it == Response::status_lines.end())
+	{
+		std::stringstream c;
+		c << code;
+		std::string auto_reason = "HTTP/1.0 " + c.str() + " Error";
+		return auto_reason;
+	}
+	return it->second;
+}
+
+static std::string build_default_error_html(int code)
+{
+    std::string reason = reason_phrase_for_status(code);
+    std::stringstream ss;
+    
+    ss << "<!DOCTYPE html>\n"
+       << "<html lang=\"en\">\n"
+       << "<head>\n"
+       << "    <meta charset=\"UTF-8\">\n"
+       << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+       << "    <title>" << code << " " << reason << "</title>\n"
+       << "    <style>\n"
+       << "        body {\n"
+       << "            font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n"
+       << "            background-color: #f3f4f6;\n"
+       << "            color: #1f2937;\n"
+       << "            display: flex;\n"
+       << "            justify-content: center;\n"
+       << "            align-items: center;\n"
+       << "            height: 100vh;\n"
+       << "            margin: 0;\n"
+       << "        }\n"
+       << "        .error-container {\n"
+       << "            background-color: #ffffff;\n"
+       << "            padding: 3rem 4rem;\n"
+       << "            border-radius: 8px;\n"
+       << "            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);\n"
+       << "            text-align: center;\n"
+       << "            max-width: 500px;\n"
+       << "            width: 90%;\n"
+       << "        }\n"
+       << "        h1 {\n"
+       << "            font-size: 5rem;\n"
+       << "            margin: 0;\n"
+       << "            color: #ef4444;\n"
+       << "            line-height: 1;\n"
+       << "        }\n"
+       << "        h2 {\n"
+       << "            font-size: 1.5rem;\n"
+       << "            margin-top: 1rem;\n"
+       << "            font-weight: 500;\n"
+       << "            color: #4b5563;\n"
+       << "        }\n"
+       << "        hr {\n"
+       << "            border: none;\n"
+       << "            border-top: 1px solid #e5e7eb;\n"
+       << "            margin: 2rem 0;\n"
+       << "        }\n"
+       << "        .server-footer {\n"
+       << "            color: #9ca3af;\n"
+       << "            font-size: 0.875rem;\n"
+       << "            margin: 0;\n"
+       << "        }\n"
+       << "    </style>\n"
+       << "</head>\n"
+       << "<body>\n"
+       << "    <div class=\"error-container\">\n"
+       << "        <h1>" << code << "</h1>\n"
+       << "        <h2>" << reason << "</h2>\n"
+       << "        <hr>\n"
+       << "        <p class=\"server-footer\">webserv</p>\n"
+       << "    </div>\n"
+       << "</body>\n"
+       << "</html>\n";
+
+    return ss.str();
+}
+
 static bool is_methodvalid(const std::string &method)
 {
 	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
@@ -148,9 +229,9 @@ void Response::setup_response(const HttpRequest &request)
 	if (request.httpVersion != "HTTP/1.0" || !::is_methodvalid(request.method))
 	{
 		this->set_status(BadRequest);
+		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
-
 	UriResolutionResult resolved = Response::resolve_uri_to_path(request);
 	this->resolved_path = resolved.filesystem_path;
 	this->set_status(OK);
@@ -169,6 +250,32 @@ void Response::setup_response(const HttpRequest &request)
 		std::cout << "-------------------" << std::endl;
 	}
 	this->stage = SendingCgi;
+}
+
+const std::string Response::get_error_page_html(const HttpRequest &request, int code)
+{
+	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	std::map<size_t, std::string>::const_iterator configured = server_conf.error_pages.find(static_cast<size_t>(code));
+	if (configured != server_conf.error_pages.end())
+	{
+		std::string configured_path = join_fs_path(server_conf.root, configured->second);
+		std::ifstream stream(configured_path.c_str());
+		if (stream.is_open())
+		{
+			std::ostringstream content;
+			content << stream.rdbuf();
+			this->resource.set_stream_buffer(content.str());
+			this->resource.setresource_type(Text);
+			this->resource.identify_type(configured_path);
+			return this->resource.get_stream_buffer();
+		}
+	}
+
+	this->resource.set_stream_buffer(build_default_error_html(code));
+	this->resource.setresource_type(Text);
+	this->resource.identify_type("error.html");
+	return this->resource.get_stream_buffer();
+	return resource.get_stream_buffer();
 }
 
 Response::~Response()

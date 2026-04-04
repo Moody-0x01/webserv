@@ -106,6 +106,11 @@ void Resource::set_stream_buffer(const std::string &s)
 	this->__stream_buffer = s;
 }
 
+const std::string &Resource::get_stream_buffer(void) const
+{
+	return this->__stream_buffer;
+}
+
 resource_type_t Resource::getresource_type(void) const
 {
 	return (this->resource_type);
