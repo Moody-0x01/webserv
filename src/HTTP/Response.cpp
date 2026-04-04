@@ -184,7 +184,11 @@ void Response::continue_processing(const HttpRequest &request)
 	
 	// ServerConfig c = Multiplexer::confs[request.owner];
 
-	if (this->stage == Setup) this->setup_response(request); // NOTE: a call to set_status(code) is mandatory before sending headers.
+	if (this->stage == Setup)
+	{
+		std::cout << "Here <\n";
+		this->setup_response(request); // NOTE: a call to set_status(code) is mandatory before sending headers.
+	}
 	this->stage = SendingHeaders;
 	switch (this->stage)
 	{
@@ -225,14 +229,20 @@ void Response::continue_processing(const HttpRequest &request)
 
 void Response::setup_response(const HttpRequest &request)
 {
-	// TODO: Validate everything here.
-	if (request.httpVersion != "HTTP/1.0" || !::is_methodvalid(request.method))
+	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") || !is_methodvalid(request.method))
 	{
 		this->set_status(BadRequest);
 		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
+	std::cout << "|" << request.httpVersion << "|\n";
+	std::cout << "Condition: " << (request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") << "\n";
+	std::cout << "Condition: " << !is_methodvalid(request.method) << "\n";
+	std::cout << "Method: " << request.method << "\n";
+
 	UriResolutionResult resolved = Response::resolve_uri_to_path(request);
+	// std::cout << "GOT: " << resolved.filesystem_path << "\n";
+	// std::cout << "ROOT: " << resolved.root << "\n";
 	this->resolved_path = resolved.filesystem_path;
 	this->set_status(OK);
 	// TODO: check if it is cgi.
