@@ -35,32 +35,10 @@ void client_request(Client *client) __THROWS_STRERROR
 
 void client_response(Client *client) __THROWS_STRERROR
 {
-	// TODO: ok! Now i have got a request. it needs to be processed that way.
-	// An example of the request:
-	// <Method> <URI> <HTTP-Version>\r\n
-	// <Header-Name>: <Header-Value>\r\n
-	// ...
-	// \r\n
-	// <optional body>
-	// Response
-	// Response R(client->request);
-	// Now: handling the response and saving its state will be done by using this field. client->response
-	
-	std::string http10_ok_header =
-		"HTTP/1.0 404 Not Found\r\n"
-		"Content-Type: text/html\r\n\r\n";
-	int conn = client->get_socket();
 	try {
-		const HttpRequest &request = client->getParser().getRequestObject().getHttpRequest();
-		int out = dup(STDOUT_FILENO);
-		{
-			dup2(conn, STDOUT_FILENO);
-		}
-
+		HttpRequest &request = client->getParser().getRequestObject().getHttpRequest();
 		client->response
 			.continue_processing(request);
-		dup2(out, STDOUT_FILENO);
-		// if (client->response.isdone())
 		client->free();
 	} catch (const char *e) {
 		client->free();

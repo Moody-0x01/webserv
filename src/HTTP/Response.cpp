@@ -181,50 +181,18 @@ Response::Response()
 
 void Response::continue_processing(const HttpRequest &request)
 {
-	
-	// ServerConfig c = Multiplexer::confs[request.owner];
-
 	if (this->stage == Setup)
 	{
-		std::cout << "Here <\n";
-		this->setup_response(request); // NOTE: a call to set_status(code) is mandatory before sending headers.
+		this->setup_response(request);
+		this->serialize_headers();
+		::write(request.conn, this->headers_as_str.c_str(), this->headers_as_str.size());
+		this->stage = SendingResource;
 	}
-	this->stage = SendingHeaders;
-	switch (this->stage)
-	{
-		case Setup: 
-		case SendingHeaders: {
-			// setup_response: setup these
-			// 1) Resources that will be sent.
-			// 2) Headers that will be send
-			// 3) Status lines that will be send based off the availability if the requested stuff.
-			if (!this->headers_as_str.size()) // Not serialized yet it should be serialized first 
-				this->serialize_headers();
-			this->send_headers();
-		} break;
-		case SendingResource: {
-			// if (this->resource.getresource_type() == Cgi)
-			// 	// execute: Params, bin
-			// if (this->requested.getresource_type() == File)
-			// this->resource.send_resource();
-			// NOTE: send_resource:
-	
-			// If (response != OK)
-			//      // send_error()
-			// If (req == cgi)
-			//      // Take paramas.
-			//		// execute bin with params
-			//		// send..
-			// If (req == File)
-			//      // send the file that was opened in the setup
-			// If (req == Text)
-			//      // Send the text
-
-		} break;
-		// case SendingCgi: {} break;
-		default:
-			abort();
+	if (this->stage == SendingResource) {
+		this->resource.send(request);
+		return ;
 	}
+	abort();
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -235,16 +203,19 @@ void Response::setup_response(const HttpRequest &request)
 		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
+	this->set_status(OK);
+	this->appendheader("content-type", TextHtml);
 	std::cout << "|" << request.httpVersion << "|\n";
 	std::cout << "Condition: " << (request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") << "\n";
 	std::cout << "Condition: " << !is_methodvalid(request.method) << "\n";
 	std::cout << "Method: " << request.method << "\n";
 
 	UriResolutionResult resolved = Response::resolve_uri_to_path(request);
+	// We should check the method??
+
 	// std::cout << "GOT: " << resolved.filesystem_path << "\n";
 	// std::cout << "ROOT: " << resolved.root << "\n";
 	this->resolved_path = resolved.filesystem_path;
-	this->set_status(OK);
 	// TODO: check if it is cgi.
 	std::string e = ".py";
 	if(request.uri.length() > e.length() && &request.uri[request.uri.length() - e.length()] == e)
@@ -259,7 +230,9 @@ void Response::setup_response(const HttpRequest &request)
 		}
 		std::cout << "-------------------" << std::endl;
 	}
-	this->stage = SendingCgi;
+	// this->resource.setresource_type(Text);
+	// this->resource.setresource_type(Cgi);
+	// this->resource.setresource_type(File);
 }
 
 const std::string Response::get_error_page_html(const HttpRequest &request, int code)
@@ -359,9 +332,10 @@ void Response::init_status_lines()
     Response::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable";
 }
 
-void Response::appendheader(const std::string key, const std::string value)
+void Response::appendheader(const char *key, const char  *value)
 {
-	this->headers[key] = value + "\r\n";
+	this->headers[key] = value;
+	this->headers[key] += "\r\n";
 }
 
 void Response::set_status(int s)
@@ -431,6 +405,13 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 		if (needs_index)
 			resolved.filesystem_path = join_fs_path(resolved.filesystem_path, resolved.index);
 	}
+
+	// resolved path -> 
+	// Check if the path leads to:
+	// Cgi..
+	//     cgi_pass 
+	// Directory..
+	// Static File
 
 	return resolved;
 }

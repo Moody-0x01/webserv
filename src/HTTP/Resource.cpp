@@ -1,5 +1,8 @@
+#include "HTTP/Response.hpp"
 #include <Server.hpp>
+#include <algorithm>
 #include <cerrno>
+#include <cstddef>
 #include <cstdio>
 #include <fstream>
 #include <string>
@@ -73,28 +76,37 @@ bool Resource::isopen(void)
 {
 	return (this->__isopen);
 }
-
-void Resource::sendchunk(int who) __THROWS_STRERROR
+#include <cmath>
+void Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
-	// TODO: make type of the Resource..
-	// Note: Do i execute the cgi here, idk.
-	(void)who;
 	switch (this->resource_type)
 	{
-		// TODO: Depending on what we are sending as resource this function should take 3 different routes.
+		case Dir: {
+			// request.method
+			::write(request.conn, "Sending a static file", 22);
+		} break;
 		case File: {
-			// Send openned file? this->__rstream
+			::write(request.conn, "Sending a static file", 22);
 		} break;
 		case Text: {
-			// Send setup text ? this->__stream_buffer
+	
+			this->__stream_buffer = "Sending a static text";
+			if (this->bytes_sent < this->__stream_buffer.size()) {
+				// size_t n = min((int)WRITE_CHUNK_SIZE, (int)this->bytes_sent -this->__stream_buffer.size());
+				this->bytes_sent += ::write(request.conn, 
+					this->__stream_buffer.c_str(), 
+					this->__stream_buffer.size());
+			} else {
+				this->__done = true;
+			}
 		} break;
 		case Cgi: {
-			// Idk? handle the cgi, execute it...
+			::write(request.conn, "Sending Cgi", 12);
 		} break;
-		default: assert(0 && "Bro wtf??");
+		default: 
+			assert(0 && "Bro wtf??");
 	}
 }
-
 
 std::string Resource::get_type(void)
 {

@@ -26,39 +26,39 @@
 #define  ServiceUnavailable   503
 
 // Mime types
-#define  TextHtml             "text/html\r\n"
-#define  TextPlain            "text/plain\r\n"
-#define  TextCss              "text/css\r\n"
-#define  TextJavascript       "text/javascript\r\n"
-#define  TextXml              "text/xml\r\n"
-#define  TextCsv              "text/csv\r\n"
+#define  TextHtml             "text/html"
+#define  TextPlain            "text/plain"
+#define  TextCss              "text/css"
+#define  TextJavascript       "text/javascript"
+#define  TextXml              "text/xml"
+#define  TextCsv              "text/csv"
 
 // Images.
-#define  ImageJpeg            "image/jpeg\r\n"
-#define  ImagePng             "image/png\r\n"
-#define  ImageGif             "image/gif\r\n"
-#define  ImageWebp            "image/webp\r\n"
-#define  ImageSvg             "image/svg+xml\r\n"
-#define  ImageIco             "image/x-icon\r\n"
+#define  ImageJpeg            "image/jpeg"
+#define  ImagePng             "image/png"
+#define  ImageGif             "image/gif"
+#define  ImageWebp            "image/webp"
+#define  ImageSvg             "image/svg+xml"
+#define  ImageIco             "image/x-icon"
 
 // Other
-#define  ApplicationJson      "application/json\r\n"
-#define  ApplicationXml       "application/xml\r\n"
-#define  ApplicationPdf       "application/pdf\r\n"
-#define  ApplicationZip       "application/zip\r\n"
-#define  ApplicationOctet     "application/octet-stream\r\n"
-#define  ApplicationForm      "application/x-www-form-urlencoded\r\n"
-#define  ApplicationJs        "application/javascript\r\n"
+#define  ApplicationJson      "application/json"
+#define  ApplicationXml       "application/xml"
+#define  ApplicationPdf       "application/pdf"
+#define  ApplicationZip       "application/zip"
+#define  ApplicationOctet     "application/octet-stream"
+#define  ApplicationForm      "application/x-www-form-urlencoded"
+#define  ApplicationJs        "application/javascript"
 
 
 // Other audio
-#define  AudioMpeg            "audio/mpeg\r\n"
-#define  AudioOgg             "audio/ogg\r\n"
+#define  AudioMpeg            "audio/mpeg"
+#define  AudioOgg             "audio/ogg"
 #define  AudioMp3 "audio/mp3"
 
 // Video
-#define  VideoMp4             "video/mp4\r\n"
-#define  VideoWebm            "video/webm\r\n"
+#define  VideoMp4             "video/mp4"
+#define  VideoWebm            "video/webm"
 
 typedef enum resource_type_e
 {
@@ -70,6 +70,7 @@ typedef enum resource_type_e
 
 class Resource
 {
+
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
@@ -90,7 +91,7 @@ class Resource
 		bool isdone(void);
 		bool isopen(void);
 		std::string get_type(void);
-		void sendchunk(int who) __THROWS_STRERROR; // Sends the next chunck to `who`
+		void send(const HttpRequest &request) __THROWS_STRERROR;
 		void set_stream_buffer(const std::string &s);
 		const std::string &get_stream_buffer(void) const;
 		resource_type_t getresource_type(void) const;
@@ -98,10 +99,8 @@ class Resource
 };
 
 typedef enum response_stage_e {
-	Setup = 0x0,
-	SendingHeaders,
+	Setup,
 	SendingResource,
-	SendingCgi,
 } response_stage_t;
 
 struct UriResolutionResult {
@@ -143,7 +142,7 @@ public:
 	void send_headers(void) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);
-	void appendheader(const std::string key, const std::string value);
+	void appendheader(const char *key, const char  *value);
 	void set_status(int s);
 	int  get_status(void) const;
 	const std::string &get_resolved_resource_path(void) const;
