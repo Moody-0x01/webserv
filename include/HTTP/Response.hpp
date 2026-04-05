@@ -105,6 +105,7 @@ typedef enum response_stage_e {
 
 struct UriResolutionResult {
 	enum type {
+		None,
 		directory,
 		cgi,
 		file

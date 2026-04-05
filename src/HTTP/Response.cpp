@@ -59,6 +59,8 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 	return base + suffix;
 }
 
+// if no index and auto index, just match the cgi
+
 static std::pair<std::string, std::string> script_name_ext(const std::string &path)
 {
 	size_t slash = path.find_last_of('/');
@@ -74,11 +76,16 @@ static std::pair<std::string, std::string> script_name_ext(const std::string &pa
 	return std::make_pair(script, extension);
 }
 
-static bool is_directory_path(const std::string &path)
+static UriResolutionResult::type get_resource_type(const std::string &path)
 {
 	struct stat path_stat;
-	if (::stat(path.c_str(), &path_stat) != 0) return false;
-	return S_ISDIR(path_stat.st_mode);
+
+	if (::stat(path.c_str(), &path_stat) != 0) return UriResolutionResult::None;
+	if (S_ISDIR(path_stat.st_mode))
+		return UriResolutionResult::directory;
+	else if (S_ISREG(path_stat.st_mode))
+		return UriResolutionResult::file;
+	return UriResolutionResult::None;
 }
 
 static const LocationConfig *find_best_location(const ServerConfig &server_conf, const std::string &request_path)
@@ -142,17 +149,14 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	if (!(script.first.empty() || script.second.empty()) && best_location->cgi_path.find(script.first + script.second) != best_location->cgi_path.end())
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
-		resolved.cgi_script = script;
+		resolved.cgi_script = script; // scriptname, interpreter pair please Mr Ameen, the greatest swe of all time, all times best and the best actual fker in the universe at all, please forgive u...
 	}
 }
 
 static void resolve_resource_type(UriResolutionResult &resolved)
 {
 	if (resolved.resource_type == UriResolutionResult::cgi) return;
-	if (is_directory_path(resolved.filesystem_path))
-		resolved.resource_type = UriResolutionResult::directory;
-	else
-		resolved.resource_type = UriResolutionResult::file;
+	resolved.resource_type = get_resource_type(resolved.filesystem_path);
 }
 
 static std::string reason_phrase_for_status(int code)
@@ -322,7 +326,12 @@ void Response::setup_response(const HttpRequest &request)
 	this->appendheader("content-type", TextHtml);
 
 	this->resolved_results = Response::resolve_uri_to_path(request);
-
+	if (this->resolved_results.resource_type == UriResolutionResult::None)
+	{
+		this->set_status(NotFound);
+		this->get_error_page_html(request, NotFound);
+		return;
+	}
 	switch (Response::classify_method(request.method))
 	{
 		case MethodGet:
