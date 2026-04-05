@@ -241,6 +241,14 @@ static bool is_methodvalid(const std::string &method)
 	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
 }
 
+Response::MethodKind Response::classify_method(const std::string &method)
+{
+	if (method == "GET") return MethodGet;
+	if (method == "POST") return MethodPost;
+	if (method == "DELETE") return MethodDelete;
+	return MethodInvalid;
+}
+
 void Response::init_mimes()
 {
 	if (!mimes.empty()) return ;
@@ -273,7 +281,6 @@ void Response::init_mimes()
 Response::Response()
 {
 	this->stage = Setup;
-	this->resolved_path = "";
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -313,34 +320,41 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	this->set_status(OK);
 	this->appendheader("content-type", TextHtml);
-	std::cout << "|" << request.httpVersion << "|\n";
-	std::cout << "Condition: " << (request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") << "\n";
-	std::cout << "Condition: " << !is_methodvalid(request.method) << "\n";
-	std::cout << "Method: " << request.method << "\n";
 
-	UriResolutionResult resolved = Response::resolve_uri_to_path(request);
-	// We should check the method??
+	this->resolved_results = Response::resolve_uri_to_path(request);
 
-	// std::cout << "GOT: " << resolved.filesystem_path << "\n";
-	// std::cout << "ROOT: " << resolved.root << "\n";
-	this->resolved_path = resolved.filesystem_path;
-	// TODO: check if it is cgi.
-	/* std::string e = ".py";
-	if(request.uri.length() > e.length() && &request.uri[request.uri.length() - e.length()] == e)
+	switch (Response::classify_method(request.method))
 	{
-		std::cout << "------- CGI -------" << std::endl;
-		std::cout << "extension: " << e << std::endl;
-		std::cout << "uri: " << request.uri  << std::endl;
-		std::map<std::string, std::string>::iterator it;
-		std::map<std::string, std::string> params = request.params;
-		for (it = params.begin(); it != params.end(); ++it) {
-			std::cout << "Key: " << it->first << " |  Value: " << it->second << std::endl;
-		}
-		std::cout << "-------------------" << std::endl;
-	} */
-	// this->resource.setresource_type(Text);
-	// this->resource.setresource_type(Cgi);
-	// this->resource.setresource_type(File);
+		case MethodGet:
+			this->handle_get(request);
+			break;
+		case MethodPost:
+			this->handle_post(request);
+			break;
+		case MethodDelete:
+			this->handle_delete(request);
+			break;
+		default:
+			this->set_status(BadRequest);
+			this->get_error_page_html(request, BadRequest);
+			break;
+	}
+}
+
+void Response::handle_get(const HttpRequest &request)
+{
+	(void)request;
+
+}
+
+void Response::handle_post(const HttpRequest &request)
+{
+	(void)request;
+}
+
+void Response::handle_delete(const HttpRequest &request)
+{
+	(void)request;;
 }
 
 const std::string Response::get_error_page_html(const HttpRequest &request, int code)
@@ -459,9 +473,9 @@ int Response::get_status(void) const
 	return (this->status);
 }
 
-const std::string &Response::get_resolved_resource_path(void) const
+const UriResolutionResult &Response::get_resolved_results(void) const
 {
-	return this->resolved_path;
+	return this->resolved_results;
 }
 
 UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)

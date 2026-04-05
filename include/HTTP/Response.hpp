@@ -122,6 +122,19 @@ struct UriResolutionResult {
 class Response
 {
 private:
+	enum MethodKind
+	{
+		MethodGet,
+		MethodPost,
+		MethodDelete,
+		MethodInvalid
+	};
+
+	static MethodKind classify_method(const std::string &method);
+	void handle_get(const HttpRequest &request);
+	void handle_post(const HttpRequest &request);
+	void handle_delete(const HttpRequest &request);
+
 	// Note: well, a Response should most probably have a write method???  No??
 	// Note: I should most probably make methods for serializing the response headers, then the body...
 	// Once headers weere serialized and sent. then the state should be switched to sending the body... in that case 
@@ -135,8 +148,8 @@ private:
 	std::string headers_as_str;
 	int bytes_sent;
 
-	Resource    resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
-	std::string resolved_path;
+	Resource             resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
+	UriResolutionResult  resolved_results; // holds the resultion struct
 public:
 	static std::map<std::string, std::string> mimes;
 	static void init_mimes();
@@ -153,7 +166,7 @@ public:
 	void appendheader(const char *key, const char  *value);
 	void set_status(int s);
 	int  get_status(void) const;
-	const std::string &get_resolved_resource_path(void) const;
+	const UriResolutionResult &get_resolved_results(void) const;
 	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
 	const std::string get_error_page_html(const HttpRequest &request, int code);
 	void setup_response(const HttpRequest &request);
