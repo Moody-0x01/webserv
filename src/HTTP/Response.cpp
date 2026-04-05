@@ -326,6 +326,12 @@ void Response::setup_response(const HttpRequest &request)
 	this->appendheader("content-type", TextHtml);
 
 	this->resolved_results = Response::resolve_uri_to_path(request);
+	// if (this->isallowed(request.method))
+	// {
+	// 	this->set_status(BadRequest);
+	// 	this->get_error_page_html(request, BadRequest);
+	// 	return;		
+	// }
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
