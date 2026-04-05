@@ -104,11 +104,19 @@ typedef enum response_stage_e {
 } response_stage_t;
 
 struct UriResolutionResult {
+	enum type {
+		directory,
+		cgi,
+		file
+	};
+	UriResolutionResult();
+	type resource_type;
 	std::string matched_location;
 	std::string request_path;
 	std::string root;
 	std::string index;
 	std::string filesystem_path;
+	std::pair <std::string, std::string> cgi_script; // holds script name and extension, empty if not a cgi
 };
 
 class Response

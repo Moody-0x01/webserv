@@ -4,6 +4,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <sys/stat.h>
 #include <utility>
 
 std::map<int, std::string> Response::status_lines;
@@ -56,6 +57,102 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 	if (base[base.size() - 1] != '/' && suffix[0] != '/')
 		return base + "/" + suffix;
 	return base + suffix;
+}
+
+static std::pair<std::string, std::string> script_name_ext(const std::string &path)
+{
+	size_t slash = path.find_last_of('/');
+	size_t dot = path.find_last_of('.');
+	if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
+		return std::make_pair(std::string(), std::string());
+
+	size_t script_start = (slash == std::string::npos) ? 0 : slash + 1;
+	if (script_start >= path.size()) return std::make_pair(std::string(), std::string());
+
+	std::string script = path.substr(slash);
+	std::string extension = path.substr(dot);
+	return std::make_pair(script, extension);
+}
+
+static bool is_directory_path(const std::string &path)
+{
+	struct stat path_stat;
+	if (::stat(path.c_str(), &path_stat) != 0) return false;
+	return S_ISDIR(path_stat.st_mode);
+}
+
+static const LocationConfig *find_best_location(const ServerConfig &server_conf, const std::string &request_path)
+{
+	const LocationConfig *best_location = NULL;
+	for (size_t i = 0; i < server_conf.locations.size(); ++i)
+	{
+		const LocationConfig &current = server_conf.locations[i];
+		if (!location_matches(request_path, current.uri)) continue;
+		if (!best_location || current.uri.size() > best_location->uri.size())
+			best_location = &current;
+	}
+	return best_location;
+}
+
+static std::string compute_relative_uri(const std::string &request_path, const LocationConfig *best_location)
+{
+	std::string relative_uri = request_path;
+	if (best_location && best_location->uri != "/")
+	{
+		if (request_path.size() <= best_location->uri.size())
+			relative_uri = "/";
+		else
+			relative_uri = request_path.substr(best_location->uri.size());
+	}
+
+	if (relative_uri.empty() || relative_uri[0] != '/')
+		relative_uri = "/" + relative_uri;
+	return relative_uri;
+}
+
+static void apply_location_override(UriResolutionResult &resolved, const LocationConfig *best_location)
+{
+	if (!best_location) return;
+	resolved.matched_location = best_location->uri;
+	if (!best_location->root.empty()) resolved.root = best_location->root;
+	if (!best_location->index.empty()) resolved.index = best_location->index;
+}
+
+static std::string build_filesystem_target(const UriResolutionResult &resolved, const std::string &relative_uri)
+{
+	std::string filesystem_path = join_fs_path(resolved.root, relative_uri);
+	if (!resolved.index.empty())
+	{
+		bool needs_index = false;
+		if (relative_uri == "/") needs_index = true;
+		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
+			needs_index = true;
+		if (needs_index)
+			filesystem_path = join_fs_path(filesystem_path, resolved.index);
+	}
+	return filesystem_path;
+}
+
+static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConfig *best_location)
+{
+	if (!best_location || best_location->cgi_path.empty()) return;
+
+	std::pair <std::string, std::string> script = script_name_ext(resolved.request_path);
+	/* std::cout << "\n" << script.first << "\n" << script.second << "\n\n"; */
+	if (!(script.first.empty() || script.second.empty()) && best_location->cgi_path.find(script.first + script.second) != best_location->cgi_path.end())
+	{
+		resolved.resource_type = UriResolutionResult::cgi;
+		resolved.cgi_script = script;
+	}
+}
+
+static void resolve_resource_type(UriResolutionResult &resolved)
+{
+	if (resolved.resource_type == UriResolutionResult::cgi) return;
+	if (is_directory_path(resolved.filesystem_path))
+		resolved.resource_type = UriResolutionResult::directory;
+	else
+		resolved.resource_type = UriResolutionResult::file;
 }
 
 static std::string reason_phrase_for_status(int code)
@@ -179,6 +276,17 @@ Response::Response()
 	this->resolved_path = "";
 }
 
+UriResolutionResult::UriResolutionResult()
+{
+	resource_type = file;
+	matched_location = "";
+	request_path = "/";
+	root = "";
+	index = "";
+	filesystem_path = "/";
+	cgi_script = std::make_pair(std::string(), std::string());
+}
+
 void Response::continue_processing(const HttpRequest &request)
 {
 	if (this->stage == Setup)
@@ -217,7 +325,7 @@ void Response::setup_response(const HttpRequest &request)
 	// std::cout << "ROOT: " << resolved.root << "\n";
 	this->resolved_path = resolved.filesystem_path;
 	// TODO: check if it is cgi.
-	std::string e = ".py";
+	/* std::string e = ".py";
 	if(request.uri.length() > e.length() && &request.uri[request.uri.length() - e.length()] == e)
 	{
 		std::cout << "------- CGI -------" << std::endl;
@@ -229,7 +337,7 @@ void Response::setup_response(const HttpRequest &request)
 			std::cout << "Key: " << it->first << " |  Value: " << it->second << std::endl;
 		}
 		std::cout << "-------------------" << std::endl;
-	}
+	} */
 	// this->resource.setresource_type(Text);
 	// this->resource.setresource_type(Cgi);
 	// this->resource.setresource_type(File);
@@ -359,7 +467,6 @@ const std::string &Response::get_resolved_resource_path(void) const
 UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 {
 	UriResolutionResult resolved;
-	resolved.matched_location = "";
 	resolved.request_path = trim_uri_to_path(request.uri);
 	resolved.filesystem_path = resolved.request_path;
 
@@ -367,51 +474,14 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	resolved.root = server_conf.root;
 	resolved.index = server_conf.index;
 
-	const LocationConfig *best_location = NULL;
-	for (size_t i = 0; i < server_conf.locations.size(); ++i)
-	{
-		const LocationConfig &current = server_conf.locations[i];
-		if (!location_matches(resolved.request_path, current.uri)) continue;
-		if (!best_location || current.uri.size() > best_location->uri.size())
-			best_location = &current;
-	}
+	const LocationConfig *best_location = find_best_location(server_conf, resolved.request_path);
+	apply_location_override(resolved, best_location);
 
-	std::string relative_uri = resolved.request_path;
-	if (best_location)
-	{
-		resolved.matched_location = best_location->uri;
-		if (!best_location->root.empty()) resolved.root = best_location->root;
-		if (!best_location->index.empty()) resolved.index = best_location->index;
+	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
+	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
 
-		if (best_location->uri != "/")
-		{
-			if (resolved.request_path.size() <= best_location->uri.size())
-				relative_uri = "/";
-			else
-				relative_uri = resolved.request_path.substr(best_location->uri.size());
-		}
-	}
-
-	if (relative_uri.empty() || relative_uri[0] != '/')
-		relative_uri = "/" + relative_uri;
-
-	resolved.filesystem_path = join_fs_path(resolved.root, relative_uri);
-	if (!resolved.index.empty())
-	{
-		bool needs_index = false;
-		if (relative_uri == "/") needs_index = true;
-		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
-			needs_index = true;
-		if (needs_index)
-			resolved.filesystem_path = join_fs_path(resolved.filesystem_path, resolved.index);
-	}
-
-	// resolved path -> 
-	// Check if the path leads to:
-	// Cgi..
-	//     cgi_pass 
-	// Directory..
-	// Static File
+	resolve_cgi_script(resolved, best_location);
+	resolve_resource_type(resolved);
 
 	return resolved;
 }
