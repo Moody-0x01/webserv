@@ -120,7 +120,7 @@ static std::string compute_relative_uri(const std::string &request_path, const L
 static void apply_location_override(UriResolutionResult &resolved, const LocationConfig *best_location)
 {
 	if (!best_location) return;
-	resolved.matched_location = best_location->uri;
+	resolved.matched_location = best_location;
 	if (!best_location->root.empty()) resolved.root = best_location->root;
 	if (!best_location->index.empty()) resolved.index = best_location->index;
 }
@@ -290,7 +290,7 @@ Response::Response()
 UriResolutionResult::UriResolutionResult()
 {
 	resource_type = file;
-	matched_location = "";
+	matched_location = NULL;
 	request_path = "/";
 	root = "";
 	index = "";
@@ -314,6 +314,13 @@ void Response::continue_processing(const HttpRequest &request)
 	abort();
 }
 
+bool Response::is_method_allowed(std::string method)
+{
+		return (std::find(resolved_results.matched_location->methods.begin(),
+								resolved_results.matched_location->methods.end(),
+								method) != resolved_results.matched_location->methods.end());
+}
+
 void Response::setup_response(const HttpRequest &request)
 {
 	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") || !is_methodvalid(request.method))
@@ -326,12 +333,12 @@ void Response::setup_response(const HttpRequest &request)
 	this->appendheader("content-type", TextHtml);
 
 	this->resolved_results = Response::resolve_uri_to_path(request);
-	// if (this->isallowed(request.method))
-	// {
-	// 	this->set_status(BadRequest);
-	// 	this->get_error_page_html(request, BadRequest);
-	// 	return;		
-	// }
+	if (!this->is_method_allowed(request.method))
+	{
+		this->set_status(BadRequest);
+		this->get_error_page_html(request, BadRequest);
+		return;
+	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);

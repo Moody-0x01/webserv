@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <HTTP/Request.hpp>
 
+struct LocationConfig;
+
 # define __THROWS_STRERROR throw(const char *)
 
 #define  WRITE_CHUNK_SIZE     4096 // 4kb each time.
@@ -111,12 +113,12 @@ struct UriResolutionResult {
 		file
 	};
 	UriResolutionResult();
-	type resource_type;
-	std::string matched_location;
-	std::string request_path;
-	std::string root;
-	std::string index;
-	std::string filesystem_path;
+	type						resource_type;
+	const LocationConfig	*matched_location;
+	std::string			request_path;
+	std::string			root;
+	std::string			index;
+	std::string			filesystem_path;
 	std::pair <std::string, std::string> cgi_script; // holds script name and extension, empty if not a cgi
 };
 
@@ -172,5 +174,6 @@ public:
 	const std::string get_error_page_html(const HttpRequest &request, int code);
 	void setup_response(const HttpRequest &request);
 	void continue_processing(const HttpRequest &request);
+	bool is_method_allowed(std::string method);
 	response_stage_t getstage(void) const;
 };
