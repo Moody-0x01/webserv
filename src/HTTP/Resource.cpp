@@ -14,7 +14,7 @@ Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), type(std:
 	this->resource_type = Text;
 }
 
-void Resource::identify_type(const std::string &path)
+void Resource::identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides)
 {
     if (path.empty())
     {
@@ -29,6 +29,17 @@ void Resource::identify_type(const std::string &path)
     }
     std::string ext = path.substr(dot + 1);
     std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+	if (mime_overrides)
+	{
+		std::map<std::string, std::string>::const_iterator over = mime_overrides->find(ext);
+		if (over != mime_overrides->end())
+		{
+			this->type = over->second;
+			return;
+		}
+	}
+
     std::map<std::string, std::string>::iterator it = Response::mimes.find(ext);
     if (it != Response::mimes.end())
         this->type = it->second;

@@ -51,6 +51,7 @@ struct ServerConfig {
     size_t                       client_max_body_size;
     std::string                  root;
     std::string                  index;
+    std::map<std::string, std::string> mime_types;
     std::map<size_t, std::string>   error_pages;
     std::vector<LocationConfig>  locations;
 
@@ -95,6 +96,7 @@ class ConfigParser {
         void        handleUploadEnabled();
         void        handleUploadPath();
         void        handleAllowMethods();
+        void        handleMimeTypes();
         void        handleReturn();
         void        verifyExt(ConfigToken &t);
         void        handleCgiPass();

@@ -27,6 +27,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
         client_max_body_size  = other.client_max_body_size;
         root                  = other.root;
         index                 = other.index;
+        mime_types            = other.mime_types;
         error_pages           = other.error_pages;
         locations             = other.locations;
     }
@@ -61,6 +62,12 @@ void Config::debug() const {
         std::cout << "  Root:                " << (srv.root.empty() ? "(none)" : srv.root) << "\n";
         std::cout << "  Index:               " << (srv.index.empty() ? "(none)" : srv.index) << "\n";
         std::cout << "  Client Max Body Size: " << srv.client_max_body_size << " bytes\n";
+
+        if (!srv.mime_types.empty()) {
+            std::cout << "  Mime Types:\n";
+            for (std::map<std::string, std::string>::const_iterator it = srv.mime_types.begin(); it != srv.mime_types.end(); ++it)
+                std::cout << "    ." << it->first << " -> " << it->second << "\n";
+        }
 
         if (!srv.error_pages.empty()) {
             std::cout << "  Error Pages:\n";
@@ -274,6 +281,24 @@ void ConfigParser::handleAllowMethods() {
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
+void ConfigParser::handleMimeTypes() {
+    consume(CONFIG_TOKEN_TYPE_WORD);
+
+    bool has_any = false;
+    while (_pos < _tokens.size() && _tokens[_pos].type != CONFIG_TOKEN_TYPE_SEMICOLON) {
+        ConfigToken mime = consume(CONFIG_TOKEN_TYPE_WORD);
+        if (_pos >= _tokens.size() || _tokens[_pos].type == CONFIG_TOKEN_TYPE_SEMICOLON)
+            errorLogger("mime_types expects pairs: <mime> <ext>", mime.line);
+        ConfigToken ext = consume(CONFIG_TOKEN_TYPE_WORD);
+        _currentServer.mime_types[ext.value] = mime.value;
+        has_any = true;
+    }
+
+    if (!has_any)
+        errorLogger("mime_types can't be empty", peek().line);
+    consume(CONFIG_TOKEN_TYPE_SEMICOLON);
+}
+
 void ConfigParser::handleReturn() {
     consume(CONFIG_TOKEN_TYPE_WORD);
     size_t code = 302;
@@ -293,12 +318,8 @@ void ConfigParser::handleReturn() {
 }
 
 void ConfigParser::verifyExt(ConfigToken &t) {
-    std::string path = t.value;
-    size_t i = path.find_last_of('.');
-    if (i == std::string::npos)
-        errorLogger("Invalid CGI file \"" + t.value + "\"", t.line);
-    std::string ext = path.substr(i, path.size() - i);
-    if (ext != ".php" && ext != ".py")
+    std::string ext = t.value;
+    if (ext != ".py")
         errorLogger("Unsupported CGI extension \"" + ext + "\"", t.line);
 }
 
@@ -352,6 +373,7 @@ Config ConfigParser::parse() {
                 else if (t.value == "error_page")           handleErrorPage();
                 else if (t.value == "root")                 handleRoot(false);
                 else if (t.value == "index")                handleIndex(false);
+                else if (t.value == "mime_types")           handleMimeTypes();
                 else if (t.value == "location") {
                     consume(CONFIG_TOKEN_TYPE_WORD);
                     _currentLocation = LocationConfig();

@@ -86,7 +86,7 @@ class Resource
 	public:
 		Resource();
 
-		void identify_type(const std::string &path);
+		void identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides = NULL);
 		int open(const std::string &path); // TODO: Init the Resource, 
 			// identify the mime type. if it is supported, if not then BadRequest error page should be set up and sent
 		~Resource();
@@ -119,7 +119,7 @@ struct UriResolutionResult {
 	std::string			root;
 	std::string			index;
 	std::string			filesystem_path;
-	std::pair <std::string, std::string> cgi_script; // holds script name and extension, empty if not a cgi
+	std::pair <std::string, std::string> cgi_script; // holds full script path and interpreter, empty if not a cgi
 };
 
 class Response
