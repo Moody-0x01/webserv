@@ -116,6 +116,7 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
+		std::cout << "\n\n" << resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
 	}
 }
 
