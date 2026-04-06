@@ -10,33 +10,6 @@
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
 
-static std::string trim_uri_to_path(const std::string &uri)
-{
-	if (uri.empty()) return "/";
-	size_t end = uri.find_first_of("?#");
-	std::string path = uri.substr(0, end);
-	if (path.empty()) return "/";
-	if (path[0] != '/') path = "/" + path;
-
-	std::string normalized;
-	normalized.reserve(path.size());
-	bool last_was_slash = false;
-	for (size_t index = 0; index < path.size(); ++index)
-	{
-		if (path[index] == '/')
-		{
-			if (last_was_slash) continue;
-			last_was_slash = true;
-		}
-		else
-			last_was_slash = false;
-		normalized.push_back(path[index]);
-	}
-
-	if (normalized.empty()) return "/";
-	return normalized;
-}
-
 static bool location_matches(const std::string &request_path, const std::string &location_uri)
 {
 	if (location_uri.empty()) return false;
@@ -136,23 +109,14 @@ static std::string build_filesystem_target(const UriResolutionResult &resolved, 
 
 static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConfig *best_location)
 {
-	// I should check the .py in config, and then I should see if the URI does have .py, then it is a CGI if not and it is  a directory I should check the index fallback to see if it is a script if not it is just a normal file, or a directory.
 	if (!best_location || best_location->cgi_path.empty()) return;
-
-	std::string extension = extract_extension(resolved.request_path);
+	std::string extension = extract_extension(resolved.filesystem_path);
 	std::map<std::string, std::string>::const_iterator cgi_it = best_location->cgi_path.find(extension);
 	if (!extension.empty() && cgi_it != best_location->cgi_path.end())
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		std::cout << "\n\n" <<  resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
 	}
-}
-
-static void resolve_resource_type(UriResolutionResult &resolved)
-{
-	if (resolved.resource_type == UriResolutionResult::cgi) return;
-	resolved.resource_type = get_resource_type(resolved.filesystem_path);
 }
 
 static std::string reason_phrase_for_status(int code)
@@ -499,7 +463,7 @@ const UriResolutionResult &Response::get_resolved_results(void) const
 UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 {
 	UriResolutionResult resolved;
-	resolved.request_path = trim_uri_to_path(request.uri);
+	resolved.request_path = request.uri.empty() ? "/" : request.uri;
 	resolved.filesystem_path = resolved.request_path;
 
 	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
@@ -512,8 +476,8 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
 
-	resolve_cgi_script(resolved, best_location);
-	resolve_resource_type(resolved);
+  resolved.resource_type = get_resource_type(resolved.filesystem_path);
+  resolve_cgi_script(resolved, best_location);
 
 	return resolved;
 }
