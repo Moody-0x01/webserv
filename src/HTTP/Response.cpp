@@ -61,19 +61,13 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 
 // if no index and auto index, just match the cgi
 
-static std::pair<std::string, std::string> script_name_ext(const std::string &path)
+static std::string extract_extension(const std::string &path)
 {
 	size_t slash = path.find_last_of('/');
 	size_t dot = path.find_last_of('.');
 	if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
-		return std::make_pair(std::string(), std::string());
-
-	size_t script_start = (slash == std::string::npos) ? 0 : slash + 1;
-	if (script_start >= path.size()) return std::make_pair(std::string(), std::string());
-
-	std::string script = path.substr(slash);
-	std::string extension = path.substr(dot);
-	return std::make_pair(script, extension);
+		return std::string();
+	return path.substr(dot);
 }
 
 static UriResolutionResult::type get_resource_type(const std::string &path)
@@ -142,14 +136,16 @@ static std::string build_filesystem_target(const UriResolutionResult &resolved, 
 
 static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConfig *best_location)
 {
+	// I should check the .py in config, and then I should see if the URI does have .py, then it is a CGI if not and it is  a directory I should check the index fallback to see if it is a script if not it is just a normal file, or a directory.
 	if (!best_location || best_location->cgi_path.empty()) return;
 
-	std::pair <std::string, std::string> script = script_name_ext(resolved.request_path);
-	/* std::cout << "\n" << script.first << "\n" << script.second << "\n\n"; */
-	if (!(script.first.empty() || script.second.empty()) && best_location->cgi_path.find(script.first + script.second) != best_location->cgi_path.end())
+	std::string extension = extract_extension(resolved.request_path);
+	std::map<std::string, std::string>::const_iterator cgi_it = best_location->cgi_path.find(extension);
+	if (!extension.empty() && cgi_it != best_location->cgi_path.end())
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
-		resolved.cgi_script = script; // scriptname, interpreter pair please Mr Ameen, the greatest swe of all time, all times best and the best actual fker in the universe at all, please forgive u...
+		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
+		std::cout << "\n\n" <<  resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
 	}
 }
 
@@ -393,14 +389,14 @@ const std::string Response::get_error_page_html(const HttpRequest &request, int 
 			content << stream.rdbuf();
 			this->resource.set_stream_buffer(content.str());
 			this->resource.setresource_type(Text);
-			this->resource.identify_type(configured_path);
+			this->resource.identify_type(configured_path, &server_conf.mime_types);
 			return this->resource.get_stream_buffer();
 		}
 	}
 
 	this->resource.set_stream_buffer(build_default_error_html(code));
 	this->resource.setresource_type(Text);
-	this->resource.identify_type("error.html");
+	this->resource.identify_type("error.html", &server_conf.mime_types);
 	return this->resource.get_stream_buffer();
 	return resource.get_stream_buffer();
 }
