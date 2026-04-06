@@ -60,7 +60,6 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 }
 
 // if no index and auto index, just match the cgi
-
 static std::pair<std::string, std::string> script_name_ext(const std::string &path)
 {
 	size_t slash = path.find_last_of('/');
@@ -240,11 +239,6 @@ static std::string build_default_error_html(int code)
     return ss.str();
 }
 
-static bool is_methodvalid(const std::string &method)
-{
-	return ((method == "GET") || (method == "POST") || (method == "DELETE"));
-}
-
 Response::MethodKind Response::classify_method(const std::string &method)
 {
 	if (method == "GET") return MethodGet;
@@ -323,7 +317,7 @@ bool Response::is_method_allowed(std::string method)
 
 void Response::setup_response(const HttpRequest &request)
 {
-	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1") || !is_methodvalid(request.method))
+	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1"))
 	{
 		this->set_status(BadRequest);
 		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
@@ -337,25 +331,31 @@ void Response::setup_response(const HttpRequest &request)
 	{
 		this->set_status(BadRequest);
 		this->get_error_page_html(request, BadRequest);
-		return;
+		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
 		this->get_error_page_html(request, NotFound);
-		return;
+		return ;
 	}
+	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
+	{
+		// TODO: Handle cgi!!
+		return ;
+	}
+
 	switch (Response::classify_method(request.method))
 	{
 		case MethodGet:
 			this->handle_get(request);
-			break;
+			break ;
 		case MethodPost:
 			this->handle_post(request);
-			break;
+			break ;
 		case MethodDelete:
 			this->handle_delete(request);
-			break;
+			break ;
 		default:
 			this->set_status(BadRequest);
 			this->get_error_page_html(request, BadRequest);
@@ -366,7 +366,6 @@ void Response::setup_response(const HttpRequest &request)
 void Response::handle_get(const HttpRequest &request)
 {
 	(void)request;
-
 }
 
 void Response::handle_post(const HttpRequest &request)

@@ -36,9 +36,8 @@ void Resource::identify_type(const std::string &path)
         this->type = ApplicationOctet;
 }
 
-int Resource::open(const std::string &path) __THROWS_STRERROR
+int Resource::open(const std::string &path)
 {
-	(void)(path);
 	errno = 0;
 
 	this->__rstream = new std::ifstream(path.c_str());
@@ -81,13 +80,10 @@ void Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
 	switch (this->resource_type)
 	{
-		case Dir: {
-			// request.method
-			::write(request.conn, "Sending a static file", 22);
-		} break;
 		case File: {
 			::write(request.conn, "Sending a static file", 22);
 		} break;
+		case Dir:
 		case Text: {
 	
 			this->__stream_buffer = "Sending a static text";
@@ -96,9 +92,8 @@ void Resource::send(const HttpRequest &request) __THROWS_STRERROR
 				this->bytes_sent += ::write(request.conn, 
 					this->__stream_buffer.c_str(), 
 					this->__stream_buffer.size());
-			} else {
+			} else
 				this->__done = true;
-			}
 		} break;
 		case Cgi: {
 			::write(request.conn, "Sending Cgi", 12);

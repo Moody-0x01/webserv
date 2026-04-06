@@ -87,7 +87,7 @@ class Resource
 		Resource();
 
 		void identify_type(const std::string &path);
-		int open(const std::string &path) __THROWS_STRERROR; // TODO: Init the Resource, 
+		int open(const std::string &path); // TODO: Init the Resource, 
 			// identify the mime type. if it is supported, if not then BadRequest error page should be set up and sent
 		~Resource();
 		bool isdone(void);
