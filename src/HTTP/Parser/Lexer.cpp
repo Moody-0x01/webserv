@@ -25,8 +25,6 @@ void Lexer::tokenize(std::string &content)
             this->handleHeaderline(buff, endofkey);
         buff.clear(); // flush the buffer
     }
-
-    // this->debug();
 }
 
 void Lexer::headerLineBufferFill(std::string &buff)

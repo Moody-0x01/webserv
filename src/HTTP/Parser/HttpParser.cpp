@@ -6,7 +6,7 @@
 #include <string>
 #include <utility>
 
-HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(0)
+HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
 }
 
@@ -60,25 +60,12 @@ void HttpParser::handle()
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
 			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
-			unsigned int contentLenght = std::atoi(it->second.c_str());
-			this->targetBodySize = contentLenght;
-			if (this->targetBodySize > 0)
-				this->currentState = BODY;
-			else
-				this->currentState = READY;
+			if (it != headers.end())
+				this->targetBodySize = std::atoi(it->second.c_str());
+			else if (this->request.getMethod() == "POST")
+				this->request.setcode(ContentLengthRequired);
 		}
-		else // Normal GET Request
-			this->currentState = READY;
-    }
-
-    if (state() == BODY)
-    {
-        if (this->getRequestBuffer().size() >= this->targetBodySize)
-        {
-            std::string safe_buffer = this->getRequestBuffer().substr(0, this->targetBodySize);
-            this->request.setBody(safe_buffer);
-            this->currentState = READY;
-        }
+		this->currentState = READY;
     }
 }
 

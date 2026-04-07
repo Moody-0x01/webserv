@@ -28,7 +28,7 @@ private:
     Lexer lexerInstence;
     SocketContext *parent;
     Request request;
-    unsigned int targetBodySize;
+    long targetBodySize;
 public:
     HttpParser();
     void handle();

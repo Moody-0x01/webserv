@@ -21,6 +21,7 @@ struct LocationConfig;
 #define  Forbidden            403
 #define  NotFound             404
 #define  MethodNotAllowed     405
+#define  ContentLengthRequired 411
 #define  RequestTimeout       408
 #define  InternalServerError  500
 #define  NotImplemented       501
@@ -31,11 +32,9 @@ struct LocationConfig;
 #define  TextHtml             "text/html"
 #define  TextPlain            "text/plain"
 #define  TextCss              "text/css"
-#define  TextJavascript       "text/javascript"
-#define  TextXml              "text/xml"
 #define  TextCsv              "text/csv"
+#define	 TextMarkDown		  "text/markdown"
 
-// Images.
 #define  ImageJpeg            "image/jpeg"
 #define  ImagePng             "image/png"
 #define  ImageGif             "image/gif"
@@ -43,22 +42,14 @@ struct LocationConfig;
 #define  ImageSvg             "image/svg+xml"
 #define  ImageIco             "image/x-icon"
 
-// Other
 #define  ApplicationJson      "application/json"
 #define  ApplicationXml       "application/xml"
 #define  ApplicationPdf       "application/pdf"
 #define  ApplicationZip       "application/zip"
 #define  ApplicationOctet     "application/octet-stream"
-#define  ApplicationForm      "application/x-www-form-urlencoded"
 #define  ApplicationJs        "application/javascript"
 
-
-// Other audio
-#define  AudioMpeg            "audio/mpeg"
-#define  AudioOgg             "audio/ogg"
-#define  AudioMp3 "audio/mp3"
-
-// Video
+#define  Audio				  "audio/mpeg"
 #define  VideoMp4             "video/mp4"
 #define  VideoWebm            "video/webm"
 

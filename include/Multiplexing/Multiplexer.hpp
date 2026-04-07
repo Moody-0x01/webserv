@@ -1,6 +1,5 @@
 #pragma once
-
-#include <cstddef>
+# include <cstddef>
 # include <map>
 # include <Multiplexing/SocketHandlers.hpp>
 #include <sys/types.h>
