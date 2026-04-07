@@ -1,4 +1,5 @@
 #include "Parser/HTTP/HttpParser.hpp"
+#include "HTTP/Response.hpp"
 #include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
 #include <cstddef>
@@ -24,7 +25,14 @@ void HttpParser::handle()
             std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
             parent->request_buffer.erase(0, endOfHeaders);
             this->lexerInstence.tokenize(headersOnly);
-            this->currentState = HEADERS_DONE;
+            if (lexerInstence.isBadRequest()) // for now am doing it from here.
+            {
+                this->request.setcode(BadRequest);
+                this->currentState = READY;
+                return;
+            }
+            else 
+                this->currentState = HEADERS_DONE;
         }
     }
 

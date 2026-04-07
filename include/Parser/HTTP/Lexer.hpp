@@ -30,6 +30,8 @@ private:
     void decrement();
     char &current();
     unsigned int getPos() const;
+    bool badRequest;
+    void markAsBad();
 public:
     Lexer();
     void tokenize(std::string &content);
@@ -39,20 +41,5 @@ public:
     void handleHeaderline(std::string &buff, size_t &endofkey);
     void headerLineBufferFill(std::string &buff);
     std::vector<Token> &getTokens();
-    
-    // DEBUG
-    void debug();
-    std::string getTypeName(Token &token) const
-    {
-        switch (token.first)
-        {
-            case HEADER_NAME:         return "HEADER_NAME";
-            case HEADER_VALUE:        return "HEADER_VALUE";
-            case HEADER_REQUSET_LINE: return "HEADER_REQUSET_LINE";
-            case METHOD:              return "METHOD";
-            case URI:                 return "URI";
-            case VERSION:             return "VERSION";
-            default:                  return "UNKNOWN_TOKEN";
-        }
-    }
+    bool isBadRequest() const;
 };
