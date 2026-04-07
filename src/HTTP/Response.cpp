@@ -340,12 +340,12 @@ void Response::serve_file(void)
 
 void Response::handle_get(const HttpRequest &request)
 {
-	/* const ServerConfig &server_conf = Multiplexer::confs[request.owner]; */
+	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
 
 	(void)request;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
-		if (!resolved_results.matched_location->autoindex)
+		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
 		{
 			this->set_status(NotFound);
 			this->get_error_page_html(request, NotFound);
