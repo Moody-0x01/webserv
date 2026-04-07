@@ -17,7 +17,7 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     return *this;
 }
 
-ServerConfig::ServerConfig() : port(""), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index("") {}
+ServerConfig::ServerConfig() : port(""), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index(""), autoindex(false) {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     if (this != &other) {
@@ -236,13 +236,19 @@ void ConfigParser::handleIndex(bool inLocation) {
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
 }
 
-void ConfigParser::handleAutoIndex() {
+void ConfigParser::handleAutoIndex(bool inLocation) {
     consume(CONFIG_TOKEN_TYPE_WORD);
     ConfigToken t = consume(CONFIG_TOKEN_TYPE_WORD);
     if (t.value == "on")
-        _currentLocation.autoindex = true;
+    {
+        if (inLocation) _currentLocation.autoindex = true;
+        else _currentServer.autoindex = true;
+    }
     else if (t.value == "off")
-        _currentLocation.autoindex = false;
+    {
+        if (inLocation) _currentLocation.autoindex = false;
+        else _currentServer.autoindex = false;
+    }
     else
         errorLogger("Invalid Auto Index value \"" + t.value + "\"", t.line);
     consume(CONFIG_TOKEN_TYPE_SEMICOLON);
@@ -373,6 +379,7 @@ Config ConfigParser::parse() {
                 else if (t.value == "error_page")           handleErrorPage();
                 else if (t.value == "root")                 handleRoot(false);
                 else if (t.value == "index")                handleIndex(false);
+                else if (t.value == "auto_index")           handleAutoIndex(false);
                 else if (t.value == "mime_types")           handleMimeTypes();
                 else if (t.value == "location") {
                     consume(CONFIG_TOKEN_TYPE_WORD);
@@ -392,7 +399,7 @@ Config ConfigParser::parse() {
                 }
                 else if (t.value == "root")            handleRoot(true);
                 else if (t.value == "index")           handleIndex(true);
-                else if (t.value == "auto_index")      handleAutoIndex();
+                else if (t.value == "auto_index")      handleAutoIndex(true);
                 else if (t.value == "upload_enabled")  handleUploadEnabled();
                 else if (t.value == "upload_path")     handleUploadPath();
                 else if (t.value == "allow_methods")   handleAllowMethods();
