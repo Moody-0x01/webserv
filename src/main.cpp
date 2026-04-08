@@ -17,6 +17,9 @@ int main(int ac, char **av)
 	} catch (std::runtime_error &e) {
 		std::cerr << "[ Multiplexer::init ] " << e.what() << "\n";
 		return (1);
+	} catch (const char *e) {
+		std::cerr << "[ Multiplexer::init ] " << e << "\n";
+		return (1);
 	}
     return (0);
 }

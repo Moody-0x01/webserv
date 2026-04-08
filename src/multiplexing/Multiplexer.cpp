@@ -1,5 +1,8 @@
 #include <Server.hpp>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <cerrno>
+#include <csignal>
 #include <cstdio>
 #include <iostream>
 #include <netdb.h>
@@ -9,11 +12,64 @@
 #include <string>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 int Multiplexer::epoll_fd = 0;
 EpollEvent Multiplexer::events[EVENT_MAX];
 std::map<int, ServerConfig> Multiplexer::confs;
 std::map<int, std::pair<Server, Clients> > Multiplexer::servers;
+int Multiplexer::signal_io[2];
+
+std::string get_signal_name(int sig)
+{
+    static std::map<int, std::string> sig_map;
+
+    sig_map[SIGINT]  =  "SIGINT (Interrupt)";
+    sig_map[SIGTERM] =  "SIGTERM (Termination)";
+    sig_map[SIGHUP]  =  "SIGHUP (Hangup/Reload)";
+    sig_map[SIGUSR1] =  "SIGUSR1 (User Defined 1)";
+    sig_map[SIGUSR2] =  "SIGUSR2 (User Defined 2)";
+    sig_map[SIGQUIT] =  "SIGQUIT (Quit/Core Dump)";
+    if (sig_map.count(sig)) return sig_map[sig];
+    return "Unknown Signal";
+}
+
+void signal_handler(int sig)
+{
+	unsigned char* data;
+    int saved_errno = errno;
+
+	data = (unsigned char*)&sig;
+    write(Multiplexer::signal_io[1],
+		data,
+		sizeof(int));
+    errno = saved_errno;
+}
+
+void Multiplexer::init_signals(void) __THROWS_STRERROR
+{
+    struct epoll_event event;
+    int code;
+
+    if (pipe(Multiplexer::signal_io) < 0)			throw strerror(errno);
+    if (set_nonblocking(Multiplexer::signal_io[0])) throw strerror(errno);
+    if (set_nonblocking(Multiplexer::signal_io[1])) throw strerror(errno);
+
+    event.events = EPOLLIN;
+    event.data.ptr = Multiplexer::signal_io; 
+    code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, 
+                    Multiplexer::signal_io[0], &event);
+    if (code < 0) throw strerror(errno);
+    signal(SIGPIPE, SIG_IGN);
+    if (signal(SIGINT,  signal_handler) == SIG_ERR) throw strerror(errno);
+    if (signal(SIGTERM, signal_handler) == SIG_ERR) throw strerror(errno);
+    if (signal(SIGHUP,  signal_handler) == SIG_ERR) throw strerror(errno);
+    if (signal(SIGQUIT,  signal_handler) == SIG_ERR) throw strerror(errno);
+	if (signal(SIGCHLD, signal_handler) == SIG_ERR) throw strerror(errno);	
+
+	std::cout << "Init Signals: Ok\n";
+}
+
 
 int set_nonblocking(int sockfd)
 {
@@ -32,13 +88,18 @@ std::string Multiplexer::resolve_host(const std::string &host)
     return host;
 }
 
-void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error)
+void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *)
 {
 	Multiplexer::epoll_fd = epoll_create(IGNORED);
 	size_t alive;
 
 	Response::init_status_lines();
-	Response::init_mimes();
+	Response::init_mimes();	
+	try {
+		Multiplexer::init_signals();
+	} catch (const char *e) {
+		throw e;
+	}
 	alive = 0;
 	if (Multiplexer::epoll_fd < 0) throw std::runtime_error(std::strerror(errno));
 	for (size_t c = 0; c < confs.size(); c++)
@@ -132,22 +193,38 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 
 int Multiplexer::loop(void)
 {
+	int sig;
+
     while (true)
 	{
 		int ready = epoll_wait(Multiplexer::epoll_fd,
 						 Multiplexer::events, EVENT_MAX, 100);
 		if (ready < 0)
 		{
+			if (errno == EINTR) continue;
 			std::cerr << "[ Multiplexer::loop ] epoll_wait: " << strerror(errno) << "\n";
 			return 1;
 		}
 		for (int index = 0; index < ready; ++index)
 		{
-			ASocketContext *handle = (ASocketContext *)(Multiplexer::events[index].data.ptr);
-			try {
-				handle->action(Multiplexer::events[index].events);
-			} catch (const char *error) {
-				std::cerr << "[ handle->action ] " << error << "\n";
+			void *ptr = Multiplexer::events[index].data.ptr;
+			if (ptr == Multiplexer::signal_io)
+			{
+				(void)read(Multiplexer::signal_io[0], &sig, sizeof(sig));
+				if (sig != SIGCHLD)
+				{
+					std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
+					return 1;
+				}
+				while (waitpid(-1, NULL, WNOHANG) > 0);
+			}
+			else {
+				ASocketContext *handle = (ASocketContext *)ptr;
+				try {
+					handle->action(Multiplexer::events[index].events);
+				} catch (const char *error) {
+					std::cerr << "[ handle->action ] " << error << "\n";
+				}
 			}
 		}
     }
