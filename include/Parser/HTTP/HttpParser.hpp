@@ -19,14 +19,14 @@ enum ParserState
 
 typedef std::pair<std::string, std::string> Param;
 
-struct SocketContext;
+struct Client;
 
 class HttpParser
 {
 private:
     ParserState currentState;
     Lexer lexerInstence;
-    SocketContext *parent;
+    Client *parent;
     Request request;
     long targetBodySize;
 public:
@@ -38,7 +38,7 @@ public:
     Request &getRequestObject();
     ParserState state() const;
 
-    SocketContext *getParent() const;
-    void setParent(SocketContext *client);
+    Client *getParent() const;
+    void setParent(Client *client);
     bool isHeaderValueExist(const std::string &key);
 };

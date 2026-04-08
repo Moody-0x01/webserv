@@ -118,12 +118,12 @@ ParserState HttpParser::state() const
     return currentState;
 }
 
-void HttpParser::setParent(SocketContext *client)
+void HttpParser::setParent(Client *client)
 {
     this->parent = client;
 }
 
-SocketContext *HttpParser::getParent() const
+Client *HttpParser::getParent() const
 {
     return this->parent;
 }

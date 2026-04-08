@@ -110,6 +110,7 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 {
 	if (!best_location || best_location->cgi_path.empty()) return;
 	std::string extension = extract_extension(resolved.filesystem_path);
+
 	std::map<std::string, std::string>::const_iterator cgi_it = best_location->cgi_path.find(extension);
 	if (!extension.empty() && cgi_it != best_location->cgi_path.end())
 	{
@@ -267,9 +268,16 @@ void Response::continue_processing(const HttpRequest &request)
 
 bool Response::is_method_allowed(std::string method)
 {
-		return (std::find(resolved_results.matched_location->methods.begin(),
-								resolved_results.matched_location->methods.end(),
-								method) != resolved_results.matched_location->methods.end());
+	/*  std::cout << "We are here!!\n";  */
+	/*  std::cout << "Method: " << method;  */
+	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
+
+	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
+	{
+		if (resolved_results.matched_location->methods[i] == method)
+			return (true);
+	}
+	return (true);
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -305,10 +313,13 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
-		// TODO: 
+		// Todo: Cgi handler...
+		// How should it be handeled????
+		// well, register a 
+		// I need to create input (The fd to write the body to) output (the fd to read from the response)
+		// pid_t pid which is the pid that is returned by fork()
 		return ;
 	}
-
 	switch (Response::classify_method(request.method))
 	{
 		// Note: any method other than Get in this section is MethodNotAllowed
