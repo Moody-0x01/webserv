@@ -338,9 +338,33 @@ void Response::setup_response(const HttpRequest &request)
 	}
 }
 
+void Response::list_dir(void)
+{
+	// TODO: use resource to fill the buffer
+}
+
+void Response::serve_file(void)
+{
+	// TODO: use resource to fill the stream and so on
+}
+
 void Response::handle_get(const HttpRequest &request)
 {
+	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+
 	(void)request;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	{
+		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
+		{
+			this->set_status(NotFound);
+			this->get_error_page_html(request, NotFound);
+			return ;
+		}
+		list_dir();
+	}
+	else
+		serve_file();
 }
 
 void Response::handle_post(const HttpRequest &request)

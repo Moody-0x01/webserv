@@ -129,6 +129,9 @@ private:
 	void handle_post(const HttpRequest &request);
 	void handle_delete(const HttpRequest &request);
 
+	void list_dir(void);
+	void serve_file(void);
+
 	// Note: well, a Response should most probably have a write method???  No??
 	// Note: I should most probably make methods for serializing the response headers, then the body...
 	// Once headers weere serialized and sent. then the state should be switched to sending the body... in that case 
