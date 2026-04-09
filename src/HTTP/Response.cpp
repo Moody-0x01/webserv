@@ -1,4 +1,3 @@
-#include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <cstdlib>
 #include <iostream>
@@ -356,7 +355,7 @@ void Response::handle_delete(const HttpRequest &request)
 
 const std::string Response::get_error_page_html(const HttpRequest &request, int code)
 {
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	std::map<size_t, std::string>::const_iterator configured = server_conf.error_pages.find(static_cast<size_t>(code));
 	if (configured != server_conf.error_pages.end())
 	{
@@ -482,7 +481,7 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	resolved.request_path = request.uri.empty() ? "/" : request.uri;
 	resolved.filesystem_path = resolved.request_path;
 
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	resolved.root = server_conf.root;
 	resolved.index = server_conf.index;
 

@@ -8,7 +8,12 @@ HttpParser &Client::getParser(void)
 
 void Client::set_owner(int owner) { _owner = owner; }
 int Client::get_owner(void) const { return _owner; }
-Server *Client::get_server(void) const { return &Multiplexer::servers[_owner].first; }
+Server *Client::get_server(void) const __THROWS_STRERROR {
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	return self->get_owner(this->get_socket());
+}
 
 void Client::take_ownership(ASocketContext *Other)
 {
@@ -31,7 +36,11 @@ void Client::free()
 void Client::parse_request() __THROWS_STRERROR
 {
 	int conn = this->get_socket();
-	// ServerConfig &config;
+	Multiplexer *self;
+	struct epoll_event cev;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
 	HttpParser &clientP = this->getParser();
 	char buff[READ_CHUNK_SIZE];
 
@@ -42,12 +51,10 @@ void Client::parse_request() __THROWS_STRERROR
 		clientP.handle();
 		if (clientP.state() == READY)
 		{
-			struct epoll_event cev;
 			cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
 			cev.data.ptr = this;
-			if (epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+			if (epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
 			{
-				// NOTE: If an epoll_ctl fails it should throw. haha throw up something. whatever
 				std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
 				this->free();
 			}

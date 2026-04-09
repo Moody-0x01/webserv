@@ -1,24 +1,14 @@
 #include <Server.hpp>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <cerrno>
-#include <csignal>
-#include <cstdio>
-#include <iostream>
-#include <netdb.h>
-#include <stdint.h>
-#include <cstring>
-#include <stdexcept>
-#include <string>
-#include <sys/types.h>
-#include <unistd.h>
-#include <signal.h>
 
-int Multiplexer::epoll_fd = 0;
-EpollEvent Multiplexer::events[EVENT_MAX];
-std::map<int, ServerConfig> Multiplexer::confs;
-std::map<int, std::pair<Server, Clients> > Multiplexer::servers;
-int Multiplexer::signal_io[2];
+int set_nonblocking(int sockfd)
+{
+	errno = 0;
+    int flags = fcntl(sockfd, F_GETFL);
+    if (flags == -1) return -1;
+	flags |= O_NONBLOCK;
+    if (fcntl(sockfd, F_SETFL, flags) == -1) return -1;
+    return 0;
+}
 
 std::string get_signal_name(int sig)
 {
@@ -38,74 +28,68 @@ void signal_handler(int sig)
 {
 	unsigned char* data;
     int saved_errno = errno;
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
 
 	data = (unsigned char*)&sig;
-    write(Multiplexer::signal_io[1],
+
+    write(self->signal_io[1],
 		data,
 		sizeof(int));
     errno = saved_errno;
 }
 
-void Multiplexer::init_signals(void) __THROWS_STRERROR
+Multiplexer *Multiplexer::get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *)
 {
-    struct epoll_event event;
-    int code;
-
-    if (pipe(Multiplexer::signal_io) < 0)			throw strerror(errno);
-    if (set_nonblocking(Multiplexer::signal_io[0])) throw strerror(errno);
-    if (set_nonblocking(Multiplexer::signal_io[1])) throw strerror(errno);
-
-    event.events = EPOLLIN;
-    event.data.ptr = Multiplexer::signal_io; 
-    code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, 
-                    Multiplexer::signal_io[0], &event);
-    if (code < 0) throw strerror(errno);
-    signal(SIGPIPE, SIG_IGN);
-    if (signal(SIGINT,  signal_handler) == SIG_ERR) throw strerror(errno);
-    if (signal(SIGTERM, signal_handler) == SIG_ERR) throw strerror(errno);
-    if (signal(SIGHUP,  signal_handler) == SIG_ERR) throw strerror(errno);
-    if (signal(SIGQUIT,  signal_handler) == SIG_ERR) throw strerror(errno);
-	if (signal(SIGCHLD, signal_handler) == SIG_ERR) throw strerror(errno);	
-
-	std::cout << "Init Signals: Ok\n";
+	static Multiplexer m;
+	if (confs) m.init(*confs);
+	return (&m);
 }
 
-
-int set_nonblocking(int sockfd)
+Multiplexer *Multiplexer::create_multiplexer(std::vector<ServerConfig> &confs)
 {
-	errno = 0;
-    int flags = fcntl(sockfd, F_GETFL);
-    if (flags == -1) return -1;
-	flags |= O_NONBLOCK;
-    if (fcntl(sockfd, F_SETFL, flags) == -1) return -1;
-    return 0;
+	return (Multiplexer::get_multiplexer(&confs));
 }
 
-std::string Multiplexer::resolve_host(const std::string &host)
+const ServerConfig &Multiplexer::get_conf(int fd)
 {
-    if (host.empty()) return "0.0.0.0";
-    if (host == "localhost") return "127.0.0.1";
-    return host;
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	return (self->confs[fd]);
+}
+
+Server *Multiplexer::get_owner(int fd) __THROWS_STRERROR
+{
+	if (this->servers.find(fd) == this->servers.end())
+		throw "Client did not find its owner";
+	return (&this->servers[fd].first);
+}
+
+Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
+{
+	if (this->epoll_fd < 0)
+		throw std::strerror(errno);
+	Response::init_status_lines();
+	Response::init_mimes();	
+	try {
+		this->init_signals();
+	} catch (const char *e) {
+		throw e;
+	}
 }
 
 void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *)
 {
-	Multiplexer::epoll_fd = epoll_create(IGNORED);
 	size_t alive;
 
-	Response::init_status_lines();
-	Response::init_mimes();	
-	try {
-		Multiplexer::init_signals();
-	} catch (const char *e) {
-		throw e;
-	}
 	alive = 0;
-	if (Multiplexer::epoll_fd < 0) throw std::runtime_error(std::strerror(errno));
 	for (size_t c = 0; c < confs.size(); c++)
 	{
 		try {
-			Multiplexer::register_server(confs[c]);
+			this->register_server(confs[c]);
 			alive++;
 		} catch (const char *error) {
 			std::cerr << "[ Multiplexer::register_server ] " << error << "\n";
@@ -115,25 +99,46 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 	throw std::runtime_error("There are no hosts to continue further.");
 }
 
-void Multiplexer::deinit(void)
+void Multiplexer::init_signals(void) __THROWS_STRERROR
 {
-	close(Multiplexer::epoll_fd);
+    struct epoll_event event;
+    int code;
+
+    if (pipe(this->signal_io) < 0)			 throw strerror(errno);
+    if (set_nonblocking(this->signal_io[0])) throw strerror(errno);
+    if (set_nonblocking(this->signal_io[1])) throw strerror(errno);
+
+    event.events = EPOLLIN;
+    event.data.ptr = this->signal_io; 
+    code = epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, 
+                    this->signal_io[0], &event);
+    if (code < 0) throw strerror(errno);
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         throw strerror(errno);
+    if (signal(SIGINT,  signal_handler) == SIG_ERR)  throw strerror(errno);
+    if (signal(SIGTERM, signal_handler) == SIG_ERR)  throw strerror(errno);
+    if (signal(SIGHUP,  signal_handler) == SIG_ERR)  throw strerror(errno);
+    if (signal(SIGQUIT,  signal_handler) == SIG_ERR) throw strerror(errno);
+	if (signal(SIGCHLD, signal_handler) == SIG_ERR)  throw strerror(errno);	
 }
 
-void Multiplexer::unregister_client(int owner, int client)
+static std::string resolve_host(const std::string &host)
 {
-	Multiplexer::servers[owner].second.erase(client);
+    if (host.empty()) return "0.0.0.0";
+    if (host == "localhost") return "127.0.0.1";
+    return host;
 }
 
 void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 {
 	Server server;
 	int server_fd, opt, code;
-
+	Multiplexer *self;
 	struct epoll_event event;
 	struct addrinfo hints, *res;
 
-	conf.host = Multiplexer::resolve_host(conf.host);
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	conf.host = resolve_host(conf.host);
 	std::memset(&hints, 0, sizeof(hints));
     hints.ai_family   = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
@@ -157,15 +162,15 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
     if (listen(server.get_socket(), SOMAXCONN) < 0)
 		throw strerror(errno);
 	server.disown();
-	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
-	Multiplexer::confs[server_fd] = conf;
+	self->servers[server_fd] = std::make_pair(server, Clients());
+	self->confs[server_fd] = conf;
 
 	event.events = EPOLLIN;
-	event.data.ptr = &Multiplexer::servers[server_fd].first;
-	code = epoll_ctl(Multiplexer::epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
+	event.data.ptr = &self->servers[server_fd].first;
+	code = epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
 	if (code < 0)
 	{
-		Multiplexer::servers.erase(server_fd);
+		self->servers.erase(server_fd);
 		throw strerror(errno);
 	}
 }
@@ -173,10 +178,14 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
 {
 	struct sockaddr_in addr;
+	Multiplexer *self;
 	int conn;
 	socklen_t len;
 	Client client;
 	(void)e;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
 
 	len = sizeof(addr);
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
@@ -186,9 +195,32 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
 	if (set_nonblocking(conn) == -1) throw strerror(errno);
-	Multiplexer::servers[server->get_socket()].second[conn]
+	self->servers[server->get_socket()].second[conn]
 		.take_ownership(&client);
-	return (&Multiplexer::servers[server->get_socket()].second[conn]);
+	return (&self->servers[server->get_socket()].second[conn]);
+}
+
+
+void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
+{
+
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	self->servers[owner].second.erase(client);
+}
+
+Multiplexer::~Multiplexer()
+{
+	this->deinit();
+}
+
+void Multiplexer::deinit(void)
+{
+	if (this->epoll_fd != -1) close(this->epoll_fd);
+	if (this->signal_io[0] != -1) close(this->signal_io[0]);
+	if (this->signal_io[1] != -1) close(this->signal_io[1]);
+	// TODO: Cleanup other stuff..
 }
 
 int Multiplexer::loop(void)
@@ -197,8 +229,8 @@ int Multiplexer::loop(void)
 
     while (true)
 	{
-		int ready = epoll_wait(Multiplexer::epoll_fd,
-						 Multiplexer::events, EVENT_MAX, 100);
+		int ready = epoll_wait(this->epoll_fd,
+						 this->events, EVENT_MAX, 100);
 		if (ready < 0)
 		{
 			if (errno == EINTR) continue;
@@ -207,10 +239,10 @@ int Multiplexer::loop(void)
 		}
 		for (int index = 0; index < ready; ++index)
 		{
-			void *ptr = Multiplexer::events[index].data.ptr;
-			if (ptr == Multiplexer::signal_io)
+			void *ptr = this->events[index].data.ptr;
+			if (ptr == this->signal_io)
 			{
-				(void)read(Multiplexer::signal_io[0], &sig, sizeof(sig));
+				(void)read(this->signal_io[0], &sig, sizeof(sig));
 				if (sig != SIGCHLD)
 				{
 					std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
@@ -221,7 +253,7 @@ int Multiplexer::loop(void)
 			else {
 				ASocketContext *handle = (ASocketContext *)ptr;
 				try {
-					handle->action(Multiplexer::events[index].events);
+					handle->action(this->events[index].events);
 				} catch (const char *error) {
 					std::cerr << "[ handle->action ] " << error << "\n";
 				}
