@@ -259,7 +259,11 @@ void Response::continue_processing(const HttpRequest &request)
 		this->stage = SendingResource;
 	}
 	if (this->stage == SendingResource) {
-		this->resource.send(request);
+		if (this->status == OK) this->resource.send(request);
+		else {
+			// Send error page..
+
+		}
 		return ;
 	}
 	abort();
@@ -289,11 +293,12 @@ void Response::setup_response(const HttpRequest &request)
 	{
 		this->set_status(request.code);
 		this->get_error_page_html(request, request.code);
+		
 		return ;
 	}
 	this->set_status(OK);
 	this->appendheader("content-type", TextHtml);
-
+	
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
@@ -398,7 +403,6 @@ const std::string Response::get_error_page_html(const HttpRequest &request, int 
 	this->resource.setresource_type(Text);
 	this->resource.identify_type("error.html", &server_conf.mime_types);
 	return this->resource.get_stream_buffer();
-	return resource.get_stream_buffer();
 }
 
 Response::~Response()

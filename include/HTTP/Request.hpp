@@ -16,6 +16,7 @@ typedef struct HttpRequest {
     std::map<std::string, std::string> headers;
     std::string body;
     std::map<std::string, std::string> params;
+    std::string query_string;
 } HttpRequest;
 
 # define __THROWS_STRERROR throw(const char *)
