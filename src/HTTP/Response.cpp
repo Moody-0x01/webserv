@@ -271,11 +271,9 @@ bool Response::is_method_allowed(std::string method)
 	/*  std::cout << "Method: " << method;  */
 	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
 
-	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
-	{
-		if (resolved_results.matched_location->methods[i] == method)
-			return (true);
-	}
+	/*  for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)  */
+	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
+	(void)(method);
 	return (true);
 }
 
@@ -350,7 +348,7 @@ void Response::serve_file(void)
 
 void Response::handle_get(const HttpRequest &request)
 {
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 
 	(void)request;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
