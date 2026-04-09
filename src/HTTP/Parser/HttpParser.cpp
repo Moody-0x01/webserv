@@ -1,4 +1,5 @@
 #include "Parser/HTTP/HttpParser.hpp"
+#include "HTTP/Response.hpp"
 #include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
 #include <cstddef>
@@ -6,7 +7,7 @@
 #include <string>
 #include <utility>
 
-HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(0)
+HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
 }
 
@@ -24,7 +25,14 @@ void HttpParser::handle()
             std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
             parent->request_buffer.erase(0, endOfHeaders);
             this->lexerInstence.tokenize(headersOnly);
-            this->currentState = HEADERS_DONE;
+            if (lexerInstence.isBadRequest()) // for now am doing it from here.
+            {
+                this->request.setcode(BadRequest);
+                this->currentState = READY;
+                return;
+            }
+            else 
+                this->currentState = HEADERS_DONE;
         }
     }
 
@@ -60,25 +68,12 @@ void HttpParser::handle()
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
 			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
-			unsigned int contentLenght = std::atoi(it->second.c_str());
-			this->targetBodySize = contentLenght;
-			if (this->targetBodySize > 0)
-				this->currentState = BODY;
-			else
-				this->currentState = READY;
+			if (it != headers.end())
+				this->targetBodySize = std::atoi(it->second.c_str());
+			else if (this->request.getMethod() == "POST")
+				this->request.setcode(ContentLengthRequired);
 		}
-		else // Normal GET Request
-			this->currentState = READY;
-    }
-
-    if (state() == BODY)
-    {
-        if (this->getRequestBuffer().size() >= this->targetBodySize)
-        {
-            std::string safe_buffer = this->getRequestBuffer().substr(0, this->targetBodySize);
-            this->request.setBody(safe_buffer);
-            this->currentState = READY;
-        }
+		this->currentState = READY;
     }
 }
 
@@ -123,12 +118,12 @@ ParserState HttpParser::state() const
     return currentState;
 }
 
-void HttpParser::setParent(SocketContext *client)
+void HttpParser::setParent(Client *client)
 {
     this->parent = client;
 }
 
-SocketContext *HttpParser::getParent() const
+Client *HttpParser::getParent() const
 {
     return this->parent;
 }

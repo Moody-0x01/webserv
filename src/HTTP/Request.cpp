@@ -1,12 +1,26 @@
 #include <Server.hpp>
 
-Request::Request() {};
+Request::Request() {
+	this->request.isbadrequest = false;
+	this->request.code = NO_CODE;
+};
 
 Request::~Request() {};
 
 const HttpRequest &Request::getHttpRequest(void) const
 {
 	return (this->request);
+}
+
+HttpRequest &Request::getHttpRequest(void)
+{
+    return (this->request);
+}
+
+void Request::setcode(int code)
+{
+	this->request.code = code;
+	this->request.isbadrequest = true;
 }
 
 void Request::set_sockets(const int server, const int client)

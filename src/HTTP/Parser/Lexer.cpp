@@ -1,6 +1,7 @@
+#include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
 
-Lexer::Lexer() : content(""), pos(0) {}
+Lexer::Lexer() : content(""), pos(0), badRequest(false) {}
 
 void Lexer::tokenize(std::string &content)
 {
@@ -23,10 +24,8 @@ void Lexer::tokenize(std::string &content)
             this->handleRequstline(buff);
         else
             this->handleHeaderline(buff, endofkey);
-        buff.clear(); // flush the buffer
+        buff.clear();
     }
-
-    // this->debug();
 }
 
 void Lexer::headerLineBufferFill(std::string &buff)
@@ -51,8 +50,9 @@ void Lexer::handleHeaderline(std::string &buff, size_t &endofkey)
     std::string key = buff.substr(0, endofkey);
     if (!key.empty() && (key[key.length() - 1] == ' ' || key[key.length() - 1] == '\t'))
     {
-        // catch to send a 400 Bad Request response.
-        // dd("Invalid whitespace before colon in header");
+        // Invalid whitespace before colon in header
+        this->markAsBad();
+        return;
     }
     endofkey++; // skip : of the key
     while (endofkey < buff.length() && (buff[endofkey] == ' ' || buff[endofkey] == '\t'))
@@ -68,18 +68,19 @@ void Lexer::handleRequstline(std::string &buff)
 
     if (fspace == std::string::npos)
     {
-        // dd("no spaces on the request line? ??????");
-        // throw BadRequestException();
+        // no spaces on the request line?
+        this->markAsBad();
+        return;
     }
     else
     {
         std::string method = buff.substr(0, fspace);
-
         size_t sspace = buff.find(' ', fspace + 1);
         if (sspace == std::string::npos)
         {
-            // dd("missing HTTP version");
-            // throw BadRequestException();
+            // missing HTTP version
+            this->markAsBad();
+            return;
 		}
 		// method uri version
         else
@@ -123,4 +124,15 @@ unsigned int Lexer::getPos() const
 std::vector<Token> &Lexer::getTokens()
 {
     return tokens;
+}
+
+// all the errors catched here are 400 Bad Request so i just used the boolean no code needed!
+void Lexer::markAsBad()
+{
+    this->badRequest = true;
+}
+
+bool Lexer::isBadRequest() const 
+{
+    return this->badRequest;
 }

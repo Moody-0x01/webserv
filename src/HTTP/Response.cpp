@@ -33,7 +33,6 @@ static std::string join_fs_path(const std::string &root, const std::string &suff
 }
 
 // if no index and auto index, just match the cgi
-
 static std::string extract_extension(const std::string &path)
 {
 	size_t slash = path.find_last_of('/');
@@ -111,11 +110,13 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 {
 	if (!best_location || best_location->cgi_path.empty()) return;
 	std::string extension = extract_extension(resolved.filesystem_path);
+
 	std::map<std::string, std::string>::const_iterator cgi_it = best_location->cgi_path.find(extension);
 	if (!extension.empty() && cgi_it != best_location->cgi_path.end())
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
+		std::cout << "\n\n" << resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
 	}
 }
 
@@ -208,37 +209,29 @@ Response::MethodKind Response::classify_method(const std::string &method)
 	return MethodInvalid;
 }
 
-void Response::init_mimes()
-{
-	if (!mimes.empty()) return ;
-
-	Response::mimes["html"]  = TextHtml;
-	Response::mimes["htm"]   = TextHtml;
-	Response::mimes["txt"]   = TextPlain;
-	Response::mimes["css"]   = TextCss;
-	Response::mimes["csv"]   = TextCsv;
-	Response::mimes["js"]    = ApplicationJs;
-	Response::mimes["mjs"]   = ApplicationJs;
-	Response::mimes["xml"]   = ApplicationXml;
-
-	Response::mimes["jpg"]   = ImageJpeg;
-	Response::mimes["jpeg"]  = ImageJpeg;
-	Response::mimes["png"]   = ImagePng;
-	Response::mimes["gif"]   = ImageGif;
-	Response::mimes["webp"]  = ImageWebp;
-	Response::mimes["svg"]   = ImageSvg;
-	Response::mimes["ico"]   = ImageIco;
-
-	Response::mimes["json"]  = ApplicationJson;
-	Response::mimes["pdf"]   = ApplicationPdf;
-	Response::mimes["zip"]   = ApplicationZip;
-	Response::mimes["bin"]   = ApplicationOctet;
-	Response::mimes["form"]  = ApplicationForm;
-
-	Response::mimes["mp3"]   = AudioMpeg;
-	Response::mimes["ogg"]   = AudioOgg;
-	Response::mimes["mp4"]   = VideoMp4;
-	Response::mimes["webm"]  = VideoWebm;
+void Response::init_mimes() {
+	if (!mimes.empty())
+		return;
+	Response::mimes["md"] = TextMarkDown;
+	Response::mimes["html"] = TextHtml;
+	Response::mimes["txt"] = TextPlain;
+	Response::mimes["css"] = TextCss;
+	Response::mimes["csv"] = TextCsv;
+	Response::mimes["jpg"] = ImageJpeg;
+	Response::mimes["png"] = ImagePng;
+	Response::mimes["gif"] = ImageGif;
+	Response::mimes["webp"] = ImageWebp;
+	Response::mimes["svg"] = ImageSvg;
+	Response::mimes["ico"] = ImageIco;
+	Response::mimes["json"] = ApplicationJson;
+	Response::mimes["xml"] = ApplicationXml;
+	Response::mimes["pdf"] = ApplicationPdf;
+	Response::mimes["zip"] = ApplicationZip;
+	Response::mimes["bin"] = ApplicationOctet;
+	Response::mimes["js"] = ApplicationJs;
+	Response::mimes["mp3"] = Audio;
+	Response::mimes["mp4"] = VideoMp4;
+	Response::mimes["webm"] = VideoWebm;
 }
 
 Response::Response()
@@ -275,9 +268,16 @@ void Response::continue_processing(const HttpRequest &request)
 
 bool Response::is_method_allowed(std::string method)
 {
-		return (std::find(resolved_results.matched_location->methods.begin(),
-								resolved_results.matched_location->methods.end(),
-								method) != resolved_results.matched_location->methods.end());
+	/*  std::cout << "We are here!!\n";  */
+	/*  std::cout << "Method: " << method;  */
+	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
+
+	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
+	{
+		if (resolved_results.matched_location->methods[i] == method)
+			return (true);
+	}
+	return (true);
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -288,14 +288,21 @@ void Response::setup_response(const HttpRequest &request)
 		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
+	if (request.isbadrequest)
+	{
+		this->set_status(request.code);
+		this->get_error_page_html(request, request.code);
+		return ;
+	}
 	this->set_status(OK);
 	this->appendheader("content-type", TextHtml);
 
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
-		this->set_status(BadRequest);
-		this->get_error_page_html(request, BadRequest);
+		// Note: any method that is Not Allowed, is Forbidden automatically
+		this->set_status(Forbidden);
+		this->get_error_page_html(request, Forbidden);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
@@ -306,12 +313,16 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
-		// TODO: Handle cgi!!
+		// Todo: Cgi handler...
+		// How should it be handeled????
+		// well, register a 
+		// I need to create input (The fd to write the body to) output (the fd to read from the response)
+		// pid_t pid which is the pid that is returned by fork()
 		return ;
 	}
-
 	switch (Response::classify_method(request.method))
 	{
+		// Note: any method other than Get in this section is MethodNotAllowed
 		case MethodGet:
 			this->handle_get(request);
 			break ;
@@ -459,9 +470,10 @@ void Response::init_status_lines()
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
 	// Cgi?
-    Response::status_lines[NotImplemented     ] = "HTTP/1.0 501 Not Implemented";
-    Response::status_lines[BadGateway         ] = "HTTP/1.0 502 Bad Gateway";
-    Response::status_lines[ServiceUnavailable ] = "HTTP/1.0 503 Service Unavailable";
+	Response::status_lines[ContentLengthRequired] = "HTTP 411 Length Required";
+    Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
+    Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";
+    Response::status_lines[ServiceUnavailable   ] = "HTTP/1.0 503 Service Unavailable";
 }
 
 void Response::appendheader(const char *key, const char  *value)
@@ -504,8 +516,8 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
 
-  resolved.resource_type = get_resource_type(resolved.filesystem_path);
-  resolve_cgi_script(resolved, best_location);
+	resolved.resource_type = get_resource_type(resolved.filesystem_path);
+	resolve_cgi_script(resolved, best_location);
 
 	return resolved;
 }

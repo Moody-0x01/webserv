@@ -66,8 +66,9 @@ void Multiplexer::unregister_client(int owner, int client)
 
 void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 {
-	Server server(server_handler);
+	Server server;
 	int server_fd, opt, code;
+
 	struct epoll_event event;
 	struct addrinfo hints, *res;
 
@@ -94,7 +95,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 		throw strerror(errno);
     if (listen(server.get_socket(), SOMAXCONN) < 0)
 		throw strerror(errno);
-	server.disown(); // So it does not close the socket at exit
+	server.disown();
 	Multiplexer::servers[server_fd] = std::make_pair(server, Clients());
 	Multiplexer::confs[server_fd] = conf;
 
@@ -113,7 +114,7 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	struct sockaddr_in addr;
 	int conn;
 	socklen_t len;
-	Client client(client_handler);
+	Client client;
 	(void)e;
 
 	len = sizeof(addr);
@@ -124,8 +125,8 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
 	if (set_nonblocking(conn) == -1) throw strerror(errno);
-	client.disown();
-	Multiplexer::servers[server->get_socket()].second[conn] = client;
+	Multiplexer::servers[server->get_socket()].second[conn]
+		.take_ownership(&client);
 	return (&Multiplexer::servers[server->get_socket()].second[conn]);
 }
 
@@ -142,9 +143,9 @@ int Multiplexer::loop(void)
 		}
 		for (int index = 0; index < ready; ++index)
 		{
-			SocketContext *handle = (SocketContext *)(Multiplexer::events[index].data.ptr);
+			ASocketContext *handle = (ASocketContext *)(Multiplexer::events[index].data.ptr);
 			try {
-				handle->action(Multiplexer::events[index].events, handle);
+				handle->action(Multiplexer::events[index].events);
 			} catch (const char *error) {
 				std::cerr << "[ handle->action ] " << error << "\n";
 			}
