@@ -79,6 +79,8 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 	} catch (const char *e) {
 		throw e;
 	}
+	this->signal_io[STDOUT_FILENO] = -1;
+	this->signal_io[STDIN_FILENO ] = -1;
 }
 
 void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *)
@@ -217,7 +219,7 @@ Multiplexer::~Multiplexer()
 
 void Multiplexer::deinit(void)
 {
-	if (this->epoll_fd != -1) close(this->epoll_fd);
+	close(this->epoll_fd);
 	if (this->signal_io[0] != -1) close(this->signal_io[0]);
 	if (this->signal_io[1] != -1) close(this->signal_io[1]);
 	// TODO: Cleanup other stuff..

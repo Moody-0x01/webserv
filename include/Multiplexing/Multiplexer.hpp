@@ -1,4 +1,6 @@
 #pragma once
+
+# include <unistd.h>
 # include "ServerSock.hpp"
 # include <cstddef>
 # include <Multiplexing/ClientSock.hpp>
@@ -13,7 +15,6 @@
 # include <netdb.h>
 # include <stdint.h>
 # include <string>
-# include <unistd.h>
 # include <signal.h>
 # include <iostream>
 # include <errno.h>
