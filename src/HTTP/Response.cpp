@@ -249,20 +249,21 @@ UriResolutionResult::UriResolutionResult()
 	cgi_script = std::make_pair(std::string(), std::string());
 }
 
-void Response::continue_processing(const HttpRequest &request)
+void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
-		this->serialize_headers();
-		::write(request.conn, this->headers_as_str.c_str(), this->headers_as_str.size());
-		this->stage = SendingResource;
+		if (this->resolved_results.resource_type != UriResolutionResult::cgi)
+		{
+			this->send_headers(request.conn);
+			this->stage = SendingResource;
+		}
 	}
 	if (this->stage == SendingResource) {
 		if (this->status == OK) this->resource.send(request);
 		else {
 			// Send error page..
-
 		}
 		return ;
 	}
@@ -271,9 +272,9 @@ void Response::continue_processing(const HttpRequest &request)
 
 bool Response::is_method_allowed(std::string method)
 {
-	/*  std::cout << "We are here!!\n";  */
-	/*  std::cout << "Method: " << method;  */
-	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
+	std::cout << "We are here!!\n";
+	std::cout << "Method: " << method;
+	std::cout << "Allowed: " << resolved_results.matched_location;
 
 	/*  for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)  */
 	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
@@ -315,11 +316,9 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
-		// Todo: Cgi handler...
-		// How should it be handeled????
-		// well, register a 
-		// I need to create input (The fd to write the body to) output (the fd to read from the response)
-		// pid_t pid which is the pid that is returned by fork()
+		this->resource.setresource_type(CGI);
+		/*  this->resource.cgi.method = request.method;  */
+		/*  this->resource.cgi.method = request.method;  */
 		return ;
 	}
 	switch (Response::classify_method(request.method))
@@ -419,8 +418,10 @@ void Response::serialize_headers(void)
 }
 
 
-void Response::send_headers(void) __THROWS_STRERROR
+void Response::send_headers(int conn) __THROWS_STRERROR
 {
+	this->serialize_headers();
+	::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
 
@@ -433,7 +434,7 @@ bool Response::isdone(void)
 	// what if it is a file? cgi?..
 	return (true);
 }
-//
+
 // void Response::write(int conn) __THROWS_STRERROR
 // {
 // 	ssize_t count;

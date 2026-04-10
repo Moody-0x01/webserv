@@ -8,6 +8,7 @@ HttpParser &Client::getParser(void)
 
 void Client::set_owner(int owner) { _owner = owner; }
 int Client::get_owner(void) const { return _owner; }
+
 Server *Client::get_server(void) const __THROWS_STRERROR {
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
@@ -47,6 +48,7 @@ void Client::parse_request() __THROWS_STRERROR
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 		std::cout << "Read: " << count << "\n";
+		// Note: In this place the read should know exactly where to forward the buff to. is it the pipe of the cgi or the parser
 		this->request_buffer.append(buff, count);
 		clientP.handle();
 		if (clientP.state() == READY)
@@ -89,8 +91,7 @@ void Client::action(uint32_t e) __THROWS_STRERROR
     }
 
 	try {
-    if (e & EPOLLIN)
-        this->parse_request();
+    if (e & EPOLLIN) this->parse_request();
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
         this->generate_response();
 	} catch (const char *e) {

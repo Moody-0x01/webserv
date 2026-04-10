@@ -3,12 +3,9 @@
 #include <map>
 #include <sys/types.h>
 #include <HTTP/Request.hpp>
+#include <CGI/Cgi.hpp>
 
 struct LocationConfig;
-
-# define __THROWS_STRERROR throw(const char *)
-
-#define  WRITE_CHUNK_SIZE     4096 // 4kb each time.
 
 #define  OK                   200
 #define  Created              201
@@ -58,12 +55,12 @@ typedef enum resource_type_e
 	File,
 	Text,
 	Dir,
-	Cgi
+	CGI
 } resource_type_t;
 
 class Resource
 {
-
+	Cgi				 cgi;
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
@@ -156,8 +153,8 @@ public:
 	static std::map<int, std::string> status_lines;
 	static void init_status_lines();
 
-	void write(int conn) __THROWS_STRERROR; // NOTE: writes the wrapped response into the the client connexion
-	void send_headers(void) __THROWS_STRERROR;
+	/*  void write(int conn) __THROWS_STRERROR; // NOTE: writes the wrapped response into the the client connexion  */
+	void send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);
 	void appendheader(const char *key, const char  *value);
@@ -167,7 +164,7 @@ public:
 	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
 	const std::string get_error_page_html(const HttpRequest &request, int code);
 	void setup_response(const HttpRequest &request);
-	void continue_processing(const HttpRequest &request);
+	void continue_processing(const HttpRequest &request) __THROWS_STRERROR;
 	bool is_method_allowed(std::string method);
 	response_stage_t getstage(void) const;
 };

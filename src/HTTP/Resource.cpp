@@ -110,7 +110,7 @@ void Resource::send(const HttpRequest &request) __THROWS_STRERROR
 			} else
 				this->__done = true;
 		} break;
-		case Cgi: {
+		case CGI: {
 			::write(request.conn, "Sending Cgi", 12);
 		} break;
 		default: 

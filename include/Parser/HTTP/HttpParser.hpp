@@ -3,7 +3,6 @@
 #include <iostream>
 #include <Parser/HTTP/Lexer.hpp>
 #include <HTTP/Request.hpp>
-#include <HTTP/Response.hpp>
 #include <algorithm>
 #include <string>
 #include <vector>

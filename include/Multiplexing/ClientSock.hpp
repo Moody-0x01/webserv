@@ -1,5 +1,6 @@
 #pragma once
 #include <Multiplexing/ServerSock.hpp>
+#include <HTTP/Response.hpp>
 
 typedef struct Client: public ASocketContext {
 public:

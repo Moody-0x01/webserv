@@ -3,8 +3,9 @@
 #include <string>
 #include <map>
 
-#define READ_CHUNK_SIZE 4096
-#define NO_CODE 999
+#define  READ_CHUNK_SIZE      4096
+#define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE // 4kb each time.
+#define  NO_CODE 999
 
 typedef struct HttpRequest {
 	int owner, conn;

@@ -13,7 +13,8 @@ SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/ASock
 	$(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
 	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp $(SOURCE_DIR)/HTTP/Response.cpp \
 	$(SOURCE_DIR)/HTTP/Resource.cpp \
-	$(SOURCE_DIR)/Config/Lexer.cpp $(SOURCE_DIR)/Config/ConfigParser.cpp
+	$(SOURCE_DIR)/Config/Lexer.cpp $(SOURCE_DIR)/Config/ConfigParser.cpp\
+	$(SOURCE_DIR)/multiplexing/Cgi.cpp
 
 
 all: $(NAME)
