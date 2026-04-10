@@ -60,7 +60,6 @@ typedef enum resource_type_e
 
 class Resource
 {
-	Cgi				 cgi;
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
@@ -72,6 +71,7 @@ class Resource
 
 
 	public:
+		Cgi				 cgi;
 		Resource();
 
 		void identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides = NULL);

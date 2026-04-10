@@ -1,7 +1,8 @@
 # pragma once
 # include <Multiplexing/ASocketContext.hpp>
-#include <string>
-#include <unistd.h>
+# include <string>
+# include <unistd.h>
+# include <unistd.h>
 
 typedef enum cgi_state_e {
 	Idle,
@@ -41,39 +42,9 @@ public:
 	int         streams[2];
 	cgi_state_t state;
 
-	void setup(std::string fn, std::string interpreter_, std::string qstring, size_t content_length_, std::string content_type_);
+	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
+	void execute();
 	void action(uint32_t e) __THROWS_STRERROR;
 	void write()            __THROWS_STRERROR;
 	void read()             __THROWS_STRERROR;
 } Cgi;
-
-/**/
-/*  void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_, size_t content_length_, std::string content_type_)  */
-/*  {  */
-/*  	std::string content_length_str;  */
-/*  	std::stringstream ss;  */
-/**/
-/*  	this->protocol = request.httpVersion;  */
-/*  	this->method = request.method;  */
-/*  	this->query_string = request.query_string;  */
-/*  	this->params = request.params;  */
-/*  	this->filename    = fn;  */
-/*  	this->executable  = fn;  */
-/*  	this->interpreter = interpreter_;  */
-/*  	this->content_length = content_length_;  */
-/*  	this->content_type = content_type_;  */
-/*  	this->gateway_interface = "CGI/1.1";  */
-/**/
-/*  	ss << content_length;  */
-/*  	content_length_str = ss.str();  */
-/*  	this->env.push_back("REQUEST_METHOD="+this->method);  */
-/*  	this->env.push_back("QUERY_STRING="+this->query_string);  */
-/*  	this->env.push_back("CONTENT_LENGTH="+content_length_str);  */
-/*  	this->env.push_back("CONTENT_TYPE="+this->content_type);  */
-/*  	this->env.push_back("GATEWAY_INTERFAC="+this->gateway_interface);  */
-/*  	this->env.push_back("SCRIPT_NAME="+this->filename);  */
-/*  	this->env.push_back("PATH_TRANSLATED="+this->filename);  */
-/*  	this->env.push_back("REMOTE_ADDR="+this->);  */
-/*  	this->env.push_back("SERVER_PROTOCOL="+this->);  */
-/*  	this->env.push_back("SERVER_SOFTWARE="+this->);  */
-/*  }  */

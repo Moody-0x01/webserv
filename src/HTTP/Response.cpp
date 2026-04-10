@@ -272,28 +272,17 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 
 bool Response::is_method_allowed(std::string method)
 {
-	std::cout << "We are here!!\n";
-	std::cout << "Method: " << method;
-	std::cout << "Allowed: " << resolved_results.matched_location;
-
-	/*  for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)  */
-	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
-	(void)(method);
-	return (true);
-	/* if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
+	if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
 	{
-		if (method == "GET" || method == "POST" || method == "DELETE")
-			return (true);
-		else
-			return false;
+		if (method == "GET" || method == "POST" || method == "DELETE") return (true);
+		else return false;
 	}
-
 	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
 	{
 		if (resolved_results.matched_location->methods[i] == method)
 			return (true);
 	}
-	return (false); */
+	return (false);
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -331,8 +320,9 @@ void Response::setup_response(const HttpRequest &request)
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
-		/*  this->resource.cgi.method = request.method;  */
-		/*  this->resource.cgi.method = request.method;  */
+
+		this->resource.cgi.setup(request, this->resolved_results.cgi_script.first, this->resolved_results.cgi_script.second);
+
 		return ;
 	}
 	switch (Response::classify_method(request.method))

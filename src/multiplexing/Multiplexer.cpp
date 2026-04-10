@@ -32,9 +32,7 @@ void signal_handler(int sig)
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-
 	data = (unsigned char*)&sig;
-
     write(self->signal_io[1],
 		data,
 		sizeof(int));
@@ -72,6 +70,8 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 {
 	if (this->epoll_fd < 0)
 		throw std::strerror(errno);
+	this->signal_io[STDOUT_FILENO] = -1;
+	this->signal_io[STDIN_FILENO ] = -1;
 	Response::init_status_lines();
 	Response::init_mimes();	
 	try {
@@ -79,8 +79,6 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 	} catch (const char *e) {
 		throw e;
 	}
-	this->signal_io[STDOUT_FILENO] = -1;
-	this->signal_io[STDIN_FILENO ] = -1;
 }
 
 void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *)

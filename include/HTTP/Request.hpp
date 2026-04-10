@@ -2,6 +2,7 @@
 
 #include <string>
 #include <map>
+#include <sys/types.h>
 
 #define  READ_CHUNK_SIZE      4096
 #define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE // 4kb each time.
@@ -18,6 +19,7 @@ typedef struct HttpRequest {
     std::string body;
     std::map<std::string, std::string> params;
     std::string query_string;
+	ssize_t content_length;
 } HttpRequest;
 
 # define __THROWS_STRERROR throw(const char *)
