@@ -85,6 +85,7 @@ void HttpParser::parseParams(std::string &uri)
     if (pos == std::string::npos)
         return;
     std::string query_string = uri.substr(pos + 1);
+    this->request.getHttpRequest().query_string = query_string;
     uri = uri.substr(0, pos);
     size_t start = 0;
     while (start < query_string.length()) {

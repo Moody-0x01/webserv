@@ -96,8 +96,12 @@ void Resource::send(const HttpRequest &request) __THROWS_STRERROR
 		} break;
 		case Dir:
 		case Text: {
-	
 			this->__stream_buffer = "Sending a static text";
+			if (!request.query_string.empty())
+			{
+				this->__stream_buffer.append(",  query string: ");
+				this->__stream_buffer.append(request.query_string.c_str());
+			}
 			if (this->bytes_sent < this->__stream_buffer.size()) {
 				// size_t n = min((int)WRITE_CHUNK_SIZE, (int)this->bytes_sent -this->__stream_buffer.size());
 				this->bytes_sent += ::write(request.conn, 

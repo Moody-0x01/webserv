@@ -1,4 +1,3 @@
-#include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <cstdlib>
 #include <iostream>
@@ -260,7 +259,11 @@ void Response::continue_processing(const HttpRequest &request)
 		this->stage = SendingResource;
 	}
 	if (this->stage == SendingResource) {
-		this->resource.send(request);
+		if (this->status == OK) this->resource.send(request);
+		else {
+			// Send error page..
+
+		}
 		return ;
 	}
 	abort();
@@ -272,7 +275,11 @@ bool Response::is_method_allowed(std::string method)
 	/*  std::cout << "Method: " << method;  */
 	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
 
-	if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
+	/*  for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)  */
+	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
+	(void)(method);
+	return (true);
+	/* if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
 	{
 		if (method == "GET" || method == "POST" || method == "DELETE")
 			return (true);
@@ -285,7 +292,7 @@ bool Response::is_method_allowed(std::string method)
 		if (resolved_results.matched_location->methods[i] == method)
 			return (true);
 	}
-	return (false);
+	return (false); */
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -300,11 +307,12 @@ void Response::setup_response(const HttpRequest &request)
 	{
 		this->set_status(request.code);
 		this->get_error_page_html(request, request.code);
+		
 		return ;
 	}
 	this->set_status(OK);
 	this->appendheader("content-type", TextHtml);
-
+	
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
@@ -359,7 +367,7 @@ void Response::serve_file(void)
 
 void Response::handle_get(const HttpRequest &request)
 {
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 
 	(void)request;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
@@ -388,7 +396,7 @@ void Response::handle_delete(const HttpRequest &request)
 
 const std::string Response::get_error_page_html(const HttpRequest &request, int code)
 {
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	std::map<size_t, std::string>::const_iterator configured = server_conf.error_pages.find(static_cast<size_t>(code));
 	if (configured != server_conf.error_pages.end())
 	{
@@ -409,7 +417,6 @@ const std::string Response::get_error_page_html(const HttpRequest &request, int 
 	this->resource.setresource_type(Text);
 	this->resource.identify_type("error.html", &server_conf.mime_types);
 	return this->resource.get_stream_buffer();
-	return resource.get_stream_buffer();
 }
 
 Response::~Response()
@@ -514,7 +521,7 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	resolved.request_path = request.uri.empty() ? "/" : request.uri;
 	resolved.filesystem_path = resolved.request_path;
 
-	const ServerConfig &server_conf = Multiplexer::confs[request.owner];
+	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	resolved.root = server_conf.root;
 	resolved.index = server_conf.index;
 
