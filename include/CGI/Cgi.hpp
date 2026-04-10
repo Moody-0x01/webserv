@@ -1,5 +1,6 @@
 # pragma once
 # include <Multiplexing/ASocketContext.hpp>
+# include <cstring>
 # include <string>
 # include <unistd.h>
 # include <unistd.h>
@@ -43,7 +44,7 @@ public:
 	cgi_state_t state;
 
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
-	void execute();
+	void execute(void)      __THROWS_STRERROR;
 	void action(uint32_t e) __THROWS_STRERROR;
 	void write()            __THROWS_STRERROR;
 	void read()             __THROWS_STRERROR;
