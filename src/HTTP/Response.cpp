@@ -279,6 +279,20 @@ bool Response::is_method_allowed(std::string method)
 	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
 	(void)(method);
 	return (true);
+	/* if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
+	{
+		if (method == "GET" || method == "POST" || method == "DELETE")
+			return (true);
+		else
+			return false;
+	}
+
+	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
+	{
+		if (resolved_results.matched_location->methods[i] == method)
+			return (true);
+	}
+	return (false); */
 }
 
 void Response::setup_response(const HttpRequest &request)
