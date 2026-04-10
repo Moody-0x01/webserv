@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <cstdio>
 #include <unistd.h>
 
 void Cgi::write() __THROWS_STRERROR
@@ -86,8 +87,8 @@ void Cgi::execute(void) __THROWS_STRERROR
 {
 	// TODO: fork... dup...
 	char *args[3] = {
-		(char*)this->interpreter.data(),
-		(char*)this->filename.data(), 
+		(char*)this->interpreter.c_str(),
+		(char*)this->filename.c_str(), 
 		NULL
 	};
 	int input[2];
@@ -111,15 +112,16 @@ void Cgi::execute(void) __THROWS_STRERROR
 	}
 	if (this->pid == 0)
 	{
-		dup2(input[0], STDIN_FILENO);
-		dup2(output[1], STDOUT_FILENO);
+		dup2(input[STDIN_FILENO], STDIN_FILENO);
+		dup2(output[STDOUT_FILENO], STDOUT_FILENO);
 		close_fdlist(output);
 		close_fdlist(input);
-		execve(this->interpreter.data(), args, &envp[0]);
-		exit(1);
+		execve(this->interpreter.c_str(), args, &envp[0]);
+		perror("execve");
+		_exit(1);
 	}
-	this->streams[STDIN_FILENO] = output[STDIN_FILENO];
-	close(output[STDOUT_FILENO]);
 	this->streams[STDOUT_FILENO] = input[STDOUT_FILENO];
 	close(input[STDIN_FILENO]);
+	this->streams[STDIN_FILENO] = output[STDIN_FILENO];
+	close(output[STDOUT_FILENO]);
 }
