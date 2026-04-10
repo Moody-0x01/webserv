@@ -63,7 +63,6 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	else
 		this->content_type = "application/octet-stream";
 
-
 	ss << content_length;
 	content_length_str = ss.str();
 	this->env.push_back("REQUEST_METHOD="+this->method);
@@ -73,17 +72,54 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->env.push_back("GATEWAY_INTERFAC="+this->gateway_interface);
 	this->env.push_back("SCRIPT_NAME="+this->filename);
 	this->env.push_back("PATH_TRANSLATED="+this->filename);
-	/*  this->env.push_back("REMOTE_ADDR="+this->);  */ // TODO: Get the ip of the client and forward it to the cgi.
+	/*  this->env.push_back("REMOTE_ADDR="+this->);  */ // TODO: Get the ip of the client and forward it to the cgi. 
 	this->env.push_back("SERVER_PROTOCOL="+this->protocol);
 }
 
-void Cgi::execute(void)
+static void close_fdlist(int fds[2])
 {
-	char *args[2] = {(char*)this->filename.data(), NULL};
+	close(fds[STDIN_FILENO]);
+	close(fds[STDOUT_FILENO]);
+}
+
+void Cgi::execute(void) __THROWS_STRERROR
+{
+	// TODO: fork... dup...
+	char *args[3] = {
+		(char*)this->interpreter.data(),
+		(char*)this->filename.data(), 
+		NULL
+	};
+	int input[2];
+	int output[2];
+
 	std::vector<char*> envp;
     for (size_t i = 0; i < this->env.size(); ++i)
         envp.push_back((char*)this->env[i].c_str());
     envp.push_back(NULL);
-	execve(this->interpreter.data(), args, &envp[0]);
-	
+	if (pipe(input) == -1) throw strerror(errno);
+	if (pipe(output) == -1) {
+		close_fdlist(input);
+		throw strerror(errno);
+	}
+	this->pid = fork();
+	if (this->pid == -1)
+	{
+		close_fdlist(output);
+		close_fdlist(input);
+		throw strerror(errno);
+	}
+	if (this->pid == 0)
+	{
+		dup2(input[0], STDIN_FILENO);
+		dup2(output[1], STDOUT_FILENO);
+		close_fdlist(output);
+		close_fdlist(input);
+		execve(this->interpreter.data(), args, &envp[0]);
+		exit(1);
+	}
+	this->streams[STDIN_FILENO] = output[STDIN_FILENO];
+	close(output[STDOUT_FILENO]);
+	this->streams[STDOUT_FILENO] = input[STDOUT_FILENO];
+	close(input[STDIN_FILENO]);
 }
