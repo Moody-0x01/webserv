@@ -1,12 +1,53 @@
 #include <Server.hpp>
+#include <cstdlib>
+#include <iostream>
 #include <sstream>
+#include <unistd.h>
 
 void Cgi::write() __THROWS_STRERROR
 {
+	// TODO: Write the body of the client into cgi output_buffer..
+	if (this->state == WritingBody) {
+		Multiplexer::write(this->streams[STDOUT_FILENO],
+					this->io_buffer.c_str(),
+					this->io_buffer.size());
+	}
 }
 
 void Cgi::read() __THROWS_STRERROR
 {
+	std::string tmp;
+	char buffer[READ_CHUNK_SIZE];
+
+	Multiplexer::read(this->streams[STDIN_FILENO],
+				buffer,
+				sizeof(buffer));
+	this->io_buffer += buffer;
+	switch (this->state)
+	{
+		case Idle: {
+			std::cout << "Wtf bro this should be done in write\n";
+			abort();
+		} break;        // Idk what is this for tho???
+		case WritingBody: {
+			std::cout << "Wtf bro this should be done in write\n";
+			abort();
+		} break; // this is done somewhere else??
+		case ReadingHeaders: {
+			size_t position = this->io_buffer.find(CRLF);
+			if (position == std::string::npos) position = this->io_buffer.find(NLNL);
+			if (position != std::string::npos) {
+				tmp = this->io_buffer.substr(position, this->io_buffer.size());
+				this->io_buffer
+					.erase(position, this->io_buffer.size());
+				this->state = ReadingBody;
+				this->parse_headers();
+				this->io_buffer.swap(tmp);
+			}
+		} break;
+		case ReadingBody: {
+		} break;
+	}
 }
 
 void Cgi::action(uint32_t e) __THROWS_STRERROR
@@ -22,12 +63,10 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 	try {
     if (e & EPOLLIN)
 	{
-		// TODO: Read from the process and hand to the client somewhere else.
 		this->read();
 	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
-		// TODO: Read the body from the client then hand it to the script.
 		this->write();
 	}
 	} catch (const char *e) {
@@ -41,6 +80,8 @@ Cgi::Cgi()
 	this->start_time          = 0;
 	this->content_length      = 0;
 	this->bytes_read_from_cgi = 0;
+	this->state               = Idle;
+	this->io_buffer           = "";
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
@@ -57,8 +98,8 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->executable  = fn;
 	this->interpreter = interpreter_;
 	this->gateway_interface = "CGI/1.1";
-	if (request.headers.find("content-type") != request.headers.end())
-		this->content_type = request.headers.at("content-type");
+	if (request.headers.find("Content-Type") != request.headers.end())
+		this->content_type = request.headers.at("Content-Type");
 	else
 		this->content_type = "application/octet-stream";
 	stream << this->content_length;
@@ -79,9 +120,30 @@ static void close_fdlist(int fds[2])
 	close(fds[STDOUT_FILENO]);
 }
 
+void Cgi::epoll_register(void) __THROWS_STRERROR
+{
+	struct epoll_event event;
+	int reg;
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+
+	reg = this->streams[STDOUT_FILENO];
+	event.events = EPOLLOUT | EPOLLRDHUP | EPOLLERR;
+	this->state  = WritingBody;
+	event.data.ptr = this;
+	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
+	if (this->method != "POST" && this->content_length > 0)
+	{
+		event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+		reg = this->streams[STDIN_FILENO];
+		if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
+	}
+}
+
 void Cgi::execute(void) __THROWS_STRERROR
 {
-	// TODO: fork... dup...
 	char *args[3] = {
 		(char*)this->interpreter.c_str(),
 		(char*)this->filename.c_str(), 
@@ -108,7 +170,7 @@ void Cgi::execute(void) __THROWS_STRERROR
 	}
 	if (this->pid == 0)
 	{
-		dup2(input[STDIN_FILENO], STDIN_FILENO);
+		dup2(input [STDIN_FILENO],  STDIN_FILENO);
 		dup2(output[STDOUT_FILENO], STDOUT_FILENO);
 		close_fdlist(output);
 		close_fdlist(input);
@@ -120,4 +182,25 @@ void Cgi::execute(void) __THROWS_STRERROR
 	close(input[STDIN_FILENO]);
 	this->streams[STDIN_FILENO] = output[STDIN_FILENO];
 	close(output[STDOUT_FILENO]);
+	this->epoll_register();
+}
+
+void Cgi::parse_headers()    __THROWS_STRERROR
+{
+	std::vector<std::string> headers;
+	std::vector<std::string> pair;
+
+	headers =
+		split(this->io_buffer, '\n');
+	for (size_t i = 0; i < headers.size(); ++i)
+	{
+		pair = split(headers[i], ":");
+		if (pair.size() != 2)
+		{
+			std::cout <<  "This header is Invalid: `" << headers[i] << "`\n";
+			continue;
+		}
+		this->headers[pair[0]] = pair[1];
+		std::cout << pair[0] << " ---> " << pair[1] << "\n";
+	}
 }

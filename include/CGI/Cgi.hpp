@@ -4,9 +4,12 @@
 # include <string>
 # include <unistd.h>
 # include <unistd.h>
+#define CRLF "\r\n\r\n"
+#define NLNL "\n\n"
 
 typedef enum cgi_state_e {
 	Idle,
+	ReadingHeaders,
 	WritingBody, // read from write to client
 	ReadingBody, // Read then send to child
 } cgi_state_t;
@@ -31,9 +34,10 @@ typedef struct Cgi: public ASocketContext
 
     size_t content_length;      /*  CONTENT_LENGTH: Critical. The script will not read from its stdin if this is missing or 0.  */
     size_t bytes_read_from_cgi; // To know when the script is done
-    bool   headers_parsed;      // Flag to track if we are still reading CGI headers
 
     std::vector<std::string> env; 
+	std::map<std::string, std::string> headers;
+
     time_t start_time;          // Use this in your loop to kill(pid, SIGKILL) 
                                 // if the script takes > 30 seconds.
 public:
@@ -42,10 +46,14 @@ public:
 	pid_t       pid;
 	int         streams[2];
 	cgi_state_t state;
+	std::string io_buffer;
 
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)      __THROWS_STRERROR;
 	void action(uint32_t e) __THROWS_STRERROR;
 	void write()            __THROWS_STRERROR;
 	void read()             __THROWS_STRERROR;
+	void parse_headers()    __THROWS_STRERROR;
+	bool validate_headers();
+	void epoll_register(void) __THROWS_STRERROR;
 } Cgi;

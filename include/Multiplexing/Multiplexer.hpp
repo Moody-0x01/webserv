@@ -60,8 +60,3 @@ public:
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
 };
-
-
-std::string get_signal_name(int sig);
-int set_nonblocking(int sockfd);
-void signal_handler(int sig);
