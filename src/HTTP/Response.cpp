@@ -320,9 +320,7 @@ void Response::setup_response(const HttpRequest &request)
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
-
 		this->resource.cgi.setup(request, this->resolved_results.cgi_script.first, this->resolved_results.cgi_script.second);
-
 		return ;
 	}
 	switch (Response::classify_method(request.method))

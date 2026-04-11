@@ -16,8 +16,8 @@ typedef struct HttpRequest {
     std::string uri;
     std::string httpVersion;
     std::map<std::string, std::string> headers;
-    std::string body;
     std::map<std::string, std::string> params;
+    std::string body;
     std::string query_string;
 	ssize_t content_length;
 } HttpRequest;

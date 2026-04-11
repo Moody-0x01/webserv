@@ -72,6 +72,7 @@ void Client::generate_response(void) __THROWS_STRERROR
 {
 	try {
 		HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
+		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
 		this->free();
@@ -97,4 +98,26 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 	} catch (const char *e) {
 		throw e;
 	}
+}
+
+void Client::setip(std::string address)
+{
+	this->ip = address;
+}
+
+std::string Client::getip(void)
+{
+	return (this->ip);
+}
+
+void Client::setip_from_bytes(uint32_t ip_bytes)
+{
+
+	std::stringstream ss;
+
+    ss << ((ip_bytes >> 24) & 0xFF) << "."
+       << ((ip_bytes >> 16) & 0xFF) << "."
+       << ((ip_bytes >> 8)  & 0xFF) << "."
+       << ((ip_bytes >> 0)  & 0xFF);
+    this->setip(ss.str());
 }

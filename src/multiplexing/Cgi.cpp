@@ -1,6 +1,5 @@
 #include <Server.hpp>
-#include <cstdio>
-#include <unistd.h>
+#include <sstream>
 
 void Cgi::write() __THROWS_STRERROR
 {
@@ -46,8 +45,7 @@ Cgi::Cgi()
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
 {
-	std::string content_length_str;
-	std::stringstream ss;
+	std::stringstream stream;
 
 	this->protocol = request.httpVersion;
 	this->method = request.method;
@@ -63,17 +61,15 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = request.headers.at("content-type");
 	else
 		this->content_type = "application/octet-stream";
-
-	ss << content_length;
-	content_length_str = ss.str();
+	stream << this->content_length;
 	this->env.push_back("REQUEST_METHOD="+this->method);
 	this->env.push_back("QUERY_STRING="+this->query_string);
-	this->env.push_back("CONTENT_LENGTH="+content_length_str);
+	this->env.push_back("CONTENT_LENGTH="+stream.str());
 	this->env.push_back("CONTENT_TYPE="+this->content_type);
 	this->env.push_back("GATEWAY_INTERFAC="+this->gateway_interface);
 	this->env.push_back("SCRIPT_NAME="+this->filename);
 	this->env.push_back("PATH_TRANSLATED="+this->filename);
-	/*  this->env.push_back("REMOTE_ADDR="+this->);  */ // TODO: Get the ip of the client and forward it to the cgi. 
+	this->env.push_back("REMOTE_ADDR="+request.headers.at("REMOTE_ADDR"));  // TODO: Get the ip of the client and forward it to the cgi.
 	this->env.push_back("SERVER_PROTOCOL="+this->protocol);
 }
 

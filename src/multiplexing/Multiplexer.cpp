@@ -178,6 +178,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
 {
 	struct sockaddr_in addr;
+	uint32_t ip;
 	Multiplexer *self;
 	int conn;
 	socklen_t len;
@@ -191,6 +192,8 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
 
+	ip = ntohl(addr.sin_addr.s_addr);
+	client.setip_from_bytes(ip);
 	client.set_owner(server->get_socket());
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
