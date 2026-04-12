@@ -70,8 +70,10 @@ int main_cgi_test()
 		cgi.io_buffer += buffer;
 		switch (cgi.state)
 		{
+			
+			case WritingBody:
+			case DONE:
 			case Idle: {} break;        // Idk what is this for tho???
-			case WritingBody: {} break; // this is done somewhere else??
 			case ReadingHeaders: {
 				size_t position = cgi.io_buffer.find(CRLF);
 				if (position == std::string::npos) position = cgi.io_buffer.find(NLNL);

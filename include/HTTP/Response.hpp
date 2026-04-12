@@ -91,6 +91,7 @@ class Resource
 typedef enum response_stage_e {
 	Setup,
 	SendingResource,
+	ProcessingCgi
 } response_stage_t;
 
 struct UriResolutionResult {
@@ -166,5 +167,7 @@ public:
 	void setup_response(const HttpRequest &request);
 	void continue_processing(const HttpRequest &request) __THROWS_STRERROR;
 	bool is_method_allowed(std::string method);
+	Resource &get_resource_ref(void);
 	response_stage_t getstage(void) const;
 };
+

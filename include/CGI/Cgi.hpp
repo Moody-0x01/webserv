@@ -12,6 +12,7 @@ typedef enum cgi_state_e {
 	ReadingHeaders,
 	WritingBody, // read from write to client
 	ReadingBody, // Read then send to child
+	DONE
 } cgi_state_t;
 
 extern char **environ;
@@ -32,8 +33,11 @@ typedef struct Cgi: public ASocketContext
 	std::string remote_addr; /*  REMOTE_ADDR: The IP of the client.  */
 	std::string protocol; /*  SERVER_PROTOCOL: (e.g., "HTTP/1.1").  */
 
-    size_t content_length;      /*  CONTENT_LENGTH: Critical. The script will not read from its stdin if this is missing or 0.  */
-    size_t bytes_read_from_cgi; // To know when the script is done
+    size_t client_content_length;      /*  CONTENT_LENGTH: Critical. The script will not read from its stdin if this is missing or 0.  */
+	size_t cgi_content_length;
+
+    size_t client_read_bytes; // To know when the script is done
+    size_t cgi_read_bytes; // To know when the script is done
 
     std::vector<std::string> env; 
 	std::map<std::string, std::string> headers;
@@ -42,18 +46,21 @@ typedef struct Cgi: public ASocketContext
                                 // if the script takes > 30 seconds.
 public:
 	Cgi();
-	~Cgi() {};
+	~Cgi();
+	bool headers_sent;
 	pid_t       pid;
 	int         streams[2];
 	cgi_state_t state;
 	std::string io_buffer;
 
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
-	void execute(void)      __THROWS_STRERROR;
-	void action(uint32_t e) __THROWS_STRERROR;
-	void write()            __THROWS_STRERROR;
-	void read()             __THROWS_STRERROR;
-	void parse_headers()    __THROWS_STRERROR;
+	void execute(void)          __THROWS_STRERROR;
+	void send_headers(int conn) __THROWS_STRERROR;
+	void send_body_chunk(int conn) __THROWS_STRERROR;
+	void action(uint32_t e)     __THROWS_STRERROR;
+	void write()                __THROWS_STRERROR;
+	void read()                 __THROWS_STRERROR;
+	void parse_headers()        __THROWS_STRERROR;
 	bool validate_headers();
-	void epoll_register(void) __THROWS_STRERROR;
+	void epoll_register(void)   __THROWS_STRERROR;
 } Cgi;

@@ -89,3 +89,25 @@ void signal_handler(int sig)
 		sizeof(int));
     errno = saved_errno;
 }
+
+std::string serialize_headers(std::map<std::string, std::string> headers, bool setdefault_status)
+{
+	std::string headers_as_str;
+	std::string status_line;
+	std::vector<std::string> theythem;
+
+	status_line = Response::status_lines[OK];
+	for (std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); ++it)
+	{
+		if (it->first == "Status") {
+			theythem = split(it->second, ' ');
+			if (theythem.size() == 2)
+				status_line = "HTTP/1.0" + theythem[0] + theythem[1];
+		} else
+			headers_as_str += it->first + ": " + it->second;
+	}
+	headers_as_str += "\r\n";
+	if (setdefault_status)
+		headers_as_str = status_line + headers_as_str;
+	return (headers_as_str);
+}

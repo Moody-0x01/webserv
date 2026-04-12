@@ -1,5 +1,5 @@
 CXX=c++
-SOURCE_DIR=./src
+SOURCE_DIR=src
 NAME=./webserv
 OBJDIR = .build
 OBJS=$(SRCS:%.cpp=$(OBJDIR)/%.o)

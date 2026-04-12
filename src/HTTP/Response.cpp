@@ -249,25 +249,27 @@ UriResolutionResult::UriResolutionResult()
 	cgi_script = std::make_pair(std::string(), std::string());
 }
 
+Resource &Response::get_resource_ref(void) { return (this->resource);};
+
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
-		if (this->resolved_results.resource_type != UriResolutionResult::cgi)
-		{
-			this->send_headers(request.conn);
-			this->stage = SendingResource;
+		if (this->resolved_results.resource_type == UriResolutionResult::cgi) {
+			this->resource.cgi.execute();
+			this->stage = ProcessingCgi;
+			return ;
 		}
-	}
-	if (this->stage == SendingResource) {
-		if (this->status == OK) this->resource.send(request);
-		else {
-			// Send error page..
-		}
+		this->send_headers(request.conn);
+		this->stage = SendingResource;
 		return ;
 	}
-	abort();
+	if (this->status == OK)
+		this->resource.send(request);
+	else {
+		// Send content error.
+	}
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -320,7 +322,9 @@ void Response::setup_response(const HttpRequest &request)
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
-		this->resource.cgi.setup(request, this->resolved_results.cgi_script.first, this->resolved_results.cgi_script.second);
+		this->resource.cgi.setup(request, 
+				this->resolved_results.cgi_script.first, 
+				this->resolved_results.cgi_script.second);
 		return ;
 	}
 	switch (Response::classify_method(request.method))
@@ -412,10 +416,8 @@ Response::~Response()
 
 void Response::serialize_headers(void)
 {
-	this->headers_as_str += this->status_line;
-	for (std::map<std::string, std::string>::iterator it = this->headers.begin(); it != this->headers.end(); ++it)
-		this->headers_as_str += it->first + ": " + it->second;
-	this->headers_as_str += "\r\n";
+
+	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
 
@@ -473,7 +475,7 @@ void Response::init_status_lines()
     Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
-	// Cgi?
+
 	Response::status_lines[ContentLengthRequired] = "HTTP 411 Length Required";
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";

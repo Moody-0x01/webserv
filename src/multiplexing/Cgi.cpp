@@ -1,16 +1,35 @@
 #include <Server.hpp>
 #include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <sstream>
 #include <unistd.h>
 
+Cgi::~Cgi() {}
+void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
+{
+	::write(conn, this->io_buffer.c_str(), this->io_buffer.size());
+	this->io_buffer.clear();
+}
+
+void Cgi::send_headers(int conn) __THROWS_STRERROR
+{
+	std::string headers = serialize_headers(this->headers, true);
+	::write(conn, headers.c_str(), headers.size());
+	this->headers_sent = true;
+}
+
 void Cgi::write() __THROWS_STRERROR
 {
-	// TODO: Write the body of the client into cgi output_buffer..
-	if (this->state == WritingBody) {
+	if (this->state == WritingBody)
+	{
 		Multiplexer::write(this->streams[STDOUT_FILENO],
 					this->io_buffer.c_str(),
 					this->io_buffer.size());
+		this->client_read_bytes += this->io_buffer.size();
+		this->io_buffer.clear();
+		if (this->client_content_length >= this->client_read_bytes)
+			this->state = ReadingHeaders;
 	}
 }
 
@@ -18,13 +37,16 @@ void Cgi::read() __THROWS_STRERROR
 {
 	std::string tmp;
 	char buffer[READ_CHUNK_SIZE];
+	if (this->state == DONE)
+		return ;
 
-	Multiplexer::read(this->streams[STDIN_FILENO],
+	ssize_t read_from_cgi = Multiplexer::read(this->streams[STDIN_FILENO],
 				buffer,
 				sizeof(buffer));
 	this->io_buffer += buffer;
 	switch (this->state)
 	{
+		case DONE: {} break;
 		case Idle: {
 			std::cout << "Wtf bro this should be done in write\n";
 			abort();
@@ -46,6 +68,9 @@ void Cgi::read() __THROWS_STRERROR
 			}
 		} break;
 		case ReadingBody: {
+			this->cgi_read_bytes += read_from_cgi;
+			if (this->cgi_read_bytes >= this->cgi_content_length)
+				this->state = DONE;
 		} break;
 	}
 }
@@ -62,13 +87,9 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 
 	try {
     if (e & EPOLLIN)
-	{
 		this->read();
-	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
-	{
 		this->write();
-	}
 	} catch (const char *e) {
 		throw e;
 	}
@@ -78,8 +99,11 @@ Cgi::Cgi()
 {
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
 	this->start_time          = 0;
-	this->content_length      = 0;
-	this->bytes_read_from_cgi = 0;
+	this->cgi_read_bytes      = 0;
+	this->cgi_content_length      = 0;
+
+	this->client_content_length = 0;
+	this->client_read_bytes = 0;
 	this->state               = Idle;
 	this->io_buffer           = "";
 }
@@ -91,7 +115,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->protocol = request.httpVersion;
 	this->method = request.method;
 	this->query_string = request.query_string;
-	this->content_length = request.content_length;
+	this->client_content_length = request.content_length;
 	this->params = request.params;
 
 	this->filename    = fn;
@@ -102,7 +126,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = request.headers.at("Content-Type");
 	else
 		this->content_type = "application/octet-stream";
-	stream << this->content_length;
+	stream << this->client_content_length;
 	this->env.push_back("REQUEST_METHOD="+this->method);
 	this->env.push_back("QUERY_STRING="+this->query_string);
 	this->env.push_back("CONTENT_LENGTH="+stream.str());
@@ -134,12 +158,11 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 	this->state  = WritingBody;
 	event.data.ptr = this;
 	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
-	if (this->method != "POST" && this->content_length > 0)
-	{
-		event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
-		reg = this->streams[STDIN_FILENO];
-		if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
-	}
+
+	event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+	reg = this->streams[STDIN_FILENO];
+	if (this->method != "POST") this->state  = ReadingHeaders;
+	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
 }
 
 void Cgi::execute(void) __THROWS_STRERROR
@@ -178,6 +201,7 @@ void Cgi::execute(void) __THROWS_STRERROR
 		perror("execve");
 		_exit(1);
 	}
+	// this->start_time = time(NULL); TODO: if some script hanged then idk maybe it is not required.
 	this->streams[STDOUT_FILENO] = input[STDOUT_FILENO];
 	close(input[STDIN_FILENO]);
 	this->streams[STDIN_FILENO] = output[STDIN_FILENO];
@@ -196,11 +220,13 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	{
 		pair = split(headers[i], ":");
 		if (pair.size() != 2)
-		{
-			std::cout <<  "This header is Invalid: `" << headers[i] << "`\n";
-			continue;
-		}
+			throw "Invalid Head";
 		this->headers[pair[0]] = pair[1];
 		std::cout << pair[0] << " ---> " << pair[1] << "\n";
 	}
+	if (this->headers.find("Content-Length") == this->headers.end())
+		throw "emmm no content length was given from cgi";
+
+	std::stringstream ss(this->headers.at("Content-Length"));
+	ss << this->cgi_content_length;
 }
