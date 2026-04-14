@@ -1,4 +1,6 @@
 #include <Server.hpp>
+#include <cstddef>
+#include <sys/epoll.h>
 
 ASocketContext::ASocketContext() : request_buffer(""), response_buffer(""), _sockfd(-1), _owns_fd(true)
 {
@@ -10,14 +12,22 @@ ASocketContext::ASocketContext(int sock) : request_buffer(""), response_buffer("
 
 ASocketContext::~ASocketContext()
 {
+	Multiplexer *self;
+
 	if (!_owns_fd)
 		return ;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
 	if (_sockfd != -1)
 	{
-		std::cout << "Closed: " << _sockfd << "\n";
+		epoll_ctl(self->epoll_fd,
+			EPOLL_CTL_DEL,
+			this->_sockfd,
+			NULL);
 		close(_sockfd);
 	}
 	_sockfd = -1;
+	_owns_fd = false;
 }
 
 void ASocketContext::disown(void)

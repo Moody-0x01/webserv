@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <fstream>
 #include <string>
+#include <unistd.h>
 
 Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), type(std::string(""))
 {
@@ -18,13 +19,13 @@ void Resource::identify_type(const std::string &path, const std::map<std::string
 {
     if (path.empty())
     {
-        this->type = ApplicationOctet;
+		this->setmime_type(ApplicationOctet);
         return ;
     }
     size_t dot = path.find_last_of('.');
     if (dot == std::string::npos || dot == path.size() - 1)
     {
-        this->type = ApplicationOctet;
+		this->setmime_type(ApplicationOctet);
         return ;
     }
     std::string ext = path.substr(dot + 1);
@@ -35,16 +36,23 @@ void Resource::identify_type(const std::string &path, const std::map<std::string
 		std::map<std::string, std::string>::const_iterator over = mime_overrides->find(ext);
 		if (over != mime_overrides->end())
 		{
-			this->type = over->second;
+			this->setmime_type(over->second);
 			return;
 		}
 	}
 
     std::map<std::string, std::string>::iterator it = Response::mimes.find(ext);
     if (it != Response::mimes.end())
-        this->type = it->second;
-    else
-        this->type = ApplicationOctet;
+	{
+		this->setmime_type(it->second);
+		return ;
+	}
+	this->setmime_type(ApplicationOctet);
+}
+
+void Resource::setmime_type(std::string t)
+{
+	this->type = t;
 }
 
 int Resource::open(const std::string &path)
@@ -86,36 +94,37 @@ bool Resource::isopen(void)
 {
 	return (this->__isopen);
 }
+
 #include <cmath>
-void Resource::send(const HttpRequest &request) __THROWS_STRERROR
+response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
 	switch (this->resource_type)
 	{
 		case File: {
 			::write(request.conn, "Sending a static file", 22);
+			return (DoneSending);
 		} break;
 		case Dir:
 		case Text: {
-			this->__stream_buffer = "Sending a static text";
-			if (!request.query_string.empty())
-			{
-				this->__stream_buffer.append(",  query string: ");
-				this->__stream_buffer.append(request.query_string.c_str());
-			}
-			if (this->bytes_sent < this->__stream_buffer.size()) {
-				// size_t n = min((int)WRITE_CHUNK_SIZE, (int)this->bytes_sent -this->__stream_buffer.size());
-				this->bytes_sent += ::write(request.conn, 
-					this->__stream_buffer.c_str(), 
-					this->__stream_buffer.size());
-			} else
-				this->__done = true;
+
+			/*  if (this->bytes_sent < this->__stream_buffer.size()) {  */
+			/*  	// size_t n = min((int)WRITE_CHUNK_SIZE, (int)this->bytes_sent -this->__stream_buffer.size());  */
+			/*  	this->bytes_sent += ::write(request.conn,   */
+			/*  		this->__stream_buffer.c_str(),   */
+			/*  		this->__stream_buffer.size());  */
+			/*  } else  */
+			/*  	this->__done = true;  */
+			::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
+			return (DoneSending);
 		} break;
 		case CGI: {
 			::write(request.conn, "Sending Cgi", 12);
+			return (DoneSending);
 		} break;
 		default: 
 			assert(0 && "Bro wtf??");
 	}
+	return (DoneSending);
 }
 
 std::string Resource::get_type(void)

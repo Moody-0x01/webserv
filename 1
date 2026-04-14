@@ -12,7 +12,9 @@
 
 Cgi::~Cgi() {
 	ASocketContext::~ASocketContext();
-	waitpid(this->pid, NULL, 0);
+	close_fdlist(this->streams);
+	if (this->pid != -1)
+		waitpid(this->pid, NULL, 0);
 }
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
@@ -36,13 +38,12 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 
 	if (this->body_buffer.size())
 	{
-		sent = ::send(conn,
+
+		sent = ::write(conn, 
 			&this->body_buffer[0],
-			this->body_buffer.size(), 0);
-		std::cout << "Body: Well, sent " << this->body_buffer.size() << " Of bytes so wtf???\n";
+			this->body_buffer.size());
 		if (sent > 0) {
-			this->body_buffer.erase(this->body_buffer.begin(),
-				this->body_buffer.begin() + sent);
+			this->body_buffer.erase(this->body_buffer.begin(), this->body_buffer.begin() + sent);
 		}
 	}
 }
@@ -50,16 +51,13 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 void Cgi::send_headers(int conn) __THROWS_STRERROR
 {
 	std::string headers = serialize_headers(this->headers, true);
-	::send(conn, headers.c_str(), headers.size(), 0);
-	std::cout << "Headers: Well, sent " << headers.size() << " Of bytes so wtf???\n";
+	Multiplexer::write(conn, headers.c_str(), headers.size());
 	this->headers_sent = true;
 }
 
 void Cgi::done(void)
 {
 	this->state = DONE;
-	unregister_fd(this->streams[0]);
-	unregister_fd(this->streams[1]);
 	close_fdlist(this->streams);
 	this->streams[0] = -1;
 	this->streams[1] = -1;
@@ -70,7 +68,7 @@ void Cgi::write() __THROWS_STRERROR
 	ssize_t sent;
 	if (this->state == WritingBody)
 	{
-		sent = Multiplexer::write(this->streams[STDIN_FILENO],
+		sent = Multiplexer::write(this->streams[STDOUT_FILENO],
 					&this->body_buffer[0],
 					this->body_buffer.size());
 		if (sent > 0) {
@@ -118,9 +116,12 @@ void Cgi::read() __THROWS_STRERROR
 	ssize_t read_from_cgi;
 
 	if (this->state == DONE)
+	{
+		this->done();
 		return ;
+	}
 	std::memset(buffer, 0, sizeof(buffer));
-	read_from_cgi = Multiplexer::read(this->streams[STDOUT_FILENO],
+	read_from_cgi = Multiplexer::read(this->streams[STDIN_FILENO],
 				buffer,
 				sizeof(buffer));
 	if (read_from_cgi == 0 || read_from_cgi == -1) {
@@ -141,20 +142,31 @@ void Cgi::read() __THROWS_STRERROR
 		} break; // this is done somewhere else??
 		case ReadingHeaders: {
 			this->append_into_headers_buffer(buffer, read_from_cgi);
-			if (this->strip_header_termination()) { this->state = ReadingBody; }
+			if (this->strip_header_termination()) {
+				this->state = ReadingBody;
+			}
 		} break;
 		case ReadingBody: {
 			this->append_into_body_buffer(buffer, read_from_cgi);
 			this->cgi_read_bytes += read_from_cgi;
-			if ((this->cgi_content_length != -1)
+			if (this->cgi_content_length != -1
 				&& (this->cgi_read_bytes >= this->cgi_content_length))
+			{
 				this->done();
+			}
 		} break;
 	}
+	print_buffer(this->body_buffer,    "BODY:   ");
+	print_buffer(this->headers_buffer, "HEADERS:");
 }
 
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
+	if (e & (EPOLLERR | EPOLLHUP))
+    {
+		this->done();
+		return ;
+    }
 	try {
     if (e & EPOLLIN)
 		this->read();
@@ -163,8 +175,6 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 	} catch (const char *e) {
 		throw e;
 	}
-	if (e & EPOLLHUP)
-		this->done();
 }
 
 Cgi::Cgi()
@@ -218,6 +228,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 void Cgi::epoll_register(void) __THROWS_STRERROR
 {
 	struct epoll_event event;
+	int reg;
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
@@ -225,21 +236,17 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 
 	if (set_nonblocking(this->streams[STDOUT_FILENO]) == -1) throw strerror(errno);
 	if (set_nonblocking(this->streams[STDIN_FILENO]) == -1) throw strerror(errno);
+	reg = this->streams[STDOUT_FILENO];
+	event.events = EPOLLOUT | EPOLLRDHUP | EPOLLERR;
+	this->state  = WritingBody;
+	event.data.ptr = this;
+	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
 
-    event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
-    event.data.ptr = this; 
-    epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[STDOUT_FILENO], &event);
-
-    if (this->method == "POST") {
-        event.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
-        event.data.ptr = this;
-        epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[STDIN_FILENO], &event);
-        this->state = WritingBody; 
-    } else {
-        this->state = ReadingHeaders;
-        close(this->streams[STDIN_FILENO]);
-        this->streams[STDIN_FILENO] = -1;
-    }
+	event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+	event.data.ptr = this;
+	reg = this->streams[STDIN_FILENO];
+	if (this->method != "POST") this->state  = ReadingHeaders;
+	if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, reg, &event) == -1) throw strerror(errno);
 }
 
 bool Cgi::is_executable(void)
@@ -305,6 +312,7 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 		pair = split(headers[i], ":");
 		if (pair.size() != 2) throw "Invalid Header";
 		this->headers[pair[0]] = pair[1];
+		/*  std::cout << pair[0] << " ---> " << pair[1] << "\n";  */
 	}
 	if (this->headers.find("Content-Length") == this->headers.end()) 
 	{

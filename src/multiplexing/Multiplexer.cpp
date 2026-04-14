@@ -175,6 +175,14 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 	self->servers[owner].second.erase(client);
 }
 
+void unregister_fd(int fd)
+{
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+}
+
 Multiplexer::~Multiplexer()
 {
 	this->deinit();
@@ -213,7 +221,7 @@ int Multiplexer::loop(void)
 					std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
 					return 1;
 				}
-				while (waitpid(-1, NULL, WNOHANG) > 0);
+				while (waitpid(-1, NULL, WNOHANG) > 0) {}
 			}
 			else {
 				ASocketContext *handle = (ASocketContext *)ptr;

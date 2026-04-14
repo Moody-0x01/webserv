@@ -60,3 +60,5 @@ public:
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
 };
+
+void unregister_fd(int fd);

@@ -1,6 +1,5 @@
 #include <Server.hpp>
 
-
 HttpParser &Client::getParser(void)
 {
 	return this->parserInstance;
@@ -48,9 +47,7 @@ void Client::parse_request() __THROWS_STRERROR
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 		if (this->response.get_resource_ref().cgi.state == WritingBody)
-		{
-			this->response.get_resource_ref().cgi.io_buffer += buff;
-		}
+			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
 		else {
 		this->request_buffer.append(buff, count);
 		clientP.handle();
@@ -74,22 +71,16 @@ void Client::parse_request() __THROWS_STRERROR
 
 void Client::generate_response(void) __THROWS_STRERROR
 {
-	try {
-		if (this->response.getstage() == ProcessingCgi) {
-			if (!this->response.get_resource_ref().cgi.headers_sent)
-				this->response.get_resource_ref().cgi.send_headers(this->get_socket());
-			else if (this->response.get_resource_ref().cgi.state == ReadingBody) {
-				this->response.get_resource_ref().cgi.send_body_chunk(this->get_socket());
-			} else
-				this->free();
-			return ;
-		} else {
-			HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
-			request.headers["REMOTE_ADDR"] = this->ip;
-			this->response
-				.continue_processing(request);
+	try {	
+		HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
+		request.headers["REMOTE_ADDR"] = this->ip;
+		this->response
+			.continue_processing(request);
+		if (this->response.getstage() == DoneSending)
+		{
+			this->free();
+			std::cout << "DONE!!!\n";
 		}
-		this->free();
 	} catch (const char *e) {
 		this->free();
 		throw e;
@@ -100,11 +91,7 @@ void Client::generate_response(void) __THROWS_STRERROR
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
 	if (e & (EPOLLERR | EPOLLHUP))
-    {
-        this->free();
-		return ;
-    }
-
+		throw "";
 	try {
     if (e & EPOLLIN) this->parse_request();
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))

@@ -35,6 +35,8 @@ fclean: clean
 
 run: $(NAME)
 	./$(NAME)
+test: all
+	./$(NAME) Test.conf
 
 re: fclean all
 

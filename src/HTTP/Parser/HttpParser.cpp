@@ -64,7 +64,7 @@ void HttpParser::handle()
                 }
             }
         }
-		if (isHeaderValueExist("content-length"))
+		if (isHeaderValueExist("Content-Length"))
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
 			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");

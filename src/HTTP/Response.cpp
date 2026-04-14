@@ -115,7 +115,8 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		std::cout << "\n\n" << resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
+		if (!exists(resolved.filesystem_path))
+			resolved.resource_type = UriResolutionResult::None;
 	}
 }
 
@@ -236,6 +237,7 @@ void Response::init_mimes() {
 Response::Response()
 {
 	this->stage = Setup;
+	this->request_ptr = NULL;
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -253,22 +255,42 @@ Resource &Response::get_resource_ref(void) { return (this->resource);};
 
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
+	if (!this->request_ptr)
+		this->request_ptr = &request;
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
 		if (this->resolved_results.resource_type == UriResolutionResult::cgi) {
-			this->resource.cgi.execute();
-			this->stage = ProcessingCgi;
-			return ;
+			try {
+				this->resource.cgi.execute();
+				this->stage = ProcessingCgi;
+			} catch (const char *e) {
+				this->stage = SendingResource;
+				/*  std::cout << "Error: " << e << "\n";  */
+				this->set_status(InternalServerError);
+			}
+		} else {
+			this->stage = SendingResource;
 		}
-		this->send_headers(request.conn);
-		this->stage = SendingResource;
-		return ;
 	}
-	if (this->status == OK)
+	if (this->stage == SendingResource)
+	{
+		this->send_headers(request.conn);
 		this->resource.send(request);
-	else {
-		// Send content error.
+		this->stage = DoneSending;
+	} else if (this->stage == ProcessingCgi) {
+		if (this->resource.cgi.state == DONE) {
+			this->stage = DoneSending;
+		}
+		if (!this->resource.cgi.headers_sent) {
+			this->resource.cgi
+				.send_headers(request.conn);
+		} else if (this->resource.cgi.state == ReadingBody) {
+			this->resource.cgi
+				.send_body_chunk(request.conn);
+		}
+	} else {
+		// IDK???
 	}
 }
 
@@ -292,31 +314,22 @@ void Response::setup_response(const HttpRequest &request)
 	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1"))
 	{
 		this->set_status(BadRequest);
-		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
 	if (request.isbadrequest)
 	{
 		this->set_status(request.code);
-		this->get_error_page_html(request, request.code);
-		
 		return ;
-	}
-	this->set_status(OK);
-	this->appendheader("content-type", TextHtml);
-	
+	}	
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
-		// Note: any method that is Not Allowed, is Forbidden automatically
 		this->set_status(Forbidden);
-		this->get_error_page_html(request, Forbidden);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
-		this->get_error_page_html(request, NotFound);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
@@ -341,7 +354,6 @@ void Response::setup_response(const HttpRequest &request)
 			break ;
 		default:
 			this->set_status(BadRequest);
-			this->get_error_page_html(request, BadRequest);
 			break;
 	}
 }
@@ -385,10 +397,14 @@ void Response::handle_delete(const HttpRequest &request)
 	(void)request;;
 }
 
-const std::string Response::get_error_page_html(const HttpRequest &request, int code)
+void Response::get_error_page_html(const HttpRequest &request, int code)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	std::map<size_t, std::string>::const_iterator configured = server_conf.error_pages.find(static_cast<size_t>(code));
+
+
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
 	if (configured != server_conf.error_pages.end())
 	{
 		std::string configured_path = join_fs_path(server_conf.root, configured->second);
@@ -397,17 +413,13 @@ const std::string Response::get_error_page_html(const HttpRequest &request, int 
 		{
 			std::ostringstream content;
 			content << stream.rdbuf();
-			this->resource.set_stream_buffer(content.str());
-			this->resource.setresource_type(Text);
-			this->resource.identify_type(configured_path, &server_conf.mime_types);
-			return this->resource.get_stream_buffer();
+			this->resource
+				.set_stream_buffer(content.str());
+			return ;
 		}
 	}
-
-	this->resource.set_stream_buffer(build_default_error_html(code));
-	this->resource.setresource_type(Text);
-	this->resource.identify_type("error.html", &server_conf.mime_types);
-	return this->resource.get_stream_buffer();
+	this->resource
+		.set_stream_buffer(build_default_error_html(code));
 }
 
 Response::~Response()
@@ -493,7 +505,7 @@ void Response::set_status(int s)
 	this->status = s;
 	this->status_line =
 		Response::status_lines[this->status] + "\r\n";
-	// TODO: fetch error page?
+	if (s != OK) this->get_error_page_html(*this->request_ptr, s);
 }
 
 int Response::get_status(void) const

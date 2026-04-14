@@ -1,4 +1,5 @@
 # include <Server.hpp>
+#include <iostream>
 
 void Server::action(uint32_t e) __THROWS_STRERROR
 {

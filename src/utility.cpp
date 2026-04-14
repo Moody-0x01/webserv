@@ -1,4 +1,9 @@
 #include <Server.hpp>
+#include <cstddef>
+#include <unistd.h>
+#include <fcntl.h>           /* Definition of AT_* constants */
+#include <unistd.h>
+#include <unistd.h>
 
 std::vector<std::string> split(std::string str, char delim)
 {
@@ -50,6 +55,29 @@ std::vector<std::string> split(std::string str, std::string delim)
 	return (strings);
 }
 
+std::vector<std::string> split(std::vector<char> str, std::string delim)
+{
+	std::vector<std::string> strings;
+	std::string t;
+
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		if (delim.find(str[i]) != std::string::npos)
+        {
+            if (!t.empty())
+            {
+                strings.push_back(t);
+                t.clear();
+            }
+            while (i < str.size() && delim.find(str[i]) != std::string::npos) ++i;
+            if (i < str.size()) t += str[i];
+			continue ;
+        }
+        t += str[i];
+	}
+	if (!t.empty())	strings.push_back(t);
+	return (strings);
+}
 
 int set_nonblocking(int sockfd)
 {
@@ -110,4 +138,45 @@ std::string serialize_headers(std::map<std::string, std::string> headers, bool s
 	if (setdefault_status)
 		headers_as_str = status_line + headers_as_str;
 	return (headers_as_str);
+}
+
+void close_fdlist(int fds[2])
+{
+	if (fds[STDIN_FILENO] != -1)  close(fds[STDIN_FILENO]);
+	if (fds[STDOUT_FILENO] != -1) close(fds[STDOUT_FILENO]);
+}
+
+
+bool check_permissions(std::string file)
+{
+	return access(file.c_str(), F_OK | X_OK) != -1;
+}
+
+bool exists(std::string file)
+{
+	return access(file.c_str(), F_OK) != -1;
+}
+
+std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern)
+{
+	return std::search(vector.begin(), vector.end(), pattern, pattern + std::strlen(pattern));
+}
+
+void print_buffer(std::vector<char> &buffer, const char *label)
+{
+	std::cout << label;
+	size_t size;
+
+	size = buffer.size();
+	if (size < 60) {
+		for (size_t i = 0; i < buffer.size(); i++)
+			std::cout << buffer[i];
+	} else {
+		for (size_t i = 0; i < 30; i++)
+			std::cout << buffer[i];
+		std::cout << "\n.....\n";
+		for (size_t i = size - 30; i < size; i++)
+			std::cout << buffer[i];
+	}
+	std::cout << std::endl;
 }
