@@ -1,10 +1,14 @@
 #include <Server.hpp>
+#include <dirent.h>
 #include <cstdlib>
+#include <cerrno>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <sys/stat.h>
 #include <utility>
+#include <vector>
 
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
@@ -130,6 +134,26 @@ static std::string reason_phrase_for_status(int code)
 		return auto_reason;
 	}
 	return it->second;
+}
+
+static std::string escape_html(const std::string &input)
+{
+	std::string escaped;
+	escaped.reserve(input.size());
+	for (size_t i = 0; i < input.size(); ++i)
+	{
+		const char c = input[i];
+		switch (c)
+		{
+			case '&': escaped += "&amp;"; break;
+			case '<': escaped += "&lt;"; break;
+			case '>': escaped += "&gt;"; break;
+			case '"': escaped += "&quot;"; break;
+			case '\'': escaped += "&#39;"; break;
+			default: escaped += c; break;
+		}
+	}
+	return escaped;
 }
 
 static std::string build_default_error_html(int code)
@@ -357,7 +381,77 @@ void Response::setup_response(const HttpRequest &request)
 
 void Response::list_dir(void)
 {
-	// TODO: use resource to fill the buffer
+	const std::string &directory_path = this->resolved_results.filesystem_path;
+	DIR *directory = ::opendir(directory_path.c_str());
+	if (!directory)
+	{
+		if (errno == EACCES)
+			this->set_status(Forbidden);
+		else
+			this->set_status(InternalServerError);
+		this->resource.setresource_type(Text);
+		this->resource.identify_type("error.html");
+		this->resource.set_stream_buffer(build_default_error_html(this->get_status()));
+		return;
+	}
+
+	std::vector< std::pair<std::string, bool> > entries;
+	struct dirent *entry;
+	while ((entry = ::readdir(directory)) != NULL)
+	{
+		std::string name = entry->d_name;
+
+		std::cout << " \n\n" << name << " \n\n";
+		if (name == ".") continue;
+
+		bool is_directory = false;
+		std::string full_entry_path = join_fs_path(directory_path, name);
+		struct stat entry_stat;
+		if (::stat(full_entry_path.c_str(), &entry_stat) == 0)
+			is_directory = S_ISDIR(entry_stat.st_mode);
+
+		entries.push_back(std::make_pair(name, is_directory));
+	}
+	::closedir(directory);
+
+	std::sort(entries.begin(), entries.end());
+
+	std::string request_uri = this->resolved_results.request_path;
+	if (request_uri.empty()) request_uri = "/";
+	if (request_uri[request_uri.size() - 1] != '/') request_uri += "/";
+
+	std::ostringstream body;
+	body << "<!DOCTYPE html>\n"
+		 << "<html lang=\"en\">\n"
+		 << "<head><meta charset=\"UTF-8\"><title>Index of " << escape_html(request_uri) << "</title></head>\n"
+		 << "<body>\n"
+		 << "<h1>Index of " << escape_html(request_uri) << "</h1>\n"
+		 << "<hr>\n"
+		 << "<ul>\n";
+
+	for (size_t i = 0; i < entries.size(); ++i)
+	{
+		const std::string &name = entries[i].first;
+		const bool is_directory = entries[i].second;
+		std::string display_name = name;
+		std::string href = request_uri + name;
+		if (is_directory)
+		{
+			display_name += "/";
+			href += "/";
+		}
+		body << "<li><a href=\"" << escape_html(href) << "\">"
+			 << escape_html(display_name) << "</a></li>\n";
+	}
+
+	body << "</ul>\n"
+		 << "<hr>\n"
+		 << "</body>\n"
+		 << "</html>\n";
+
+	this->resource.setresource_type(Dir);
+	this->resource.identify_type("index.html");
+	this->resource.set_stream_buffer(body.str());
 }
 
 void Response::serve_file(void)
