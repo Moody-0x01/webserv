@@ -1,6 +1,6 @@
 #include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
-#include <algorithm>
+
 Lexer::Lexer() : content(""), pos(0), badRequest(false) {}
 
 void Lexer::tokenize(std::string &content)
