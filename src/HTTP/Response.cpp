@@ -73,7 +73,7 @@ static const LocationConfig *find_best_location(const ServerConfig &server_conf,
 static std::string compute_relative_uri(const std::string &request_path, const LocationConfig *best_location)
 {
 	std::string relative_uri = request_path;
-	if (best_location && best_location->uri != "/")
+	if (best_location && best_location->uri != "/" && !best_location->root.empty())
 	{
 		if (request_path.size() <= best_location->uri.size())
 			relative_uri = "/";
