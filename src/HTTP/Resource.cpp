@@ -8,7 +8,7 @@
 #include <string>
 #include <unistd.h>
 
-Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), type(std::string(""))
+Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), __isbuf(false) , type(std::string(""))
 {
 	this->__stream_buffer = "";
 	this->bytes_sent = 0;
@@ -134,6 +134,7 @@ std::string Resource::get_type(void)
 
 void Resource::set_stream_buffer(const std::string &s)
 {
+	this->__isbuf = true;
 	this->__stream_buffer = s;
 }
 

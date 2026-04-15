@@ -70,6 +70,7 @@ class Resource
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
+	bool				__isbuf;
 	bool         __done;
 	bool         __isopen;
 	// char         buffer[WRITE_CHUNK_SIZE]; Well be used to send chuncks
