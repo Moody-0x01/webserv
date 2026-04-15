@@ -510,6 +510,11 @@ void Response::handle_post(const HttpRequest &request)
 	std::cout << "Content-lenght: " << request.content_length << std::endl;
 	std::cout << "Code: " << request.code << std::endl;
 	std::cout << "Body: " << request.body << std::endl;
+	if (request.content_length == 0)
+	{
+		this->set_status(ContentLengthRequired);
+		return;
+	}
 }
 
 void Response::handle_delete(const HttpRequest &request)
