@@ -3,12 +3,9 @@
 #include <map>
 #include <sys/types.h>
 #include <HTTP/Request.hpp>
+#include <CGI/Cgi.hpp>
 
 struct LocationConfig;
-
-# define __THROWS_STRERROR throw(const char *)
-
-#define  WRITE_CHUNK_SIZE     4096 // 4kb each time.
 
 #define  OK                   200
 #define  Created              201
@@ -58,12 +55,18 @@ typedef enum resource_type_e
 	File,
 	Text,
 	Dir,
-	Cgi
+	CGI
 } resource_type_t;
+
+typedef enum response_stage_e {
+	Setup,
+	SendingResource,
+	ProcessingCgi,
+	DoneSending
+} response_stage_t;
 
 class Resource
 {
-
 	resource_type_t  resource_type;
 	std::ifstream *__rstream;
 	std::string __stream_buffer;
@@ -75,6 +78,7 @@ class Resource
 
 
 	public:
+		Cgi				 cgi;
 		Resource();
 
 		void identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides = NULL);
@@ -84,17 +88,13 @@ class Resource
 		bool isdone(void);
 		bool isopen(void);
 		std::string get_type(void);
-		void send(const HttpRequest &request) __THROWS_STRERROR;
+		response_stage_t send(const HttpRequest &request) __THROWS_STRERROR;
 		void set_stream_buffer(const std::string &s);
 		const std::string &get_stream_buffer(void) const;
 		resource_type_t getresource_type(void) const;
 		void setresource_type(resource_type_t t);
+		void setmime_type(std::string t);
 };
-
-typedef enum response_stage_e {
-	Setup,
-	SendingResource,
-} response_stage_t;
 
 struct UriResolutionResult {
 	enum type {
@@ -124,18 +124,8 @@ private:
 		MethodInvalid
 	};
 
-	static MethodKind classify_method(const std::string &method);
-	void handle_get(const HttpRequest &request);
-	void handle_post(const HttpRequest &request);
-	void handle_delete(const HttpRequest &request);
-
-	void list_dir(void);
-	void serve_file(void);
-
-	// Note: well, a Response should most probably have a write method???  No??
-	// Note: I should most probably make methods for serializing the response headers, then the body...
-	// Once headers weere serialized and sent. then the state should be switched to sending the body... in that case 
 	int status;
+	const HttpRequest *request_ptr;
 	// Will be generated last after headers and opening the file resource
 	std::string status_line; // HTTP/1.0 Code Message
 	// isfile?
@@ -147,6 +137,13 @@ private:
 
 	Resource             resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
 	UriResolutionResult  resolved_results; // holds the resultion struct
+	static MethodKind classify_method(const std::string &method);
+	void handle_get(const HttpRequest &request);
+	void handle_post(const HttpRequest &request);
+	void handle_delete(const HttpRequest &request);
+
+	void list_dir(void);
+	void serve_file(void);
 public:
 	static std::map<std::string, std::string> mimes;
 	static void init_mimes();
@@ -156,8 +153,7 @@ public:
 	static std::map<int, std::string> status_lines;
 	static void init_status_lines();
 
-	void write(int conn) __THROWS_STRERROR; // NOTE: writes the wrapped response into the the client connexion
-	void send_headers(void) __THROWS_STRERROR;
+	void send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);
 	void appendheader(const char *key, const char  *value);
@@ -165,9 +161,11 @@ public:
 	int  get_status(void) const;
 	const UriResolutionResult &get_resolved_results(void) const;
 	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
-	const std::string get_error_page_html(const HttpRequest &request, int code);
+	void get_error_page_html(const HttpRequest &request, int code);
 	void setup_response(const HttpRequest &request);
-	void continue_processing(const HttpRequest &request);
+	void continue_processing(const HttpRequest &request) __THROWS_STRERROR;
 	bool is_method_allowed(std::string method);
+	Resource &get_resource_ref(void);
 	response_stage_t getstage(void) const;
 };
+

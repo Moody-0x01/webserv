@@ -1,0 +1,182 @@
+#include <Server.hpp>
+#include <cstddef>
+#include <unistd.h>
+#include <fcntl.h>           /* Definition of AT_* constants */
+#include <unistd.h>
+#include <unistd.h>
+
+std::vector<std::string> split(std::string str, char delim)
+{
+	std::vector<std::string> strings;
+	std::string t;
+
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		if (str[i] == delim)
+        {
+            if (!t.empty())
+            {
+                strings.push_back(t);
+                t.clear();
+            }
+            while (i < str.size() && str[i] == delim)
+                ++i;
+            if (i < str.size())
+                t += str[i];
+			continue ;
+        }
+        t += str[i];
+	}
+	if (!t.empty())	strings.push_back(t);
+	return (strings);
+}
+
+std::vector<std::string> split(std::string str, std::string delim)
+{
+	std::vector<std::string> strings;
+	std::string t;
+
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		if (delim.find(str[i]) != std::string::npos)
+        {
+            if (!t.empty())
+            {
+                strings.push_back(t);
+                t.clear();
+            }
+            while (i < str.size() && delim.find(str[i]) != std::string::npos) ++i;
+            if (i < str.size()) t += str[i];
+			continue ;
+        }
+        t += str[i];
+	}
+	if (!t.empty())	strings.push_back(t);
+	return (strings);
+}
+
+std::vector<std::string> split(std::vector<char> str, std::string delim)
+{
+	std::vector<std::string> strings;
+	std::string t;
+
+	for (size_t i = 0; i < str.size(); ++i)
+	{
+		if (delim.find(str[i]) != std::string::npos)
+        {
+            if (!t.empty())
+            {
+                strings.push_back(t);
+                t.clear();
+            }
+            while (i < str.size() && delim.find(str[i]) != std::string::npos) ++i;
+            if (i < str.size()) t += str[i];
+			continue ;
+        }
+        t += str[i];
+	}
+	if (!t.empty())	strings.push_back(t);
+	return (strings);
+}
+
+int set_nonblocking(int sockfd)
+{
+	errno = 0;
+    int flags = fcntl(sockfd, F_GETFL);
+    if (flags == -1) return -1;
+	flags |= O_NONBLOCK;
+    if (fcntl(sockfd, F_SETFL, flags) == -1) return -1;
+    return 0;
+}
+
+std::string get_signal_name(int sig)
+{
+    static std::map<int, std::string> sig_map;
+
+    sig_map[SIGINT]  =  "SIGINT (Interrupt)";
+    sig_map[SIGTERM] =  "SIGTERM (Termination)";
+    sig_map[SIGHUP]  =  "SIGHUP (Hangup/Reload)";
+    sig_map[SIGUSR1] =  "SIGUSR1 (User Defined 1)";
+    sig_map[SIGUSR2] =  "SIGUSR2 (User Defined 2)";
+    sig_map[SIGQUIT] =  "SIGQUIT (Quit/Core Dump)";
+    if (sig_map.count(sig)) return sig_map[sig];
+    return "Unknown Signal";
+}
+
+void signal_handler(int sig)
+{
+	unsigned char* data;
+    int saved_errno = errno;
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	data = (unsigned char*)&sig;
+    write(self->signal_io[1],
+		data,
+		sizeof(int));
+    errno = saved_errno;
+}
+
+std::string serialize_headers(std::map<std::string, std::string> headers, bool setdefault_status)
+{
+	std::string headers_as_str;
+	std::string status_line;
+	std::vector<std::string> theythem;
+
+	status_line = Response::status_lines[OK];
+	for (std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); ++it)
+	{
+		if (it->first == "Status") {
+			theythem = split(it->second, ' ');
+			if (theythem.size() == 2)
+				status_line = "HTTP/1.0" + theythem[0] + theythem[1];
+		} else
+			headers_as_str += it->first + ": " + it->second;
+	}
+	headers_as_str += "\r\n";
+	if (setdefault_status)
+		headers_as_str = status_line + headers_as_str;
+	return (headers_as_str);
+}
+
+void close_fdlist(int fds[2])
+{
+	if (fds[STDIN_FILENO] != -1)  close(fds[STDIN_FILENO]);
+	if (fds[STDOUT_FILENO] != -1) close(fds[STDOUT_FILENO]);
+}
+
+
+bool check_permissions(std::string file)
+{
+	return access(file.c_str(), F_OK | X_OK) != -1;
+}
+
+bool exists(std::string file)
+{
+	return access(file.c_str(), F_OK) != -1;
+}
+
+std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern)
+{
+	return std::search(vector.begin(), vector.end(), pattern, pattern + std::strlen(pattern));
+}
+
+void print_buffer(std::vector<char> &buffer, const char *label)
+{
+	std::cout << label;
+	size_t size;
+
+	size = buffer.size();
+	if (size < 60) {
+		for (size_t i = 0; i < buffer.size(); i++)
+			std::cout << buffer[i];
+	} else {
+		for (size_t i = 0; i < 30; i++)
+			std::cout << buffer[i];
+		std::cout << "\n.....\n";
+		for (size_t i = size - 30; i < size; i++)
+			std::cout << buffer[i];
+	}
+	std::cout << std::endl;
+}

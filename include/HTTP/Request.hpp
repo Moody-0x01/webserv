@@ -2,9 +2,11 @@
 
 #include <string>
 #include <map>
+#include <sys/types.h>
 
-#define READ_CHUNK_SIZE 4096
-#define NO_CODE 999
+#define  READ_CHUNK_SIZE      4096
+#define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE // 4kb each time.
+#define  NO_CODE 999
 
 typedef struct HttpRequest {
 	int owner, conn;
@@ -14,9 +16,10 @@ typedef struct HttpRequest {
     std::string uri;
     std::string httpVersion;
     std::map<std::string, std::string> headers;
-    std::string body;
     std::map<std::string, std::string> params;
+    std::string body;
     std::string query_string;
+	ssize_t content_length;
 } HttpRequest;
 
 # define __THROWS_STRERROR throw(const char *)

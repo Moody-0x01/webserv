@@ -1,6 +1,5 @@
 #include <Server.hpp>
 
-
 HttpParser &Client::getParser(void)
 {
 	return this->parserInstance;
@@ -8,6 +7,7 @@ HttpParser &Client::getParser(void)
 
 void Client::set_owner(int owner) { _owner = owner; }
 int Client::get_owner(void) const { return _owner; }
+
 Server *Client::get_server(void) const __THROWS_STRERROR {
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
@@ -46,7 +46,9 @@ void Client::parse_request() __THROWS_STRERROR
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-		std::cout << "Read: " << count << "\n";
+		if (this->response.get_resource_ref().cgi.state == WritingBody)
+			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
+		else {
 		this->request_buffer.append(buff, count);
 		clientP.handle();
 		if (clientP.state() == READY)
@@ -59,6 +61,7 @@ void Client::parse_request() __THROWS_STRERROR
 				this->free();
 			}
 		}
+		}
 	} catch (const char *e) {
 		this->free();
 		throw e;
@@ -68,11 +71,16 @@ void Client::parse_request() __THROWS_STRERROR
 
 void Client::generate_response(void) __THROWS_STRERROR
 {
-	try {
+	try {	
 		HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
+		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
-		this->free();
+		if (this->response.getstage() == DoneSending)
+		{
+			this->free();
+			std::cout << "DONE!!!\n";
+		}
 	} catch (const char *e) {
 		this->free();
 		throw e;
@@ -83,17 +91,34 @@ void Client::generate_response(void) __THROWS_STRERROR
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
 	if (e & (EPOLLERR | EPOLLHUP))
-    {
-        this->free();
-		return ;
-    }
-
+		throw "";
 	try {
-    if (e & EPOLLIN)
-        this->parse_request();
+    if (e & EPOLLIN) this->parse_request();
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
         this->generate_response();
 	} catch (const char *e) {
 		throw e;
 	}
+}
+
+void Client::setip(std::string address)
+{
+	this->ip = address;
+}
+
+std::string Client::getip(void)
+{
+	return (this->ip);
+}
+
+void Client::setip_from_bytes(uint32_t ip_bytes)
+{
+
+	std::stringstream ss;
+
+    ss << ((ip_bytes >> 24) & 0xFF) << "."
+       << ((ip_bytes >> 16) & 0xFF) << "."
+       << ((ip_bytes >> 8)  & 0xFF) << "."
+       << ((ip_bytes >> 0)  & 0xFF);
+    this->setip(ss.str());
 }

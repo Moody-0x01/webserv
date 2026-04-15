@@ -2,24 +2,20 @@
 # include <string>
 # include <sys/epoll.h>
 # include <sys/socket.h>
-#include <sys/types.h>
+# include <sys/types.h>
 # include <unistd.h>
 # include <cassert>
 # include <netinet/in.h>
 # include <Parser/HTTP/HttpParser.hpp>
 # include <Parser/Config/Config.hpp>
-# include <HTTP/Response.hpp>
 # include <HTTP/Request.hpp>
 
+# define __THROWS_STRERROR throw(const char *)
 typedef struct ASocketContext
 {
 public:
-	// TODO: If an assignment operatior is called then it is obvious that the ownership of the socketfd,
-	// will be passed to the newly created socket. no need to close it.
 	ASocketContext(int sock);
 	ASocketContext();
-	/*  virtual ASocketContext &ASocketContext::operator=(ASocketContext &Other);  */
-	/*  virtual ASocketContext &operator=(const ASocketContext &Other);  */
 	virtual ~ASocketContext();
 
 
@@ -35,17 +31,3 @@ private:
 	int  _sockfd;
 	bool _owns_fd;
 } ASocketContext;
-
-
-typedef enum cgi_state_e {
-	WRITING_BODY,
-	READING_RESPONSE
-} cgi_state_t;
-
-typedef struct Cgi_: public ASocketContext {
-public:
-	void action(uint32_t e) __THROWS_STRERROR;
-	pid_t       pid;
-	int         streams[2];
-	cgi_state_t state;
-} Cgi_;

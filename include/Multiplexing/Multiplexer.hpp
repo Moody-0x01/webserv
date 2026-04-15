@@ -1,4 +1,6 @@
 #pragma once
+
+# include <unistd.h>
 # include "ServerSock.hpp"
 # include <cstddef>
 # include <Multiplexing/ClientSock.hpp>
@@ -13,7 +15,6 @@
 # include <netdb.h>
 # include <stdint.h>
 # include <string>
-# include <unistd.h>
 # include <signal.h>
 # include <iostream>
 # include <errno.h>
@@ -60,7 +61,4 @@ public:
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
 };
 
-
-std::string get_signal_name(int sig);
-int set_nonblocking(int sockfd);
-void signal_handler(int sig);
+void unregister_fd(int fd);

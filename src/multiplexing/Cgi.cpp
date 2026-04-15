@@ -1,0 +1,316 @@
+#include <Server.hpp>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <vector>
+
+Cgi::~Cgi() {
+	ASocketContext::~ASocketContext();
+	waitpid(this->pid, NULL, 0);
+}
+
+void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
+{
+	this->headers_buffer.reserve(this->headers_buffer.size() + size);
+	this->headers_buffer.insert(this->headers_buffer.begin(),
+			buffer,
+			buffer + size);
+}
+
+void Cgi::append_into_body_buffer(const char *buffer, ssize_t size)
+{
+	this->body_buffer.insert(this->body_buffer.end(),
+			buffer,
+			buffer + size);
+}
+
+void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
+{
+	ssize_t sent;
+
+	if (this->body_buffer.size())
+	{
+		sent = ::send(conn,
+			&this->body_buffer[0],
+			this->body_buffer.size(), 0);
+		std::cout << "Body: Well, sent " << this->body_buffer.size() << " Of bytes so wtf???\n";
+		if (sent > 0) {
+			this->body_buffer.erase(this->body_buffer.begin(),
+				this->body_buffer.begin() + sent);
+		}
+	}
+}
+
+void Cgi::send_headers(int conn) __THROWS_STRERROR
+{
+	std::string headers = serialize_headers(this->headers, true);
+	::send(conn, headers.c_str(), headers.size(), 0);
+	std::cout << "Headers: Well, sent " << headers.size() << " Of bytes so wtf???\n";
+	this->headers_sent = true;
+}
+
+void Cgi::done(void)
+{
+	this->state = DONE;
+	unregister_fd(this->streams[0]);
+	unregister_fd(this->streams[1]);
+	close_fdlist(this->streams);
+	this->streams[0] = -1;
+	this->streams[1] = -1;
+}
+
+void Cgi::write() __THROWS_STRERROR
+{
+	ssize_t sent;
+	if (this->state == WritingBody)
+	{
+		sent = Multiplexer::write(this->streams[STDIN_FILENO],
+					&this->body_buffer[0],
+					this->body_buffer.size());
+		if (sent > 0) {
+			this->body_buffer.erase(this->body_buffer.begin(), this->body_buffer.begin() + sent);
+			this->client_read_bytes += sent;
+		}
+		if (this->client_content_length >= this->client_read_bytes) {
+			this->state = ReadingHeaders;
+		}
+	}
+}
+
+bool Cgi::strip_header_termination(void)
+{
+	std::vector<char> tmp;
+	std::vector<char>::iterator position;
+	size_t sep_len;
+	const char *seperator;
+
+	seperator = NLNL;
+	position = search(this->headers_buffer, seperator);
+	if (position == this->headers_buffer.end()) {
+		seperator = CRLF;
+		position = search(this->headers_buffer, seperator);
+	}
+	if (position != this->headers_buffer.end()) { // Jackpot
+		sep_len = strlen(seperator);
+		this->body_buffer
+			.insert(
+				this->body_buffer.begin(), 
+				position + sep_len,
+				this->headers_buffer.end()
+			);
+		this->headers_buffer
+			.erase(position, this->headers_buffer.end());
+		this->parse_headers();
+		return (true);
+	}
+	return (false);
+}
+
+void Cgi::read() __THROWS_STRERROR
+{
+	char buffer[READ_CHUNK_SIZE];
+	ssize_t read_from_cgi;
+
+	if (this->state == DONE)
+		return ;
+	std::memset(buffer, 0, sizeof(buffer));
+	read_from_cgi = Multiplexer::read(this->streams[STDOUT_FILENO],
+				buffer,
+				sizeof(buffer));
+	if (read_from_cgi == 0 || read_from_cgi == -1) {
+		this->done();
+		return ;
+	}
+	buffer[read_from_cgi-1] = 0;
+	switch (this->state)
+	{
+		case DONE: { } break;
+		case Idle: {
+			std::cout << "Wtf bro this should be done in write\n";
+			abort();
+		} break;        // Idk what is this for tho???
+		case WritingBody: {
+			std::cout << "Wtf bro this should be done in write\n";
+			abort();
+		} break; // this is done somewhere else??
+		case ReadingHeaders: {
+			this->append_into_headers_buffer(buffer, read_from_cgi);
+			if (this->strip_header_termination()) { this->state = ReadingBody; }
+		} break;
+		case ReadingBody: {
+			this->append_into_body_buffer(buffer, read_from_cgi);
+			this->cgi_read_bytes += read_from_cgi;
+			if ((this->cgi_content_length != -1)
+				&& (this->cgi_read_bytes >= this->cgi_content_length))
+				this->done();
+		} break;
+	}
+}
+
+void Cgi::action(uint32_t e) __THROWS_STRERROR
+{
+	try {
+    if (e & EPOLLIN)
+		this->read();
+    if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
+		this->write();
+	} catch (const char *e) {
+		throw e;
+	}
+	if (e & EPOLLHUP)
+		this->done();
+}
+
+Cgi::Cgi()
+{
+	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
+
+	this->start_time             =  0;
+
+	this->cgi_read_bytes         =  -1; // tracker for body data read from cgi.
+	this->cgi_content_length     =  -1; // How much data do u expect from cgi
+	this->client_content_length  =  -1; // trac
+	this->client_read_bytes      =  -1;
+
+	this->state                  =  Idle;
+	this->streams[0]             =  -1;
+	this->streams[1]             =  -1;
+	this->pid                    =  -1;
+}
+
+void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
+{
+	std::stringstream stream;
+
+	this->protocol               =  request.httpVersion;
+	this->method                 =  request.method;
+	this->query_string           =  request.query_string;
+	if (this->method == "POST")
+		this->client_content_length  =  request.content_length;
+	this->params                 =  request.params;
+	this->filename               =  fn;
+	this->executable             =  fn;
+	this->interpreter            =  interpreter_;
+	this->gateway_interface      =  "CGI/1.1";
+
+	if (request.headers.find("Content-Type") != request.headers.end())
+		this->content_type = request.headers.at("Content-Type");
+	else
+		this->content_type = "application/octet-stream";
+	stream << this->client_content_length;
+	this->env.push_back("REQUEST_METHOD="   + this->method);
+	this->env.push_back("QUERY_STRING="     + this->query_string);
+	this->env.push_back("CONTENT_LENGTH="   + stream.str());
+	this->env.push_back("CONTENT_TYPE="     + this->content_type);
+	this->env.push_back("GATEWAY_INTERFAC=" + this->gateway_interface);
+	this->env.push_back("SCRIPT_NAME="      + this->filename);
+	this->env.push_back("PATH_TRANSLATED="  + this->filename);
+	this->env.push_back("REMOTE_ADDR="      + request.headers.at("REMOTE_ADDR"));  // TODO: Get the ip of the client and forward it to the cgi.
+	this->env.push_back("SERVER_PROTOCOL="  + this->protocol);
+}
+
+void Cgi::epoll_register(void) __THROWS_STRERROR
+{
+	struct epoll_event event;
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+
+	if (set_nonblocking(this->streams[STDOUT_FILENO]) == -1) throw strerror(errno);
+	if (set_nonblocking(this->streams[STDIN_FILENO]) == -1) throw strerror(errno);
+
+    event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
+    event.data.ptr = this; 
+    epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[STDOUT_FILENO], &event);
+
+    if (this->method == "POST") {
+        event.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
+        event.data.ptr = this;
+        epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[STDIN_FILENO], &event);
+        this->state = WritingBody; 
+    } else {
+        this->state = ReadingHeaders;
+        close(this->streams[STDIN_FILENO]);
+        this->streams[STDIN_FILENO] = -1;
+    }
+}
+
+bool Cgi::is_executable(void)
+{
+	if (!check_permissions(this->interpreter)) return (false);
+	if (!exists(this->filename)) return (false);
+	return (true);
+}
+
+void Cgi::execute(void) __THROWS_STRERROR
+{
+	char *args[3] = {
+		(char*)this->interpreter.c_str(),
+		(char*)this->filename.c_str(), 
+		NULL
+	};
+	int input[2];
+	int output[2];
+
+	std::vector<char*> envp;
+	if (!this->is_executable()) throw strerror(errno);
+    for (size_t i = 0; i < this->env.size(); ++i)
+        envp.push_back((char*)this->env[i].c_str());
+    envp.push_back(NULL);
+	if (pipe(input) == -1) throw strerror(errno);
+	if (pipe(output) == -1) {
+		close_fdlist(input);
+		throw strerror(errno);
+	}
+	this->pid = fork();
+	if (this->pid == -1)
+	{
+		close_fdlist(output);
+		close_fdlist(input);
+		throw strerror(errno);
+	}
+	if (this->pid == 0)
+	{
+		dup2(input [STDIN_FILENO],  STDIN_FILENO);
+		dup2(output[STDOUT_FILENO], STDOUT_FILENO);
+		/*  dup2(output[STDERR_FILENO], STDOUT_FILENO);  */
+		close_fdlist(output);
+		close_fdlist(input);
+		execve(this->interpreter.c_str(), args, &envp[0]);
+		_exit(127);
+	}
+	this->streams[STDIN_FILENO] = input[STDOUT_FILENO]; 
+	close(input[STDIN_FILENO]);
+	this->streams[STDOUT_FILENO] = output[STDIN_FILENO]; 
+	close(output[STDOUT_FILENO]);
+	this->epoll_register();
+}
+
+void Cgi::parse_headers()    __THROWS_STRERROR
+{
+	std::vector<std::string> headers;
+	std::vector<std::string> pair;
+
+	headers =
+		split(this->headers_buffer, "\n");
+	for (size_t i = 0; i < headers.size(); ++i)
+	{
+		pair = split(headers[i], ":");
+		if (pair.size() != 2) throw "Invalid Header";
+		this->headers[pair[0]] = pair[1];
+	}
+	if (this->headers.find("Content-Length") == this->headers.end()) 
+	{
+		this->headers["Transfer-Encoding"] = "chunked";
+		return ;
+	}
+	std::stringstream ss(this->headers.at("Content-Length"));
+	ss << this->cgi_content_length;
+}

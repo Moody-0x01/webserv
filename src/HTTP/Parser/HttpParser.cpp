@@ -64,12 +64,15 @@ void HttpParser::handle()
                 }
             }
         }
-		if (isHeaderValueExist("content-length"))
+		if (isHeaderValueExist("Content-Length"))
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
 			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
 			if (it != headers.end())
+			{
 				this->targetBodySize = std::atoi(it->second.c_str());
+				this->request.getHttpRequest().content_length = this->targetBodySize;
+			}
 			else if (this->request.getMethod() == "POST")
 				this->request.setcode(ContentLengthRequired);
 		}

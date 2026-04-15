@@ -119,7 +119,8 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		std::cout << "\n\n" << resolved.filesystem_path << " -- " << cgi_it->second << "\n\n";
+		if (!exists(resolved.filesystem_path))
+			resolved.resource_type = UriResolutionResult::None;
 	}
 }
 
@@ -260,6 +261,7 @@ void Response::init_mimes() {
 Response::Response()
 {
 	this->stage = Setup;
+	this->request_ptr = NULL;
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -273,50 +275,62 @@ UriResolutionResult::UriResolutionResult()
 	cgi_script = std::make_pair(std::string(), std::string());
 }
 
-void Response::continue_processing(const HttpRequest &request)
+Resource &Response::get_resource_ref(void) { return (this->resource);};
+
+void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
+	if (!this->request_ptr)
+		this->request_ptr = &request;
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
-		this->serialize_headers();
-		::write(request.conn, this->headers_as_str.c_str(), this->headers_as_str.size());
-		this->stage = SendingResource;
-	}
-	if (this->stage == SendingResource) {
-		if (this->status == OK) this->resource.send(request);
-		else {
-			// Send error page..
-
+		if (this->resolved_results.resource_type == UriResolutionResult::cgi) {
+			try {
+				this->resource.cgi.execute();
+				this->stage = ProcessingCgi;
+			} catch (const char *e) {
+				this->stage = SendingResource;
+				/*  std::cout << "Error: " << e << "\n";  */
+				this->set_status(InternalServerError);
+			}
+		} else {
+			this->stage = SendingResource;
 		}
-		return ;
 	}
-	abort();
+	if (this->stage == SendingResource)
+	{
+		this->send_headers(request.conn);
+		this->resource.send(request);
+		this->stage = DoneSending;
+	} else if (this->stage == ProcessingCgi) {
+		if (this->resource.cgi.state == DONE) {
+			this->stage = DoneSending;
+		}
+		if (!this->resource.cgi.headers_sent) {
+			this->resource.cgi
+				.send_headers(request.conn);
+		} else if (this->resource.cgi.state == ReadingBody) {
+			this->resource.cgi
+				.send_body_chunk(request.conn);
+		}
+	} else {
+		// IDK???
+	}
 }
 
 bool Response::is_method_allowed(std::string method)
 {
-	/*  std::cout << "We are here!!\n";  */
-	/*  std::cout << "Method: " << method;  */
-	/*  std::cout << "Allowed: " << resolved_results.matched_location;  */
-
-	/*  for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)  */
-	/*  	if (resolved_results.matched_location->methods[i] == method) return (true);  */
-	(void)(method);
-	return (true);
-	/* if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
+	if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
 	{
-		if (method == "GET" || method == "POST" || method == "DELETE")
-			return (true);
-		else
-			return false;
+		if (method == "GET" || method == "POST" || method == "DELETE") return (true);
+		else return false;
 	}
-
 	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
 	{
 		if (resolved_results.matched_location->methods[i] == method)
 			return (true);
 	}
-	return (false); */
+	return (false);
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -324,40 +338,30 @@ void Response::setup_response(const HttpRequest &request)
 	if ((request.httpVersion != "HTTP/1.0" && request.httpVersion != "HTTP/1.1"))
 	{
 		this->set_status(BadRequest);
-		this->get_error_page_html(request, BadRequest); // TODO: need to make appropriate headers ig
 		return ;
 	}
 	if (request.isbadrequest)
 	{
 		this->set_status(request.code);
-		this->get_error_page_html(request, request.code);
-		
 		return ;
-	}
-	this->set_status(OK);
-	this->appendheader("content-type", TextHtml);
-	
+	}	
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
-		// Note: any method that is Not Allowed, is Forbidden automatically
 		this->set_status(Forbidden);
-		this->get_error_page_html(request, Forbidden);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
-		this->get_error_page_html(request, NotFound);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
-		// Todo: Cgi handler...
-		// How should it be handeled????
-		// well, register a 
-		// I need to create input (The fd to write the body to) output (the fd to read from the response)
-		// pid_t pid which is the pid that is returned by fork()
+		this->resource.setresource_type(CGI);
+		this->resource.cgi.setup(request, 
+				this->resolved_results.cgi_script.first, 
+				this->resolved_results.cgi_script.second);
 		return ;
 	}
 	switch (Response::classify_method(request.method))
@@ -374,7 +378,6 @@ void Response::setup_response(const HttpRequest &request)
 			break ;
 		default:
 			this->set_status(BadRequest);
-			this->get_error_page_html(request, BadRequest);
 			break;
 	}
 }
@@ -505,10 +508,14 @@ void Response::handle_delete(const HttpRequest &request)
 	(void)request;;
 }
 
-const std::string Response::get_error_page_html(const HttpRequest &request, int code)
+void Response::get_error_page_html(const HttpRequest &request, int code)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 	std::map<size_t, std::string>::const_iterator configured = server_conf.error_pages.find(static_cast<size_t>(code));
+
+
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
 	if (configured != server_conf.error_pages.end())
 	{
 		std::string configured_path = join_fs_path(server_conf.root, configured->second);
@@ -517,17 +524,13 @@ const std::string Response::get_error_page_html(const HttpRequest &request, int 
 		{
 			std::ostringstream content;
 			content << stream.rdbuf();
-			this->resource.set_stream_buffer(content.str());
-			this->resource.setresource_type(Text);
-			this->resource.identify_type(configured_path, &server_conf.mime_types);
-			return this->resource.get_stream_buffer();
+			this->resource
+				.set_stream_buffer(content.str());
+			return ;
 		}
 	}
-
-	this->resource.set_stream_buffer(build_default_error_html(code));
-	this->resource.setresource_type(Text);
-	this->resource.identify_type("error.html", &server_conf.mime_types);
-	return this->resource.get_stream_buffer();
+	this->resource
+		.set_stream_buffer(build_default_error_html(code));
 }
 
 Response::~Response()
@@ -536,16 +539,16 @@ Response::~Response()
 
 void Response::serialize_headers(void)
 {
-	this->headers_as_str += this->status_line;
-	for (std::map<std::string, std::string>::iterator it = this->headers.begin(); it != this->headers.end(); ++it)
-		this->headers_as_str += it->first + ": " + it->second;
-	this->headers_as_str += "\r\n";
+
+	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
 
 
-void Response::send_headers(void) __THROWS_STRERROR
+void Response::send_headers(int conn) __THROWS_STRERROR
 {
+	this->serialize_headers();
+	::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
 
@@ -558,7 +561,7 @@ bool Response::isdone(void)
 	// what if it is a file? cgi?..
 	return (true);
 }
-//
+
 // void Response::write(int conn) __THROWS_STRERROR
 // {
 // 	ssize_t count;
@@ -595,7 +598,7 @@ void Response::init_status_lines()
     Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
-	// Cgi?
+
 	Response::status_lines[ContentLengthRequired] = "HTTP 411 Length Required";
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";
@@ -613,7 +616,7 @@ void Response::set_status(int s)
 	this->status = s;
 	this->status_line =
 		Response::status_lines[this->status] + "\r\n";
-	// TODO: fetch error page?
+	if (s != OK) this->get_error_page_html(*this->request_ptr, s);
 }
 
 int Response::get_status(void) const

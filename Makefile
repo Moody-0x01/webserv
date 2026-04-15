@@ -1,10 +1,10 @@
 CXX=c++
-SOURCE_DIR=./src
+SOURCE_DIR=src
 NAME=./webserv
 OBJDIR = .build
 OBJS=$(SRCS:%.cpp=$(OBJDIR)/%.o)
 INCLUDE=./include/
-CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE) -g3 -fsanitize=address 
+CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE) -ggdb # -g3 -fsanitize=address 
 RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 # $(SOURCE_DIR)/multiplexing/SocketHandlers.cpp removed
@@ -13,7 +13,8 @@ SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/ASock
 	$(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
 	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp $(SOURCE_DIR)/HTTP/Response.cpp \
 	$(SOURCE_DIR)/HTTP/Resource.cpp \
-	$(SOURCE_DIR)/Config/Lexer.cpp $(SOURCE_DIR)/Config/ConfigParser.cpp
+	$(SOURCE_DIR)/Config/Lexer.cpp $(SOURCE_DIR)/Config/ConfigParser.cpp\
+	$(SOURCE_DIR)/multiplexing/Cgi.cpp $(SOURCE_DIR)/utility.cpp
 
 
 all: $(NAME)
@@ -34,6 +35,8 @@ fclean: clean
 
 run: $(NAME)
 	./$(NAME)
+test: all
+	./$(NAME) Test.conf
 
 re: fclean all
 

@@ -1,45 +1,5 @@
 #include <Server.hpp>
 
-int set_nonblocking(int sockfd)
-{
-	errno = 0;
-    int flags = fcntl(sockfd, F_GETFL);
-    if (flags == -1) return -1;
-	flags |= O_NONBLOCK;
-    if (fcntl(sockfd, F_SETFL, flags) == -1) return -1;
-    return 0;
-}
-
-std::string get_signal_name(int sig)
-{
-    static std::map<int, std::string> sig_map;
-
-    sig_map[SIGINT]  =  "SIGINT (Interrupt)";
-    sig_map[SIGTERM] =  "SIGTERM (Termination)";
-    sig_map[SIGHUP]  =  "SIGHUP (Hangup/Reload)";
-    sig_map[SIGUSR1] =  "SIGUSR1 (User Defined 1)";
-    sig_map[SIGUSR2] =  "SIGUSR2 (User Defined 2)";
-    sig_map[SIGQUIT] =  "SIGQUIT (Quit/Core Dump)";
-    if (sig_map.count(sig)) return sig_map[sig];
-    return "Unknown Signal";
-}
-
-void signal_handler(int sig)
-{
-	unsigned char* data;
-    int saved_errno = errno;
-	Multiplexer *self;
-
-	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
-
-	data = (unsigned char*)&sig;
-
-    write(self->signal_io[1],
-		data,
-		sizeof(int));
-    errno = saved_errno;
-}
 
 Multiplexer *Multiplexer::get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *)
 {
@@ -72,6 +32,8 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 {
 	if (this->epoll_fd < 0)
 		throw std::strerror(errno);
+	this->signal_io[STDOUT_FILENO] = -1;
+	this->signal_io[STDIN_FILENO ] = -1;
 	Response::init_status_lines();
 	Response::init_mimes();	
 	try {
@@ -178,6 +140,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
 {
 	struct sockaddr_in addr;
+	uint32_t ip;
 	Multiplexer *self;
 	int conn;
 	socklen_t len;
@@ -191,6 +154,8 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
 
+	ip = ntohl(addr.sin_addr.s_addr);
+	client.setip_from_bytes(ip);
 	client.set_owner(server->get_socket());
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
@@ -210,6 +175,14 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 	self->servers[owner].second.erase(client);
 }
 
+void unregister_fd(int fd)
+{
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+}
+
 Multiplexer::~Multiplexer()
 {
 	this->deinit();
@@ -217,7 +190,7 @@ Multiplexer::~Multiplexer()
 
 void Multiplexer::deinit(void)
 {
-	if (this->epoll_fd != -1) close(this->epoll_fd);
+	close(this->epoll_fd);
 	if (this->signal_io[0] != -1) close(this->signal_io[0]);
 	if (this->signal_io[1] != -1) close(this->signal_io[1]);
 	// TODO: Cleanup other stuff..
@@ -248,7 +221,7 @@ int Multiplexer::loop(void)
 					std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
 					return 1;
 				}
-				while (waitpid(-1, NULL, WNOHANG) > 0);
+				while (waitpid(-1, NULL, WNOHANG) > 0) {}
 			}
 			else {
 				ASocketContext *handle = (ASocketContext *)ptr;

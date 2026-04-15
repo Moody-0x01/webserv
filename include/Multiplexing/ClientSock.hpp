@@ -1,5 +1,6 @@
 #pragma once
 #include <Multiplexing/ServerSock.hpp>
+#include <HTTP/Response.hpp>
 
 typedef struct Client: public ASocketContext {
 public:
@@ -15,6 +16,13 @@ public:
 	void generate_response(void) __THROWS_STRERROR;
 	void set_owner(int owner);
 	int  get_owner(void) const;
+
+	void setip(std::string address);
+	void setip_from_bytes(uint32_t ip_bytes);
+	std::string getip(void);
+
+
 private:
-	int  _owner;
+	int			 _owner;
+	std::string  ip;
 } Client;
