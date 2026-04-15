@@ -477,7 +477,6 @@ void Response::handle_get(const HttpRequest &request)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 
-	(void)request;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
