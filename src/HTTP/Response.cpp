@@ -392,9 +392,6 @@ void Response::list_dir(void)
 			this->set_status(Forbidden);
 		else
 			this->set_status(InternalServerError);
-		this->resource.setresource_type(Text);
-		this->resource.identify_type("error.html");
-		this->resource.set_stream_buffer(build_default_error_html(this->get_status()));
 		return;
 	}
 
@@ -468,9 +465,6 @@ void Response::serve_file(void)
 			this->set_status(Forbidden);
 		else
 			this->set_status(open_status);
-		this->resource.set_stream_buffer(build_default_error_html(this->get_status()));
-		this->resource.setresource_type(Text);
-		this->resource.identify_type("error.html");
 	}
 	else
 		this->set_status(OK);
