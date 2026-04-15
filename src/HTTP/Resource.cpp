@@ -8,7 +8,7 @@
 #include <string>
 #include <unistd.h>
 
-Resource::Resource(): __rstream(NULL), __done(false), __isopen(false), __isbuf(false) , type(std::string(""))
+Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string(""))
 {
 	this->__stream_buffer = "";
 	this->bytes_sent = 0;
@@ -98,14 +98,20 @@ bool Resource::isopen(void)
 #include <cmath>
 response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
-	switch (this->resource_type)
+	if (__isbuf)
+	{
+		::write(request.conn, __stream_buffer.c_str(), __stream_buffer.length());
+		return (DoneSending);
+	}
+	
+	/* switch (this->resource_type)
 	{
 		case File: {
 			::write(request.conn, "Sending a static file", 22);
 			return (DoneSending);
 		} break;
 		case Dir:
-		case Text: {
+		case Text: { */
 
 			/*  if (this->bytes_sent < this->__stream_buffer.size()) {  */
 			/*  	// size_t n = min((int)WRITE_CHUNK_SIZE, (int)this->bytes_sent -this->__stream_buffer.size());  */
@@ -114,7 +120,7 @@ response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 			/*  		this->__stream_buffer.size());  */
 			/*  } else  */
 			/*  	this->__done = true;  */
-			::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
+		/* 	::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
 			return (DoneSending);
 		} break;
 		case CGI: {
@@ -123,8 +129,8 @@ response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 		} break;
 		default: 
 			assert(0 && "Bro wtf??");
-	}
-	return (DoneSending);
+	}*/
+	return (DoneSending); 
 }
 
 std::string Resource::get_type(void)
