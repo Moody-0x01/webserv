@@ -482,7 +482,6 @@ void Response::handle_get(const HttpRequest &request)
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
 		{
 			this->set_status(NotFound);
-			this->get_error_page_html(request, NotFound);
 			return ;
 		}
 		list_dir();
