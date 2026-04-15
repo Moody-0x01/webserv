@@ -456,7 +456,24 @@ void Response::list_dir(void)
 
 void Response::serve_file(void)
 {
-	// TODO: use resource to fill the stream and so on
+	const std::string &file_path = this->resolved_results.filesystem_path;
+	int open_status = this->resource.open(file_path);
+
+	if (open_status != OK)
+	{
+		if (open_status == Unauthorized)
+			this->set_status(Forbidden);
+		else
+			this->set_status(open_status);
+		this->resource.set_stream_buffer(build_default_error_html(this->get_status()));
+		this->resource.setresource_type(Text);
+		this->resource.identify_type("error.html");
+	}
+	else
+		this->set_status(OK);
+
+	std::string content_type = this->resource.get_type();
+	this->appendheader("content-type", content_type.c_str());
 }
 
 void Response::handle_get(const HttpRequest &request)
