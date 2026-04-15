@@ -71,7 +71,8 @@ void HttpParser::handle()
 			if (it != headers.end())
 			{
 				this->targetBodySize = std::atoi(it->second.c_str());
-				this->request.getHttpRequest().content_length = this->targetBodySize;
+                std::cout << "this->targetBodySize : " <<  this->targetBodySize << std::endl;
+			    this->request.getHttpRequest().content_length = this->targetBodySize;
 			}
 			else if (this->request.getMethod() == "POST")
 				this->request.setcode(ContentLengthRequired);

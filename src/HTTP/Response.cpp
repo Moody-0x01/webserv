@@ -1,7 +1,10 @@
+#include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <cstdlib>
+#include <ios>
 #include <iostream>
 #include <map>
+#include <ostream>
 #include <string>
 #include <sys/stat.h>
 #include <utility>
@@ -116,7 +119,10 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
 		if (!exists(resolved.filesystem_path))
+		{
 			resolved.resource_type = UriResolutionResult::None;
+			std::cout << "Hello world!!\n";
+		}
 	}
 }
 
@@ -327,11 +333,12 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(Forbidden);
 		return ;
 	}
-	if (this->resolved_results.resource_type == UriResolutionResult::None)
-	{
-		this->set_status(NotFound);
-		return ;
-	}
+	// if (this->resolved_results.resource_type == UriResolutionResult::None)
+	// {
+	// 	this->set_status(NotFound);
+	// 	return ;
+	// }
+
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
@@ -389,7 +396,16 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	(void)request;
+	std::cout << "---------------------------------" << std::endl;
+	std::cout << std::boolalpha;
+	std::cout << "is Bad?: " << request.isbadrequest << std::endl;
+	std::cout << "Method: " << request.method << std::endl;
+	std::cout << "Uri: " << request.uri << std::endl;
+	std::cout << "httpVersion: " << request.httpVersion << std::endl;
+	std::cout << "Query String: " << request.query_string << std::endl;
+	std::cout << "Content-lenght: " << request.content_length << std::endl;
+	std::cout << "Code: " << request.code << std::endl;
+	std::cout << "Body: " << request.body << std::endl;
 }
 
 void Response::handle_delete(const HttpRequest &request)
@@ -535,8 +551,8 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
 
 	resolved.resource_type = get_resource_type(resolved.filesystem_path);
-	resolve_cgi_script(resolved, best_location);
-
+	if (resolved.resource_type == UriResolutionResult::file)
+		resolve_cgi_script(resolved, best_location);
 	return resolved;
 }
 
