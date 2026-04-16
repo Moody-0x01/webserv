@@ -130,7 +130,6 @@ std::vector<Token> &Lexer::getTokens()
     return tokens;
 }
 
-// all the errors catched here are 400 Bad Request so i just used the boolean no code needed!
 void Lexer::markAsBad()
 {
     this->badRequest = true;
