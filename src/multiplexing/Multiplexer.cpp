@@ -75,6 +75,7 @@ void Multiplexer::init_signals(void) __THROWS_STRERROR
     code = epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, 
                     this->signal_io[0], &event);
     if (code < 0) throw strerror(errno);
+
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         throw strerror(errno);
     if (signal(SIGINT,  signal_handler) == SIG_ERR)  throw strerror(errno);
     if (signal(SIGTERM, signal_handler) == SIG_ERR)  throw strerror(errno);
@@ -173,6 +174,7 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 	self->servers[owner].second.erase(client);
+	unregister_fd(client);
 }
 
 void unregister_fd(int fd)
@@ -228,8 +230,9 @@ int Multiplexer::loop(void)
 				try {
 					handle->action(this->events[index].events);
 				} catch (const char *error) {
-					std::cerr << "[ handle->action ] " << error << "\n";
+					// std::cerr << "[ handle->action ] " << error << "\n";
 				}
+
 			}
 		}
     }

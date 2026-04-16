@@ -253,6 +253,8 @@ UriResolutionResult::UriResolutionResult()
 
 Resource &Response::get_resource_ref(void) { return (this->resource);};
 
+/*  []  */
+/*  [headers | body]  */
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
@@ -278,19 +280,18 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		this->send_headers(request.conn);
 		this->resource.send(request);
 		this->stage = DoneSending;
-	} else if (this->stage == ProcessingCgi) {
-		if (this->resource.cgi.state == DONE) {
+	} else if (this->stage == ProcessingCgi) {	
+		if (this->resource.cgi.state == DONE)
+		{
 			this->stage = DoneSending;
 		}
-		if (!this->resource.cgi.headers_sent) {
+		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
 			this->resource.cgi
 				.send_headers(request.conn);
-		} else if (this->resource.cgi.state == ReadingBody) {
+		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
 			this->resource.cgi
 				.send_body_chunk(request.conn);
 		}
-	} else {
-		// IDK???
 	}
 }
 

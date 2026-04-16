@@ -30,6 +30,7 @@ void Client::take_ownership(ASocketContext *Other)
 
 void Client::free()
 {
+	std::cout << "Closed connexion for " << this->get_socket() << "\n";
 	Multiplexer::unregister_client(this->get_owner(), this->get_socket());
 }
 
@@ -90,14 +91,17 @@ void Client::generate_response(void) __THROWS_STRERROR
 
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
-	if (e & (EPOLLERR | EPOLLHUP))
-		throw "";
 	try {
     if (e & EPOLLIN) this->parse_request();
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
         this->generate_response();
 	} catch (const char *e) {
 		throw e;
+	}
+	if (e & (EPOLLERR | EPOLLHUP))
+	{
+		this->free();
+		return ;
 	}
 }
 

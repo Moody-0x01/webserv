@@ -80,7 +80,7 @@ int main_cgi_test()
 			} break; // this is done somewhere else??
 			case ReadingHeaders: {
 				cgi.append_into_headers_buffer(buffer, read_from_cgi);
-				if (cgi.strip_header_termination())
+				if (cgi.find_header_end() != cgi.headers_buffer.end())
 					cgi.state = ReadingBody;
 			} break;
 			case ReadingBody: {
@@ -89,10 +89,8 @@ int main_cgi_test()
 		}
 		std::memset(buffer, 0, sizeof(buffer));
 	}
-
 	print_buffer(cgi.headers_buffer, "Headers: ");
 	print_buffer(cgi.body_buffer, "Body: ");
-
 	wait(NULL);
 	return (0);
 }
