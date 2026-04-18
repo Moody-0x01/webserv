@@ -78,10 +78,7 @@ void Client::generate_response(void) __THROWS_STRERROR
 		this->response
 			.continue_processing(request);
 		if (this->response.getstage() == DoneSending)
-		{
 			this->free();
-			std::cout << "DONE!!!\n";
-		}
 	} catch (const char *e) {
 		this->free();
 		throw e;
@@ -92,16 +89,26 @@ void Client::generate_response(void) __THROWS_STRERROR
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
 	try {
-    if (e & EPOLLIN) this->parse_request();
-    if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
-        this->generate_response();
-	} catch (const char *e) {
-		throw e;
+    if (e & EPOLLIN) {
+		this->parse_request();
+		return ;
 	}
-	if (e & (EPOLLERR | EPOLLHUP))
+    if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
+		this->generate_response();
+		return ;
+	}
+	if (e & EPOLLERR) {
 		this->free();
 		return ;
+	}
+	if (e & EPOLLHUP) {
+		this->free();
+		return ;
+	}
+	} catch (const char *e) {
+		this->free();
+		throw e;
 	}
 }
 

@@ -15,5 +15,5 @@ std::string serialize_headers(std::map<std::string, std::string> &headers, bool 
 void close_fdlist(int fds[2]);
 bool check_permissions(std::string file);
 bool exists(std::string file);
-std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);
+/*  std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);  */
 void print_buffer(std::vector<char> &buffer, const char *label);

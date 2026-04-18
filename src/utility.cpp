@@ -4,6 +4,8 @@
 #include <fcntl.h>           /* Definition of AT_* constants */
 #include <unistd.h>
 #include <unistd.h>
+#include <utility>
+#include <vector>
 
 std::vector<std::string> split(std::string str, char delim)
 {
@@ -163,7 +165,7 @@ std::vector<char>::iterator search(std::vector<char> &vector, const char *patter
 
 void print_buffer(std::vector<char> &buffer, const char *label)
 {
-	std::cout << label;
+	std::cout << label << " Size: " << buffer.size();
 	size_t size;
 
 	size = buffer.size();

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <ctime>
 #include <iostream>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <sys/wait.h>
@@ -12,6 +13,8 @@
 
 Cgi::~Cgi() {
 	ASocketContext::~ASocketContext();
+	std::cout << "Cgi is done\n";
+	this->done();
 }
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
@@ -32,16 +35,20 @@ void Cgi::append_into_body_buffer(const char *buffer, ssize_t size)
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 {
 	ssize_t sent;
+	size_t to_send;
 
 	if (this->body_buffer.size())
 	{
-		sent = ::write(conn,
-			&this->body_buffer[0],
-			this->body_buffer.size());
+		to_send = std::min((int)WRITE_CHUNK_SIZE, (int)this->body_buffer.size());
+		sent = ::write(conn, &this->body_buffer[0], to_send);
 		if (sent > 0) {
 			this->body_buffer.erase(
 				this->body_buffer.begin(),
 				this->body_buffer.begin() + sent);
+		} else {
+			std::cout << "Send body size " << to_send << std::endl;
+			std::cout << "Sent           " << sent << std::endl;
+			std::cout << "Error          " << strerror(errno) << std::endl;
 		}
 	}
 }
@@ -55,12 +62,15 @@ void Cgi::send_headers(int conn) __THROWS_STRERROR
 
 void Cgi::done(void)
 {
-	this->state = DONE;
-	unregister_fd(this->streams[0]);
-	unregister_fd(this->streams[1]);
-	close_fdlist(this->streams);
-	this->streams[0] = -1;
-	this->streams[1] = -1;
+	if (this->state != DONE) {
+		std::cout << "We done reading!\n";
+		this->state = DONE;
+		unregister_fd(this->streams[CGI_READ_END]);
+		unregister_fd(this->streams[CGI_WRITE_END]);
+		close_fdlist(this->streams);
+		this->streams[CGI_READ_END] = -1;
+		this->streams[CGI_WRITE_END] = -1;
+	}
 }
 
 void Cgi::write() __THROWS_STRERROR
@@ -68,7 +78,7 @@ void Cgi::write() __THROWS_STRERROR
 	ssize_t sent;
 	if (this->state == WritingBody)
 	{
-		sent = Multiplexer::write(this->streams[STDIN_FILENO],
+		sent = Multiplexer::write(this->streams[CGI_WRITE_END],
 					&this->body_buffer[0],
 					this->body_buffer.size());
 		if (sent > 0) {
@@ -81,27 +91,39 @@ void Cgi::write() __THROWS_STRERROR
 	}
 }
 
-std::vector<char>::iterator Cgi::find_header_end()
+
+std::pair<std::vector<char>::iterator, size_t> Cgi::find_seperator(void)
 {
     const char *p1 = CRLF;
     const char *p2 = NLNL;
+
     if (this->headers_buffer.size() < 4) 
-        return this->headers_buffer.end();
+        return std::make_pair(this->headers_buffer.end(), 0);
 
     std::vector<char>::iterator it = std::search(this->headers_buffer.begin(), 
                                                  this->headers_buffer.end(), 
                                                  p1, p1 + 4);
-    if (it != this->headers_buffer.end()) {
-		std::cout << "Found CRLF\n";
-		return it;
-	}
-    it = std::search(this->headers_buffer.begin(), 
+    if (it != this->headers_buffer.end())
+		return std::make_pair(it, 4);
+    return std::make_pair(std::search(this->headers_buffer.begin(), 
                        this->headers_buffer.end(), 
-                       p2, p2 + 2);
-	if (it != this->headers_buffer.end()) {
-		std::cout << "Found NLNL\n";
-	}
-	return (it);
+                       p2, p2 + 2), 2);
+}
+
+bool Cgi::strip_body_if_found(void)
+{
+	std::pair<std::vector<char>::iterator, size_t> seperator =
+		this->find_seperator();
+
+	size_t headers_length;
+	if (seperator.first == this->headers_buffer.end())
+		return (false);
+	headers_length = ((seperator.first - this->headers_buffer.begin()) + 1);
+	this->append_into_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
+				this->headers_buffer.size() - headers_length - seperator.second);
+	this->headers_buffer
+		.resize(headers_length);
+	return (true);
 }
 
 void Cgi::read() __THROWS_STRERROR
@@ -112,17 +134,20 @@ void Cgi::read() __THROWS_STRERROR
 
 	if (this->state == DONE)
 		return ;
+	if (this->state == ReadingBody && this->body_buffer.size() >= 2048) // 64KB
+		return ;
 	std::memset(buffer, 0, sizeof(buffer));
-	read_from_cgi = Multiplexer::read(this->streams[STDOUT_FILENO],
+	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
 				buffer,
 				sizeof(buffer));
+	std::cout << "read: " <<  read_from_cgi << std::endl;
 	if (read_from_cgi == 0 || read_from_cgi == -1) {
 		this->done();
 		return ;
 	}
 	switch (this->state)
 	{
-		case DONE: { } break;
+		case DONE: {} break;
 		case Idle: {
 			std::cout << "Wtf bro this should be done in write\n";
 			abort();
@@ -133,16 +158,10 @@ void Cgi::read() __THROWS_STRERROR
 		} break; // this is done somewhere else??
 		case ReadingHeaders: {
 			this->append_into_headers_buffer(buffer, read_from_cgi);
-			std::cout << "read: " << read_from_cgi << "\n";
-			it = this->find_header_end();
-			if (it != this->headers_buffer.end()) {
-				size_t header_len = (it - this->headers_buffer.begin()) + 4; // +4 for \r\n\r\n
-				if (this->headers_buffer.size() > header_len) {
-					size_t extra_bytes = this->headers_buffer.size() - header_len;
-					this->append_into_body_buffer(&this->headers_buffer[header_len], extra_bytes);
-					this->headers_buffer.resize(header_len);
-				}
-				this->state = ReadingBody; 
+			if (this->strip_body_if_found())
+			{
+				this->parse_headers();
+				this->state = ReadingBody;
 			}
 		} break;
 		case ReadingBody: {
@@ -160,7 +179,6 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 
 	try {
 		if (e & EPOLLERR) {
-			std::cout << "Error ajmi:: \n";
             this->done();
             return;
         }
@@ -169,9 +187,7 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
         if (e & EPOLLOUT)
             this->write();
         if ((e & EPOLLHUP) || (e & EPOLLRDHUP))
-		{
             this->done();
-		}
 	} catch (const char *e) {
 		this->done();
 		throw e;
@@ -181,17 +197,14 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 Cgi::Cgi()
 {
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
-
 	this->start_time             =  0;
-
 	this->cgi_read_bytes         =  -1; // tracker for body data read from cgi.
 	this->cgi_content_length     =  -1; // How much data do u expect from cgi
 	this->client_content_length  =  -1; // trac
 	this->client_read_bytes      =  -1;
-
 	this->state                  =  Idle;
-	this->streams[0]             =  -1;
-	this->streams[1]             =  -1;
+	this->streams[CGI_READ_END ] =  -1;
+	this->streams[CGI_WRITE_END] =  -1;
 	this->pid                    =  -1;
 	this->headers_parsed         = false;
 	this->headers_sent           = false;
@@ -236,24 +249,24 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 
-	if (set_nonblocking(this->streams[STDOUT_FILENO]) == -1) throw strerror(errno);
-	if (set_nonblocking(this->streams[STDIN_FILENO]) == -1) throw strerror(errno);
+	if (set_nonblocking(this->streams[CGI_WRITE_END]) == -1) throw strerror(errno);
+	if (set_nonblocking(this->streams[CGI_READ_END]) == -1) throw strerror(errno);
 
     event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
     event.data.ptr = this; 
     epoll_ctl(self->epoll_fd,
 			EPOLL_CTL_ADD,
-			this->streams[STDOUT_FILENO], &event);
+			this->streams[CGI_READ_END], &event);
 
     if (this->method == "POST") {
         event.events = EPOLLOUT | EPOLLERR;
         event.data.ptr = this;
-        epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[STDIN_FILENO], &event);
+        epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[CGI_WRITE_END], &event);
         this->state = WritingBody; 
     } else {
         this->state = ReadingHeaders;
-        close(this->streams[STDIN_FILENO]);
-        this->streams[STDIN_FILENO] = -1;
+        close(this->streams[CGI_WRITE_END]);
+        this->streams[CGI_WRITE_END] = -1;
     }
 }
 
@@ -294,16 +307,16 @@ void Cgi::execute(void) __THROWS_STRERROR
 	if (this->pid == 0)
 	{
 		if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         exit(1);
-		dup2(input [STDIN_FILENO],  STDIN_FILENO);
-		dup2(output[STDOUT_FILENO], STDOUT_FILENO);
+		dup2(input [CGI_READ_END],  STDIN_FILENO);
+		dup2(output[CGI_WRITE_END], STDOUT_FILENO);
 		close_fdlist(output);
 		close_fdlist(input);
 		execve(this->interpreter.c_str(), args, &envp[0]);
 		_exit(127);
 	}
-	this->streams[STDIN_FILENO] = input[STDOUT_FILENO]; 
+	this->streams[CGI_READ_END] = output[STDIN_FILENO]; 
 	close(input[STDIN_FILENO]);
-	this->streams[STDOUT_FILENO] = output[STDIN_FILENO]; 
+	this->streams[CGI_WRITE_END] = input[STDOUT_FILENO]; 
 	close(output[STDOUT_FILENO]);
 	this->epoll_register();
 }
@@ -323,7 +336,10 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 			//            Status:    xxx             OK?
 			this->headers[pair[0]] = pair[1] + " " + pair[2];
 		} else if (pair.size() != 2)
+		{
+			std::cout << "H: " << headers[i] << "\n";
 			throw "Invalid Header";
+		}
 		else
 			this->headers[pair[0]] = pair[1];
 	}

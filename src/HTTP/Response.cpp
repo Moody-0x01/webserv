@@ -281,10 +281,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		this->resource.send(request);
 		this->stage = DoneSending;
 	} else if (this->stage == ProcessingCgi) {	
-		if (this->resource.cgi.state == DONE)
-		{
-			this->stage = DoneSending;
-		}
 		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
 			this->resource.cgi
 				.send_headers(request.conn);
@@ -292,6 +288,8 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 			this->resource.cgi
 				.send_body_chunk(request.conn);
 		}
+		if (this->resource.cgi.state == DONE)
+			this->stage = DoneSending;
 	}
 }
 

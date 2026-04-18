@@ -171,6 +171,7 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 {
 
 	Multiplexer *self;
+
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 	self->servers[owner].second.erase(client);
@@ -230,7 +231,7 @@ int Multiplexer::loop(void)
 				try {
 					handle->action(this->events[index].events);
 				} catch (const char *error) {
-					// std::cerr << "[ handle->action ] " << error << "\n";
+					std::cerr << "[ handle->action ] " << error << "\n";
 				}
 
 			}

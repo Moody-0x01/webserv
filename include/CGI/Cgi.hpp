@@ -18,6 +18,9 @@ typedef enum cgi_state_e {
 
 extern char **environ;
 
+# define CGI_READ_END  0
+# define CGI_WRITE_END 1
+
 typedef struct Cgi: public ASocketContext
 {
 	std::string uri;
@@ -69,6 +72,7 @@ public:
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
 	bool validate_headers();
 	bool is_executable(void);
-	std::vector<char>::iterator find_header_end();
+	std::pair<std::vector<char>::iterator, size_t> find_seperator(void);
+	bool strip_body_if_found(void);
 	void done(void);
 } Cgi;
