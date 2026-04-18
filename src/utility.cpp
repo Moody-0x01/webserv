@@ -120,6 +120,12 @@ void signal_handler(int sig)
     errno = saved_errno;
 }
 
+void sigpipe_handler(int sig)
+{
+	signal_handler(sig);	
+	while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
 std::string serialize_headers(std::map<std::string, std::string> &headers, bool setdefault_status)
 {
 	std::string headers_as_str;

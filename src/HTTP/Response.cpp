@@ -255,6 +255,7 @@ Resource &Response::get_resource_ref(void) { return (this->resource);};
 
 /*  []  */
 /*  [headers | body]  */
+
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
@@ -268,7 +269,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
 				this->stage = SendingResource;
-				/*  std::cout << "Error: " << e << "\n";  */
 				this->set_status(InternalServerError);
 			}
 		} else {
@@ -281,6 +281,18 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		this->resource.send(request);
 		this->stage = DoneSending;
 	} else if (this->stage == ProcessingCgi) {	
+		if (this->resource.cgi.timeout())
+		{
+			if (!this->resource.cgi.headers_sent) {
+				std::cout << "Timout but headers were not sent.\n";
+				this->stage = SendingResource;
+				this->set_status(RequestTimeout);
+				return ;
+			}
+			std::cout << "Timout but headers already sent.\n";
+			this->stage = DoneSending;
+			return ;
+		}
 		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
 			this->resource.cgi
 				.send_headers(request.conn);

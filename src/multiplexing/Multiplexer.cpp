@@ -80,8 +80,8 @@ void Multiplexer::init_signals(void) __THROWS_STRERROR
     if (signal(SIGINT,  signal_handler) == SIG_ERR)  throw strerror(errno);
     if (signal(SIGTERM, signal_handler) == SIG_ERR)  throw strerror(errno);
     if (signal(SIGHUP,  signal_handler) == SIG_ERR)  throw strerror(errno);
-    if (signal(SIGQUIT,  signal_handler) == SIG_ERR) throw strerror(errno);
-	if (signal(SIGCHLD, signal_handler) == SIG_ERR)  throw strerror(errno);	
+    if (signal(SIGQUIT, signal_handler) == SIG_ERR) throw strerror(errno);
+	if (signal(SIGCHLD, sigpipe_handler) == SIG_ERR)  throw strerror(errno);	
 }
 
 static std::string resolve_host(const std::string &host)
@@ -93,7 +93,6 @@ static std::string resolve_host(const std::string &host)
 
 void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 {
-	Server server;
 	int server_fd, opt, code;
 	Multiplexer *self;
 	struct epoll_event event;
@@ -111,7 +110,6 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 	if (code != 0) throw gai_strerror(code);
 	server_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (server_fd < 0) throw strerror(errno);
-	server.set_socket(server_fd);
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     std::memset(&event, 0, sizeof(event));
     if (bind(server_fd, res->ai_addr, res->ai_addrlen) < 0)
@@ -120,20 +118,21 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 		throw strerror(errno);
     }
     freeaddrinfo(res);
-	if (set_nonblocking(server.get_socket()) == -1)
+	if (set_nonblocking(server_fd) == -1)
 		throw strerror(errno);
-    if (listen(server.get_socket(), SOMAXCONN) < 0)
+    if (listen(server_fd, SOMAXCONN) < 0)
 		throw strerror(errno);
-	server.disown();
-	self->servers[server_fd] = std::make_pair(server, Clients());
-	self->confs[server_fd] = conf;
 
+	self->servers[server_fd] = std::make_pair(Server(), Clients());
+	self->confs[server_fd]   = conf;
+	self->servers[server_fd].first.set_socket(server_fd);
 	event.events = EPOLLIN;
 	event.data.ptr = &self->servers[server_fd].first;
-	code = epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, server.get_socket(), &event);
+	code = epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, server_fd, &event);
 	if (code < 0)
 	{
-		self->servers.erase(server_fd);
+		self->servers
+			.erase(server_fd);
 		throw strerror(errno);
 	}
 }
@@ -145,7 +144,6 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	Multiplexer *self;
 	int conn;
 	socklen_t len;
-	Client client;
 	(void)e;
 
 	self = Multiplexer::get_multiplexer(NULL);
@@ -154,16 +152,20 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	len = sizeof(addr);
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
-
 	ip = ntohl(addr.sin_addr.s_addr);
+	if (set_nonblocking(conn) == -1) throw strerror(errno);
+
+	self->servers[server->get_socket()].second[conn] = Client();
+
+	Client &client = self->servers[server->get_socket()].second[conn];
+
 	client.setip_from_bytes(ip);
 	client.set_owner(server->get_socket());
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
-	if (set_nonblocking(conn) == -1) throw strerror(errno);
-	self->servers[server->get_socket()].second[conn]
-		.take_ownership(&client);
-	return (&self->servers[server->get_socket()].second[conn]);
+	client.getParser().setParent(&client);
+	std::cout << "register_client: " << &client << std::endl;
+	return (&client);
 }
 
 
@@ -174,16 +176,24 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-	self->servers[owner].second.erase(client);
-	unregister_fd(client);
+	std::cout << ">> Destructor entrance\n";
+	self->servers[owner].second
+		.erase(client);
+	std::cout << "<< Destructor Out\n";
 }
 
 void unregister_fd(int fd)
 {
 	Multiplexer *self;
-	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
-	epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+	epoll_event dummy;
+
+	if (fd >= 0) {
+		self = Multiplexer::get_multiplexer(NULL);
+		std::cout << "Closing :: " << fd << std::endl;
+		if (!self) throw "Well, failed to get a Multiplexer class";
+		epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, &dummy);
+		close(fd);
+	}
 }
 
 Multiplexer::~Multiplexer()
@@ -219,12 +229,10 @@ int Multiplexer::loop(void)
 			if (ptr == this->signal_io)
 			{
 				(void)read(this->signal_io[0], &sig, sizeof(sig));
-				if (sig != SIGCHLD)
-				{
-					std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
-					return 1;
-				}
-				while (waitpid(-1, NULL, WNOHANG) > 0) {}
+				if (sig == SIGCHLD)
+					continue ;
+				std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
+				return 1;
 			}
 			else {
 				ASocketContext *handle = (ASocketContext *)ptr;
@@ -252,4 +260,14 @@ ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERR
 	ssize_t count = ::write(fd, buf, size);
 	if (count <= 0) throw strerror(errno);
 	return (count);
+}
+
+Cgi   *Multiplexer::get_cgi_instance(int client_fd)
+{
+	return (&this->_cgi_instances[client_fd]);
+}
+
+void   Multiplexer::push_cgi_instance(int client)
+{
+	this->_cgi_instances[client] = Cgi();
 }

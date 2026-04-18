@@ -20,6 +20,7 @@ extern char **environ;
 
 # define CGI_READ_END  0
 # define CGI_WRITE_END 1
+# define SCRIPT_TIMEOUT 5
 
 typedef struct Cgi: public ASocketContext
 {
@@ -67,7 +68,7 @@ public:
 	void read()                 __THROWS_STRERROR;
 	void parse_headers()        __THROWS_STRERROR;
 	void epoll_register(void)   __THROWS_STRERROR;
-	/*  bool strip_header_termination(void);  */
+	bool timeout(void)     __THROWS_STRERROR;
 	void append_into_body_buffer(const char *buffer, ssize_t size);
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
 	bool validate_headers();

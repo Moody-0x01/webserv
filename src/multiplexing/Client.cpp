@@ -5,6 +5,11 @@ HttpParser &Client::getParser(void)
 	return this->parserInstance;
 }
 
+Client::~Client()
+{
+	std::cout << this->get_socket() << " was freeed::::)\n";
+}
+
 void Client::set_owner(int owner) { _owner = owner; }
 int Client::get_owner(void) const { return _owner; }
 
@@ -15,23 +20,12 @@ Server *Client::get_server(void) const __THROWS_STRERROR {
 	return self->get_owner(this->get_socket());
 }
 
-void Client::take_ownership(ASocketContext *Other)
-{
-	ASocketContext::take_ownership(Other);
-	Client *realOther = dynamic_cast<Client*>(Other);
-
-    if (realOther) {
-        // Now you have access to Client-specific fields!
-        this->_owner = realOther->_owner;
-        this->parserInstance = realOther->parserInstance;
-		this->parserInstance.setParent(this);
-    }
-}
 
 void Client::free()
 {
-	std::cout << "Closed connexion for " << this->get_socket() << "\n";
-	Multiplexer::unregister_client(this->get_owner(), this->get_socket());
+	shutdown(this->get_socket(), SHUT_WR);
+	Multiplexer::unregister_client(this->get_owner(),
+				this->get_socket());
 }
 
 void Client::parse_request() __THROWS_STRERROR
@@ -39,14 +33,15 @@ void Client::parse_request() __THROWS_STRERROR
 	int conn = this->get_socket();
 	Multiplexer *self;
 	struct epoll_event cev;
+	char buff[READ_CHUNK_SIZE];
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 	HttpParser &clientP = this->getParser();
-	char buff[READ_CHUNK_SIZE];
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
+		/*  std::cout << "Read Gen[request]: At -> " << count << " Heyy \n";  */
 		if (this->response.get_resource_ref().cgi.state == WritingBody)
 			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
 		else {
@@ -69,7 +64,6 @@ void Client::parse_request() __THROWS_STRERROR
 	}
 }
 
-
 void Client::generate_response(void) __THROWS_STRERROR
 {
 	try {	
@@ -88,6 +82,7 @@ void Client::generate_response(void) __THROWS_STRERROR
 
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
+	/*  std::cout << this->get_socket() << " triggered an action\n";  */
 	try {
     if (e & EPOLLIN) {
 		this->parse_request();
@@ -95,6 +90,7 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
+		std::cout << "EPOLLOUT at " << this->get_socket() << "\n";
 		this->generate_response();
 		return ;
 	}

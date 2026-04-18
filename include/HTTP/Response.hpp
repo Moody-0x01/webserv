@@ -78,7 +78,6 @@ class Resource
 
 
 	public:
-		Cgi				 cgi;
 		Resource();
 
 		void identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides = NULL);

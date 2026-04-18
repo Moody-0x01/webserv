@@ -14,7 +14,11 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 void HttpParser::handle()
 {
     if (this->parent == NULL)
+	{
+		// Hello?
+		std::cout << "Hi\n";
         return;
+	}
 
     if (state() == IDLE)
     {

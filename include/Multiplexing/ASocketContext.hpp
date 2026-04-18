@@ -22,7 +22,6 @@ public:
 	std::string request_buffer;
 	std::string response_buffer;
 	void virtual action(uint32_t e) __THROWS_STRERROR = 0;
-	void virtual take_ownership(ASocketContext *Other);
 
 	void set_socket(int sockfd);
 	int get_socket(void) const;

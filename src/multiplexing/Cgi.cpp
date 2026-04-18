@@ -1,5 +1,6 @@
 #include <Server.hpp>
 #include <cerrno>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -12,8 +13,7 @@
 #include <vector>
 
 Cgi::~Cgi() {
-	ASocketContext::~ASocketContext();
-	std::cout << "Cgi is done\n";
+	std::cout << "brother!! Cgi is done!!\n";
 	this->done();
 }
 
@@ -45,11 +45,7 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 			this->body_buffer.erase(
 				this->body_buffer.begin(),
 				this->body_buffer.begin() + sent);
-		} else {
-			std::cout << "Send body size " << to_send << std::endl;
-			std::cout << "Sent           " << sent << std::endl;
-			std::cout << "Error          " << strerror(errno) << std::endl;
-		}
+		} else this->done();
 	}
 }
 
@@ -62,12 +58,13 @@ void Cgi::send_headers(int conn) __THROWS_STRERROR
 
 void Cgi::done(void)
 {
-	if (this->state != DONE) {
-		std::cout << "We done reading!\n";
+	if (this->state != DONE && this->state != Idle) {
 		this->state = DONE;
+		std::cout << "We done reading!\n";
+		std::cout << "Now close pipes: \n";
+
 		unregister_fd(this->streams[CGI_READ_END]);
 		unregister_fd(this->streams[CGI_WRITE_END]);
-		close_fdlist(this->streams);
 		this->streams[CGI_READ_END] = -1;
 		this->streams[CGI_WRITE_END] = -1;
 	}
@@ -140,7 +137,6 @@ void Cgi::read() __THROWS_STRERROR
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
 				buffer,
 				sizeof(buffer));
-	std::cout << "read: " <<  read_from_cgi << std::endl;
 	if (read_from_cgi == 0 || read_from_cgi == -1) {
 		this->done();
 		return ;
@@ -174,9 +170,27 @@ void Cgi::read() __THROWS_STRERROR
 	}
 }
 
+bool Cgi::timeout(void) __THROWS_STRERROR
+{
+	time_t now;
+
+	now = time(NULL);
+	if (now < 0)
+	{
+		this->done();
+		throw strerror(errno);
+	}
+	if ((now - this->start_time) >= SCRIPT_TIMEOUT)
+	{
+		this->done();
+		return true;
+	}
+	return (false);
+}
+
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
-
+	// Note: Check timeout...
 	try {
 		if (e & EPOLLERR) {
             this->done();
@@ -194,7 +208,7 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 	}
 }
 
-Cgi::Cgi()
+Cgi::Cgi(): ASocketContext()
 {
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
 	this->start_time             =  0;
@@ -307,12 +321,26 @@ void Cgi::execute(void) __THROWS_STRERROR
 	if (this->pid == 0)
 	{
 		if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         exit(1);
+
 		dup2(input [CGI_READ_END],  STDIN_FILENO);
 		dup2(output[CGI_WRITE_END], STDOUT_FILENO);
+
+		int logfd = open("/tmp/cgi.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+		if (logfd != -1) {
+			dup2(logfd, STDERR_FILENO);
+			close(logfd);
+		}
 		close_fdlist(output);
 		close_fdlist(input);
 		execve(this->interpreter.c_str(), args, &envp[0]);
 		_exit(127);
+	}
+	this->start_time = 
+		time(NULL);
+	if (this->start_time < 0) {
+		close_fdlist(output);
+		close_fdlist(input);
+		throw strerror(errno);
 	}
 	this->streams[CGI_READ_END] = output[STDIN_FILENO]; 
 	close(input[STDIN_FILENO]);

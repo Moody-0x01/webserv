@@ -28,9 +28,8 @@
 # define IGNORED 1
 # define __THROWS_STRERROR throw(const char *)
 
-typedef std::map<int, Client> Clients;
 typedef struct epoll_event EpollEvent;
-
+typedef std::map<int, Client> Clients;
 // Note: instead of having this class as a static class that has bunch of static methods, I think it is better to just make it a singelton.
 
 class Multiplexer {
@@ -41,6 +40,7 @@ public:
 	EpollEvent events[EVENT_MAX];
 	std::map<int, ServerConfig> confs;
 	std::map<int, std::pair<Server, Clients> > servers;
+	std::map<int, Cgi> _cgi_instances;
 	const int epoll_fd;
 	int signal_io[2];
 	~Multiplexer();
@@ -58,6 +58,8 @@ public:
 	static ssize_t  read(int fd, void *buf, size_t size) __THROWS_STRERROR;
 	static ssize_t  write(int fd, const void *buf, size_t size) __THROWS_STRERROR;
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
+	Cgi   *get_cgi_instance(int client_fd);
+	void   push_cgi_instance(int client);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
 };
 
