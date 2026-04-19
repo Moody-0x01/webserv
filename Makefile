@@ -7,7 +7,6 @@ INCLUDE=./include/
 CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE) -ggdb # -g3 -fsanitize=address 
 RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
-# $(SOURCE_DIR)/multiplexing/SocketHandlers.cpp removed
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/ASocketContext.cpp \
 	$(SOURCE_DIR)/multiplexing/Server.cpp $(SOURCE_DIR)/multiplexing/Client.cpp\
 	$(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \

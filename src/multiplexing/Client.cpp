@@ -41,7 +41,6 @@ void Client::parse_request() __THROWS_STRERROR
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-		/*  std::cout << "Read Gen[request]: At -> " << count << " Heyy \n";  */
 		if (this->response.get_resource_ref().cgi.state == WritingBody)
 			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
 		else {
@@ -90,7 +89,6 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
-		std::cout << "EPOLLOUT at " << this->get_socket() << "\n";
 		this->generate_response();
 		return ;
 	}

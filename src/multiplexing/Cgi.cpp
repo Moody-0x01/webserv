@@ -192,16 +192,31 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	// Note: Check timeout...
 	try {
-		if (e & EPOLLERR) {
-            this->done();
-            return;
-        }
 		if (e & EPOLLIN)
             this->read(); 
         if (e & EPOLLOUT)
             this->write();
-        if ((e & EPOLLHUP) || (e & EPOLLRDHUP))
+        if (e & EPOLLHUP)
+		{
+			// I can not read from cgi anymore. this is an internal server error and cgi should be marked as done
+			// if the headers are not sent yet then we should send internal server error.
+			// else just hangup and thas it.
             this->done();
+			return ;
+		}
+        if (e & EPOLLRDHUP)
+		{
+			// I can not write body to connexion anymore..
+			// if I did not send any heades then it makes sense to just send internal server error.
+            this->done();
+			return ;
+		}
+
+		if (e & EPOLLERR) {
+			// Error !!
+            this->done();
+            return;
+        }
 	} catch (const char *e) {
 		this->done();
 		throw e;
