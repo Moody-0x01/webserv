@@ -265,6 +265,9 @@ Response::Response()
 {
 	this->stage = Setup;
 	this->request_ptr = NULL;
+	this->status = OK;
+	this->status_line = "HTTP/1.0 200 OK\r\n";
+	this->bytes_sent = 0;
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -567,9 +570,22 @@ void Response::serialize_headers(void) {
 
 void Response::send_headers(int conn) __THROWS_STRERROR
 {
-	this->serialize_headers();
+	if (this->headers_as_str.empty())
+		this->serialize_headers();
 	std::cout << this->headers_as_str;
-	::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
+	while (this->bytes_sent < static_cast<int>(this->headers_as_str.size()))
+	{
+		size_t remaining = this->headers_as_str.size() - static_cast<size_t>(this->bytes_sent);
+		size_t to_send = std::min(remaining, static_cast<size_t>(WRITE_CHUNK_SIZE));
+		ssize_t sent = ::write(conn,
+			this->headers_as_str.c_str() + this->bytes_sent,
+			to_send);
+		if (sent < 0)
+			throw strerror(errno);
+		if (sent == 0)
+			throw "client disconnected while sending headers";
+		this->bytes_sent += static_cast<int>(sent);
+	}
 }
 
 

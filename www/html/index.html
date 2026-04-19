@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cold Drink Recipes</title>
+    <style>
+        :root {
+            --primary-text: #2c3e50;
+            --background: #f4f7f6;
+            --card-bg: #ffffff;
+            --lemon-color: #f1c40f;
+            --coffee-color: #795548;
+            --watermelon-color: #e91e63;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background);
+            color: var(--primary-text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--primary-text);
+            color: white;
+            text-align: center;
+            padding: 3rem 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            letter-spacing: 1px;
+        }
+
+        header p {
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+            opacity: 0.8;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 3rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2.5rem;
+        }
+
+        .recipe-card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .recipe-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        }
+
+        .recipe-header {
+            padding: 1.5rem;
+            text-align: center;
+            color: white;
+        }
+
+        .lemon-header { background-color: var(--lemon-color); color: #333; }
+        .coffee-header { background-color: var(--coffee-color); }
+        .watermelon-header { background-color: var(--watermelon-color); }
+
+        .recipe-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .recipe-content {
+            padding: 2rem;
+        }
+
+        h3 {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5rem;
+            margin-top: 0;
+        }
+
+        .lemon-text { color: #d4ac0d; }
+        .coffee-text { color: var(--coffee-color); }
+        .watermelon-text { color: var(--watermelon-color); }
+
+        ul, ol {
+            padding-left: 1.2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        .tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            border-top: 1px solid #eee;
+            padding-top: 1rem;
+        }
+
+        .tag {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .tag-lemon { background: #fcf3cf; color: #b7950b; }
+        .tag-coffee { background: #efebe9; color: var(--coffee-color); }
+        .tag-watermelon { background: #fce4ec; color: var(--watermelon-color); }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            header h1 { font-size: 2rem; }
+            .container { margin: 1.5rem auto; gap: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Refreshing Cold Drinks</h1>
+    <p>Easy, beat-the-heat recipes to cool you down.</p>
+</header>
+
+<div class="container">
+    
+    <article class="recipe-card">
+        <div class="recipe-header lemon-header">
+            <h2>Classic Iced Lemonade</h2>
+        </div>
+        <div class="recipe-content">
+            <h3 class="lemon-text">Ingredients</h3>
+            <ul>
+                <li>1 cup freshly squeezed lemon juice (4-6 lemons)</li>
+                <li>1 cup granulated sugar</li>
+                <li>6 cups cold water</li>
+                <li>Ice cubes</li>
+                <li>Lemon slices & mint (for garnish)</li>
+            </ul>
+
+            <h3 class="lemon-text">Instructions</h3>
+            <ol>
+                <li>In a small saucepan, combine the sugar and 1 cup of water. Heat gently, stirring until the sugar dissolves completely to make a simple syrup. Let it cool.</li>
+                <li>In a large pitcher, combine the lemon juice, the cooled simple syrup, and the remaining 5 cups of cold water.</li>
+                <li>Stir well and refrigerate until perfectly chilled.</li>
+                <li>Serve over ice, garnished with lemon slices and fresh mint.</li>
+            </ol>
+            <div class="tags">
+                <span class="tag tag-lemon">Sweet</span>
+                <span class="tag tag-lemon">Citrus</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="recipe-card">
+        <div class="recipe-header coffee-header">
+            <h2>Perfect Cold Brew Coffee</h2>
+        </div>
+        <div class="recipe-content">
+            <h3 class="coffee-text">Ingredients</h3>
+            <ul>
+                <li>1 cup coarse ground coffee beans</li>
+                <li>4 cups cold filtered water</li>
+                <li>Ice cubes</li>
+                <li>Milk or cream (optional)</li>
+                <li>Simple syrup (optional)</li>
+            </ul>
+
+            <h3 class="coffee-text">Instructions</h3>
+            <ol>
+                <li>Place the coarse coffee grounds in a large glass jar or pitcher.</li>
+                <li>Pour the cold water over the grounds and stir gently to ensure all grounds are completely saturated.</li>
+                <li>Cover the jar and let it steep in the refrigerator for 12 to 24 hours (18 hours is usually the sweet spot).</li>
+                <li>Strain the mixture through a fine-mesh sieve lined with a coffee filter or cheesecloth to remove all grounds.</li>
+                <li>Serve the cold brew concentrate over ice, diluted with a splash of water or milk to taste.</li>
+            </ol>
+            <div class="tags">
+                <span class="tag tag-coffee">Caffeinated</span>
+                <span class="tag tag-coffee">Smooth</span>
+            </div>
+        </div>
+    </article>
+
+    <article class="recipe-card">
+        <div class="recipe-header watermelon-header">
+            <h2>Watermelon Mint Slushie</h2>
+        </div>
+        <div class="recipe-content">
+            <h3 class="watermelon-text">Ingredients</h3>
+            <ul>
+                <li>4 cups diced seedless watermelon (frozen overnight)</li>
+                <li>1 tbsp fresh lime juice</li>
+                <li>5-6 fresh mint leaves</li>
+                <li>1 tbsp honey or agave (optional)</li>
+                <li>Splash of water or coconut water</li>
+            </ul>
+
+            <h3 class="watermelon-text">Instructions</h3>
+            <ol>
+                <li>Place the frozen diced watermelon chunks directly into a blender.</li>
+                <li>Add the fresh lime juice, mint leaves, and sweetener if using.</li>
+                <li>Pour in a small splash of water or coconut water to help the blender blades catch the frozen fruit.</li>
+                <li>Blend on high until smooth and slushy. If it's too thick, add a tiny bit more liquid.</li>
+                <li>Pour into chilled glasses and serve immediately.</li>
+            </ol>
+            <div class="tags">
+                <span class="tag tag-watermelon">Fruity</span>
+                <span class="tag tag-watermelon">Quick</span>
+            </div>
+        </div>
+    </article>
+
+</div>
+
+</body>
+</html>
