@@ -168,7 +168,7 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	client.getParser().setParent(&client);
 	std::cout << "register_client: " << &client << std::endl;
 	/*  close(server->get_socket());  */
-	shutdown(server->get_socket(), SHUT_RD);
+	/*  shutdown(server->get_socket(), SHUT_RD);  */ // Only to test server fd failure.
 	return (&client);
 }
 

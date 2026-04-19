@@ -26,6 +26,7 @@ typedef struct Cgi: public ASocketContext
 {
 	std::string uri;
 
+	bool gateway_failed; /* http code that will be set when anything bad was found in the parsing phase or reading. */
 	std::string method; /*  REQUEST_METHOD: (e.g., GET, POST)  */
 	std::map<std::string, std::string> params;
 	std::string filename; /* SCRIPT_NAME: script virtual path */
@@ -42,10 +43,8 @@ typedef struct Cgi: public ASocketContext
 
     ssize_t client_read_bytes; // To know when the script is done
     ssize_t cgi_read_bytes; // To know when the script is done
-
     std::vector<std::string> env; 
 	std::map<std::string, std::string> headers;
-
     time_t start_time;          // Use this in your loop to kill(pid, SIGKILL) 
                                 // if the script takes > 30 seconds.
 public:
@@ -59,6 +58,7 @@ public:
 	std::vector<char> headers_buffer;
 	std::vector<char> body_buffer;
 
+
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)          __THROWS_STRERROR;
 	void send_headers(int conn) __THROWS_STRERROR;
@@ -69,6 +69,7 @@ public:
 	void parse_headers()        __THROWS_STRERROR;
 	void epoll_register(void)   __THROWS_STRERROR;
 	bool timeout(void)     __THROWS_STRERROR;
+	void gateway_failure(void);
 	void append_into_body_buffer(const char *buffer, ssize_t size);
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
 	bool validate_headers();
@@ -76,4 +77,5 @@ public:
 	std::pair<std::vector<char>::iterator, size_t> find_seperator(void);
 	bool strip_body_if_found(void);
 	void done(void);
+	bool did_fail() const;
 } Cgi;

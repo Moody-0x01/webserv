@@ -7,10 +7,14 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
-#include <stdexcept>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+
+bool Cgi::did_fail(void) const
+{
+	return (this->gateway_failed);
+}
 
 Cgi::~Cgi() {
 	std::cout << "brother!! Cgi is done!!\n";
@@ -156,8 +160,12 @@ void Cgi::read() __THROWS_STRERROR
 			this->append_into_headers_buffer(buffer, read_from_cgi);
 			if (this->strip_body_if_found())
 			{
-				this->parse_headers();
-				this->state = ReadingBody;
+				try {
+					this->parse_headers();
+				} catch (const char *e) {
+					this->done();
+					throw e;
+				}
 			}
 		} break;
 		case ReadingBody: {
@@ -237,6 +245,7 @@ Cgi::Cgi(): ASocketContext()
 	this->pid                    =  -1;
 	this->headers_parsed         = false;
 	this->headers_sent           = false;
+	this->gateway_failed                   = 0;
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
@@ -364,14 +373,24 @@ void Cgi::execute(void) __THROWS_STRERROR
 	this->epoll_register();
 }
 
+void Cgi::gateway_failure(void)
+{
+	this->gateway_failed = BadGateway;
+	this->done();
+}
+
 void Cgi::parse_headers()    __THROWS_STRERROR
 {
 	std::vector<std::string> headers;
 	std::vector<std::string> pair;
 
-	this->headers_parsed = true;
 	headers =
 		split(this->headers_buffer, "\n");
+	if (!isheaders_valid(headers))
+	{
+		this->gateway_failure();
+		return ;
+	}
 	for (size_t i = 0; i < headers.size(); ++i)
 	{
 		pair = split(headers[i], " :");
@@ -380,12 +399,14 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 			this->headers[pair[0]] = pair[1] + " " + pair[2];
 		} else if (pair.size() != 2)
 		{
-			std::cout << "H: " << headers[i] << "\n";
-			throw "Invalid Header";
+			this->gateway_failure();
+			return ;
 		}
 		else
 			this->headers[pair[0]] = pair[1];
 	}
+	this->state = ReadingBody;
+	this->headers_parsed = true;
 	if (this->headers.find("Content-Length") == this->headers.end()) 
 	{
 		/*  this->headers["Transfer-Encoding"] = "chunked";  */
