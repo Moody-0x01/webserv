@@ -133,7 +133,7 @@ response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 	return (DoneSending); 
 }
 
-std::string Resource::get_type(void)
+std::string Resource::getmime_type(void)
 {
 	return (this->type);
 }

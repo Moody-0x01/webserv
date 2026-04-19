@@ -4,6 +4,8 @@
 #include <fcntl.h>           /* Definition of AT_* constants */
 #include <unistd.h>
 #include <unistd.h>
+#include <utility>
+#include <vector>
 
 std::vector<std::string> split(std::string str, char delim)
 {
@@ -118,26 +120,32 @@ void signal_handler(int sig)
     errno = saved_errno;
 }
 
-std::string serialize_headers(std::map<std::string, std::string> headers, bool setdefault_status)
+void sigpipe_handler(int sig)
+{
+	signal_handler(sig);	
+	while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
+std::string serialize_headers(std::map<std::string, std::string> &headers, bool setdefault_status)
 {
 	std::string headers_as_str;
-	std::string status_line;
-	std::vector<std::string> theythem;
+	std::string status_line, final;
 
-	status_line = Response::status_lines[OK];
+	status_line = Response::status_lines[OK] + "\r\n";
 	for (std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); ++it)
 	{
 		if (it->first == "Status") {
-			theythem = split(it->second, ' ');
-			if (theythem.size() == 2)
-				status_line = "HTTP/1.0" + theythem[0] + theythem[1];
-		} else
-			headers_as_str += it->first + ": " + it->second;
+			if (setdefault_status)
+				status_line = "HTTP/1.0 " + it->second + "\r\n";
+			continue ;
+		}
+		headers_as_str += it->first + ": " + it->second + "\r\n";
 	}
-	headers_as_str += "\r\n";
-	if (setdefault_status)
-		headers_as_str = status_line + headers_as_str;
-	return (headers_as_str);
+	if (setdefault_status) {
+		final = status_line + headers_as_str + "\r\n";
+	} else 
+		final = headers_as_str + "\r\n";
+	return (final);
 }
 
 void close_fdlist(int fds[2])
@@ -164,7 +172,7 @@ std::vector<char>::iterator search(std::vector<char> &vector, const char *patter
 
 void print_buffer(std::vector<char> &buffer, const char *label)
 {
-	std::cout << label;
+	std::cout << label << " Size: " << buffer.size();
 	size_t size;
 
 	size = buffer.size();

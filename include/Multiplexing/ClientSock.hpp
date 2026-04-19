@@ -4,8 +4,8 @@
 
 typedef struct Client: public ASocketContext {
 public:
+	~Client();
 	void action(uint32_t e) __THROWS_STRERROR;
-	void take_ownership(ASocketContext *Other);
 	HttpParser parserInstance;
 	Response   response;
 	void free();

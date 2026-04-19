@@ -14,7 +14,11 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 void HttpParser::handle()
 {
     if (this->parent == NULL)
+	{
+		// Hello?
+		std::cout << "Hi\n";
         return;
+	}
 
     if (state() == IDLE)
     {
@@ -64,14 +68,14 @@ void HttpParser::handle()
                 }
             }
         }
-		if (isHeaderValueExist("Content-Length"))
+		if (isHeaderValueExist("content-length"))
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
 			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
 			if (it != headers.end())
 			{
 				this->targetBodySize = std::atoi(it->second.c_str());
-				this->request.getHttpRequest().content_length = this->targetBodySize;
+			    this->request.getHttpRequest().content_length = this->targetBodySize;
 			}
 			else if (this->request.getMethod() == "POST")
 				this->request.setcode(ContentLengthRequired);

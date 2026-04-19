@@ -1,9 +1,12 @@
+#include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
+#include <ios>
 #include <iostream>
 #include <map>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
@@ -277,6 +280,9 @@ UriResolutionResult::UriResolutionResult()
 
 Resource &Response::get_resource_ref(void) { return (this->resource);};
 
+/*  []  */
+/*  [headers | body]  */
+
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
@@ -290,7 +296,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
 				this->stage = SendingResource;
-				/*  std::cout << "Error: " << e << "\n";  */
 				this->set_status(InternalServerError);
 			}
 		} else {
@@ -302,19 +307,28 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		this->send_headers(request.conn);
 		this->resource.send(request);
 		this->stage = DoneSending;
-	} else if (this->stage == ProcessingCgi) {
-		if (this->resource.cgi.state == DONE) {
+	} else if (this->stage == ProcessingCgi) {	
+		if (this->resource.cgi.timeout())
+		{
+			if (!this->resource.cgi.headers_sent) {
+				std::cout << "Timout but headers were not sent.\n";
+				this->stage = SendingResource;
+				this->set_status(RequestTimeout);
+				return ;
+			}
+			std::cout << "Timout but headers already sent.\n";
 			this->stage = DoneSending;
+			return ;
 		}
-		if (!this->resource.cgi.headers_sent) {
+		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
 			this->resource.cgi
 				.send_headers(request.conn);
-		} else if (this->resource.cgi.state == ReadingBody) {
+		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
 			this->resource.cgi
 				.send_body_chunk(request.conn);
 		}
-	} else {
-		// IDK???
+		if (this->resource.cgi.state == DONE)
+			this->stage = DoneSending;
 	}
 }
 
@@ -356,6 +370,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(NotFound);
 		return ;
 	}
+
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
@@ -469,8 +484,8 @@ void Response::serve_file(void)
 	else
 		this->set_status(OK);
 
-	std::string content_type = this->resource.get_type();
-	this->appendheader("content-type", content_type.c_str());
+	std::string content_type = this->resource.getmime_type();
+	this->appendheader("Content-Type", content_type.c_str());
 }
 
 void Response::handle_get(const HttpRequest &request)
@@ -492,7 +507,21 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	(void)request;
+	std::cout << "---------------------------------" << std::endl;
+	std::cout << std::boolalpha;
+	std::cout << "is Bad?: " << request.isbadrequest << std::endl;
+	std::cout << "Method: " << request.method << std::endl;
+	std::cout << "Uri: " << request.uri << std::endl;
+	std::cout << "httpVersion: " << request.httpVersion << std::endl;
+	std::cout << "Query String: " << request.query_string << std::endl;
+	std::cout << "Content-lenght: " << request.content_length << std::endl;
+	std::cout << "Code: " << request.code << std::endl;
+	std::cout << "Body: " << request.body << std::endl;
+	if (request.content_length == 0)
+	{
+		this->set_status(ContentLengthRequired);
+		return;
+	}
 }
 
 void Response::handle_delete(const HttpRequest &request)
@@ -529,8 +558,7 @@ Response::~Response()
 {
 }
 
-void Response::serialize_headers(void)
-{
+void Response::serialize_headers(void) {
 
 	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
@@ -540,6 +568,7 @@ void Response::serialize_headers(void)
 void Response::send_headers(int conn) __THROWS_STRERROR
 {
 	this->serialize_headers();
+	std::cout << this->headers_as_str;
 	::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
@@ -608,7 +637,10 @@ void Response::set_status(int s)
 	this->status = s;
 	this->status_line =
 		Response::status_lines[this->status] + "\r\n";
-	if (s != OK) this->get_error_page_html(*this->request_ptr, s);
+	if (s != OK) {
+		this->get_error_page_html(*this->request_ptr, s);
+		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
+	}
 }
 
 int Response::get_status(void) const
@@ -636,10 +668,9 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
-
 	resolved.resource_type = get_resource_type(resolved.filesystem_path);
-	resolve_cgi_script(resolved, best_location);
-
+	if (resolved.resource_type == UriResolutionResult::file)
+		resolve_cgi_script(resolved, best_location);
 	return resolved;
 }
 

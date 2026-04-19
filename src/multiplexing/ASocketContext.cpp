@@ -12,20 +12,11 @@ ASocketContext::ASocketContext(int sock) : request_buffer(""), response_buffer("
 
 ASocketContext::~ASocketContext()
 {
-	Multiplexer *self;
 
-	if (!_owns_fd)
+	if (!_owns_fd || _sockfd == -1)
 		return ;
-	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
-	if (_sockfd != -1)
-	{
-		epoll_ctl(self->epoll_fd,
-			EPOLL_CTL_DEL,
-			this->_sockfd,
-			NULL);
-		close(_sockfd);
-	}
+	std::cout << "Heereee: " << _sockfd << std::endl;
+	unregister_fd(_sockfd);
 	_sockfd = -1;
 	_owns_fd = false;
 }
@@ -33,16 +24,6 @@ ASocketContext::~ASocketContext()
 void ASocketContext::disown(void)
 {
 	this->_owns_fd = false;
-}
-
-void ASocketContext::take_ownership(ASocketContext *Other)
-{
-	if (this != Other)
-	{
-		this->_sockfd = Other->get_socket();
-		this->_owns_fd = true;
-		Other->disown();
-	}
 }
 
 void ASocketContext::set_socket(int sockfd) { _sockfd = sockfd; }
