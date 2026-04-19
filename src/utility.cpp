@@ -143,7 +143,8 @@ std::string serialize_headers(std::map<std::string, std::string> &headers, bool 
 	}
 	if (setdefault_status) {
 		final = status_line + headers_as_str + "\r\n";
-	}
+	} else 
+		final = headers_as_str + "\r\n";
 	return (final);
 }
 

@@ -2,6 +2,7 @@
 
 import sys
 import time
+
 sys.stdout.buffer.write(b"Status: 200 OK\n")
 sys.stdout.buffer.write(b"Content-Type: video/mp4\n") # Add \r just to be safe with HTTP
 sys.stdout.buffer.write(b"\n\r")  # Blank line for headers

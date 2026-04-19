@@ -78,6 +78,7 @@ class Resource
 
 
 	public:
+		Cgi  cgi;
 		Resource();
 
 		void identify_type(const std::string &path, const std::map<std::string, std::string> *mime_overrides = NULL);
@@ -86,13 +87,13 @@ class Resource
 		~Resource();
 		bool isdone(void);
 		bool isopen(void);
-		std::string get_type(void);
 		response_stage_t send(const HttpRequest &request) __THROWS_STRERROR;
 		void set_stream_buffer(const std::string &s);
 		const std::string &get_stream_buffer(void) const;
 		resource_type_t getresource_type(void) const;
 		void setresource_type(resource_type_t t);
 		void setmime_type(std::string t);
+		std::string getmime_type(void);
 };
 
 struct UriResolutionResult {

@@ -1,10 +1,17 @@
+#include "HTTP/Response.hpp"
 #include <Server.hpp>
+#include <dirent.h>
 #include <cstdlib>
+#include <cerrno>
+#include <ios>
 #include <iostream>
 #include <map>
+#include <ostream>
+#include <sstream>
 #include <string>
 #include <sys/stat.h>
 #include <utility>
+#include <vector>
 
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
@@ -69,7 +76,7 @@ static const LocationConfig *find_best_location(const ServerConfig &server_conf,
 static std::string compute_relative_uri(const std::string &request_path, const LocationConfig *best_location)
 {
 	std::string relative_uri = request_path;
-	if (best_location && best_location->uri != "/")
+	if (best_location && best_location->uri != "/" && !best_location->root.empty())
 	{
 		if (request_path.size() <= best_location->uri.size())
 			relative_uri = "/";
@@ -131,6 +138,26 @@ static std::string reason_phrase_for_status(int code)
 		return auto_reason;
 	}
 	return it->second;
+}
+
+static std::string escape_html(const std::string &input)
+{
+	std::string escaped;
+	escaped.reserve(input.size());
+	for (size_t i = 0; i < input.size(); ++i)
+	{
+		const char c = input[i];
+		switch (c)
+		{
+			case '&': escaped += "&amp;"; break;
+			case '<': escaped += "&lt;"; break;
+			case '>': escaped += "&gt;"; break;
+			case '"': escaped += "&quot;"; break;
+			case '\'': escaped += "&#39;"; break;
+			default: escaped += c; break;
+		}
+	}
+	return escaped;
 }
 
 static std::string build_default_error_html(int code)
@@ -343,6 +370,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(NotFound);
 		return ;
 	}
+
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
@@ -371,25 +399,104 @@ void Response::setup_response(const HttpRequest &request)
 
 void Response::list_dir(void)
 {
-	// TODO: use resource to fill the buffer
+	const std::string &directory_path = this->resolved_results.filesystem_path;
+	DIR *directory = ::opendir(directory_path.c_str());
+	if (!directory)
+	{
+		if (errno == EACCES)
+			this->set_status(Forbidden);
+		else
+			this->set_status(InternalServerError);
+		return;
+	}
+
+	std::vector< std::pair<std::string, bool> > entries;
+	struct dirent *entry;
+	while ((entry = ::readdir(directory)) != NULL)
+	{
+		std::string name = entry->d_name;
+
+		std::cout << " \n\n" << name << " \n\n";
+		if (name == ".") continue;
+
+		bool is_directory = false;
+		std::string full_entry_path = join_fs_path(directory_path, name);
+		struct stat entry_stat;
+		if (::stat(full_entry_path.c_str(), &entry_stat) == 0)
+			is_directory = S_ISDIR(entry_stat.st_mode);
+
+		entries.push_back(std::make_pair(name, is_directory));
+	}
+	::closedir(directory);
+
+	std::sort(entries.begin(), entries.end());
+
+	std::string request_uri = this->resolved_results.request_path;
+	if (request_uri.empty()) request_uri = "/";
+	if (request_uri[request_uri.size() - 1] != '/') request_uri += "/";
+
+	std::ostringstream body;
+	body << "<!DOCTYPE html>\n"
+		 << "<html lang=\"en\">\n"
+		 << "<head><meta charset=\"UTF-8\"><title>Index of " << escape_html(request_uri) << "</title></head>\n"
+		 << "<body>\n"
+		 << "<h1>Index of " << escape_html(request_uri) << "</h1>\n"
+		 << "<hr>\n"
+		 << "<ul>\n";
+
+	for (size_t i = 0; i < entries.size(); ++i)
+	{
+		const std::string &name = entries[i].first;
+		const bool is_directory = entries[i].second;
+		std::string display_name = name;
+		std::string href = request_uri + name;
+		if (is_directory)
+		{
+			display_name += "/";
+			href += "/";
+		}
+		body << "<li><a href=\"" << escape_html(href) << "\">"
+			 << escape_html(display_name) << "</a></li>\n";
+	}
+
+	body << "</ul>\n"
+		 << "<hr>\n"
+		 << "</body>\n"
+		 << "</html>\n";
+
+	this->resource.setresource_type(Dir);
+	this->resource.identify_type("index.html");
+	this->resource.set_stream_buffer(body.str());
 }
 
 void Response::serve_file(void)
 {
-	// TODO: use resource to fill the stream and so on
+	const std::string &file_path = this->resolved_results.filesystem_path;
+	int open_status = this->resource.open(file_path);
+
+	if (open_status != OK)
+	{
+		if (open_status == Unauthorized)
+			this->set_status(Forbidden);
+		else
+			this->set_status(open_status);
+	}
+	else
+		this->set_status(OK);
+
+	std::string content_type = this->resource.getmime_type();
+	this->appendheader("Content-Type", content_type.c_str());
 }
 
 void Response::handle_get(const HttpRequest &request)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
 
-	(void)request;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
 		{
 			this->set_status(NotFound);
-			this->get_error_page_html(request, NotFound);
 			return ;
 		}
 		list_dir();
@@ -400,7 +507,21 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	(void)request;
+	std::cout << "---------------------------------" << std::endl;
+	std::cout << std::boolalpha;
+	std::cout << "is Bad?: " << request.isbadrequest << std::endl;
+	std::cout << "Method: " << request.method << std::endl;
+	std::cout << "Uri: " << request.uri << std::endl;
+	std::cout << "httpVersion: " << request.httpVersion << std::endl;
+	std::cout << "Query String: " << request.query_string << std::endl;
+	std::cout << "Content-lenght: " << request.content_length << std::endl;
+	std::cout << "Code: " << request.code << std::endl;
+	std::cout << "Body: " << request.body << std::endl;
+	if (request.content_length == 0)
+	{
+		this->set_status(ContentLengthRequired);
+		return;
+	}
 }
 
 void Response::handle_delete(const HttpRequest &request)
@@ -437,8 +558,7 @@ Response::~Response()
 {
 }
 
-void Response::serialize_headers(void)
-{
+void Response::serialize_headers(void) {
 
 	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
@@ -448,6 +568,7 @@ void Response::serialize_headers(void)
 void Response::send_headers(int conn) __THROWS_STRERROR
 {
 	this->serialize_headers();
+	std::cout << this->headers_as_str;
 	::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
@@ -516,7 +637,10 @@ void Response::set_status(int s)
 	this->status = s;
 	this->status_line =
 		Response::status_lines[this->status] + "\r\n";
-	if (s != OK) this->get_error_page_html(*this->request_ptr, s);
+	if (s != OK) {
+		this->get_error_page_html(*this->request_ptr, s);
+		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
+	}
 }
 
 int Response::get_status(void) const
@@ -544,10 +668,9 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
-
 	resolved.resource_type = get_resource_type(resolved.filesystem_path);
-	resolve_cgi_script(resolved, best_location);
-
+	if (resolved.resource_type == UriResolutionResult::file)
+		resolve_cgi_script(resolved, best_location);
 	return resolved;
 }
 

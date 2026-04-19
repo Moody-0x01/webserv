@@ -115,7 +115,7 @@ bool Cgi::strip_body_if_found(void)
 	size_t headers_length;
 	if (seperator.first == this->headers_buffer.end())
 		return (false);
-	headers_length = ((seperator.first - this->headers_buffer.begin()) + 1);
+	headers_length = ((seperator.first - this->headers_buffer.begin()));
 	this->append_into_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
 				this->headers_buffer.size() - headers_length - seperator.second);
 	this->headers_buffer
@@ -131,7 +131,7 @@ void Cgi::read() __THROWS_STRERROR
 
 	if (this->state == DONE)
 		return ;
-	if (this->state == ReadingBody && this->body_buffer.size() >= 2048) // 64KB
+	if (this->state == ReadingBody && this->body_buffer.size() >= 1024 * 64) // 64KB
 		return ;
 	std::memset(buffer, 0, sizeof(buffer));
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
