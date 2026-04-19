@@ -92,13 +92,26 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 		this->generate_response();
 		return ;
 	}
-	if (e & EPOLLERR) {
+	if (e & EPOLLHUP)
+	{
+		// I can not read from cgi anymore. this is an internal server error and cgi should be marked as free
+		// if the headers are not sent yet then we should send internal server error.
+		// else just hangup and thas it.
 		this->free();
 		return ;
 	}
-	if (e & EPOLLHUP) {
+	if (e & EPOLLRDHUP)
+	{
+		// I can not write body to connexion anymore..
+		// if I did not send any heades then it makes sense to just send internal server error.
 		this->free();
 		return ;
+	}
+
+	if (e & EPOLLERR) {
+		// Error !!
+		this->free();
+		return;
 	}
 	} catch (const char *e) {
 		this->free();
