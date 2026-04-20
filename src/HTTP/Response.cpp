@@ -365,7 +365,7 @@ void Response::setup_response(const HttpRequest &request)
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
-		this->set_status(Forbidden);
+		this->set_status(MethodNotAllowed);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
@@ -499,10 +499,10 @@ void Response::handle_get(const HttpRequest &request)
 	{
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
 		{
-			this->set_status(NotFound);
+			list_dir();
 			return ;
 		}
-		list_dir();
+		this->set_status(NotFound);
 	}
 	else
 		serve_file();
