@@ -299,7 +299,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 				this->resource.cgi.execute();
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
-				this->stage = SendingResource;
 				this->set_status(InternalServerError);
 				throw e;
 			}
@@ -317,7 +316,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		{
 			if (!this->resource.cgi.headers_sent) {
 				std::cout << "Timout but headers were not sent.\n";
-				this->stage = SendingResource;
 				this->set_status(RequestTimeout);
 				return ;
 			}
@@ -332,7 +330,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 			this->resource.cgi
 				.send_body_chunk(request.conn);
 		} else if (this->resource.cgi.state == DONE && !this->resource.cgi.headers_sent) {
-			this->stage = SendingResource;
 			if (this->resource.cgi.did_fail()) {
 				this->set_status(BadGateway);
 			} else
@@ -531,7 +528,7 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	if (request.content_length == 0 && request.body.empty())
+	if (request.content_length == 0)
 	{
 		this->set_status(ContentLengthRequired);
 		return;
@@ -547,7 +544,7 @@ void Response::handle_post(const HttpRequest &request)
 	std::fstream out_file(file.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out_file.is_open())
 	{
-		this->set_status(Forbidden);
+		this->set_status(InternalServerError);
 		return;
 	}
 
@@ -700,6 +697,7 @@ void Response::set_status(int s)
 	if (s != OK) {
 		this->get_error_page_html(*this->request_ptr, s);
 		this->appendheader("content-type", this->resource.getmime_type().c_str());
+		this->stage = SendingResource;
 	}
 }
 

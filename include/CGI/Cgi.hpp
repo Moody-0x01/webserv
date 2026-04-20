@@ -58,7 +58,6 @@ public:
 	std::vector<char> headers_buffer;
 	std::vector<char> body_buffer;
 
-
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)          __THROWS_STRERROR;
 	void send_headers(int conn) __THROWS_STRERROR;

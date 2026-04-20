@@ -46,18 +46,18 @@ void Client::parse_request() __THROWS_STRERROR
 		if (this->response.get_resource_ref().cgi.state == WritingBody)
 			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
 		else {
-		this->request_buffer.append(buff, count);
-		clientP.handle();
-		if (clientP.state() == READY)
-		{
-			cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
-			cev.data.ptr = this;
-			if (epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+			this->request_buffer.append(buff, count);
+			clientP.handle();
+			if (clientP.state() == READY)
 			{
-				std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-				this->free();
+				cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
+				cev.data.ptr = this;
+				if (epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+				{
+					std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
+					this->free();
+				}
 			}
-		}
 		}
 	} catch (const char *e) {
 		this->free();
