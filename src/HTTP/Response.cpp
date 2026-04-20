@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
+#include <fstream>
 #include <ios>
 #include <iostream>
 #include <map>
@@ -516,23 +517,58 @@ void Response::handle_get(const HttpRequest &request)
 		serve_file();
 }
 
+
+// std::cout << "---------------------------------" << std::endl;
+// std::cout << std::boolalpha;
+// std::cout << "is Bad?: " << request.isbadrequest << std::endl;
+// std::cout << "Method: " << request.method << std::endl;
+// std::cout << "Uri: " << request.uri << std::endl;
+// std::cout << "httpVersion: " << request.httpVersion << std::endl;
+// std::cout << "Query String: " << request.query_string << std::endl;
+// std::cout << "Content-lenght: " << request.content_length << std::endl;
+// std::cout << "Code: " << request.code << std::endl;
+// std::cout << "Body: " << request.body << std::endl;
+
 void Response::handle_post(const HttpRequest &request)
 {
-	std::cout << "---------------------------------" << std::endl;
-	std::cout << std::boolalpha;
-	std::cout << "is Bad?: " << request.isbadrequest << std::endl;
-	std::cout << "Method: " << request.method << std::endl;
-	std::cout << "Uri: " << request.uri << std::endl;
-	std::cout << "httpVersion: " << request.httpVersion << std::endl;
-	std::cout << "Query String: " << request.query_string << std::endl;
-	std::cout << "Content-lenght: " << request.content_length << std::endl;
-	std::cout << "Code: " << request.code << std::endl;
-	std::cout << "Body: " << request.body << std::endl;
-	if (request.content_length == 0)
+	if (request.content_length == 0 && request.body.empty())
 	{
 		this->set_status(ContentLengthRequired);
 		return;
 	}
+
+	std::string file = this->resolved_results.filesystem_path;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	{
+		this->set_status(Forbidden);
+		return;
+	}
+
+	std::fstream out_file(file.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out_file.is_open())
+	{
+		this->set_status(Forbidden);
+		return;
+	}
+
+	out_file.write(request.body.c_str(), request.body.size());
+	if (out_file.fail())
+	{
+		out_file.close();
+		this->set_status(InternalServerError);
+		return;
+	}
+	this->set_status(Created);
+	// out_file.close();
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
+	this->resource.set_stream_buffer(
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>201 Created</title></head>\n"
+        "<body><h1>201 Created</h1><p>File successfully uploaded.</p></body>\n"
+        "</html>\n"
+    );
 }
 
 void Response::handle_delete(const HttpRequest &request)
