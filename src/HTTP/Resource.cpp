@@ -1,13 +1,5 @@
 #include "HTTP/Response.hpp"
 #include <Server.hpp>
-#include <algorithm>
-#include <cerrno>
-#include <cstddef>
-#include <cstring>
-#include <cstdio>
-#include <fstream>
-#include <string>
-#include <unistd.h>
 
 Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string(""))
 {
@@ -68,16 +60,10 @@ int Resource::open(const std::string &path)
 		if (errno == ENOENT) return (NotFound);
         if (errno == EACCES) return (Unauthorized);
         return (InternalServerError);
-		// Note: returning from here means that something did not happen as expected and it we need to actually handle the error and return the server code.
 	}
-	// TODO: Set the mime type which is the type here
-	// TODO: if anything break while opening then 500 should be thrown to the user and the serer should log whateer happened.
-	// TODO: set __isopen to true
-	// this->__filename = path; // NOTE: Maybe we need it for logging errors?
 	Resource::identify_type(path);
 	this->__isopen = true;
 	this->resource_type = File;
-	// Note: returning from here means everything was okay. u may send the body as a file
 	return (OK);
 }
 
@@ -96,7 +82,6 @@ bool Resource::isopen(void)
 	return (this->__isopen);
 }
 
-#include <cmath>
 response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (__isbuf)

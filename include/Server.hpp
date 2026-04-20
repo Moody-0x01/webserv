@@ -7,3 +7,8 @@
 # include <Parser/Config/Config.hpp>
 # include <Parser/HTTP/HttpParser.hpp>
 # include <utility.hpp>
+#include <cerrno>
+#include <cstring>
+#include <cstdio>
+#include <unistd.h>
+#include <cmath>

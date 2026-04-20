@@ -216,7 +216,6 @@ void Multiplexer::deinit(void)
 
 int Multiplexer::loop(void)
 {
-
 	Multiplexer::introduce_new_context((uint64_t)this->signal_io);
     while (this->servers.size())
 	{

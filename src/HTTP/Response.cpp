@@ -514,18 +514,6 @@ void Response::handle_get(const HttpRequest &request)
 		serve_file();
 }
 
-
-// std::cout << "---------------------------------" << std::endl;
-// std::cout << std::boolalpha;
-// std::cout << "is Bad?: " << request.isbadrequest << std::endl;
-// std::cout << "Method: " << request.method << std::endl;
-// std::cout << "Uri: " << request.uri << std::endl;
-// std::cout << "httpVersion: " << request.httpVersion << std::endl;
-// std::cout << "Query String: " << request.query_string << std::endl;
-// std::cout << "Content-lenght: " << request.content_length << std::endl;
-// std::cout << "Code: " << request.code << std::endl;
-// std::cout << "Body: " << request.body << std::endl;
-
 void Response::handle_post(const HttpRequest &request)
 {
 	if (request.content_length == 0)
@@ -556,7 +544,6 @@ void Response::handle_post(const HttpRequest &request)
 		return;
 	}
 	this->set_status(Created);
-	// out_file.close();
 	this->resource.setresource_type(Text);
 	this->resource.setmime_type(TextHtml);
 	this->resource.set_stream_buffer(
@@ -570,7 +557,7 @@ void Response::handle_post(const HttpRequest &request)
 
 void Response::handle_delete(const HttpRequest &request)
 {
-	(void)request;;
+	(void)request;
 }
 
 void Response::get_error_page_html(const HttpRequest &request, int code)
