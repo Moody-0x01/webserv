@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <algorithm>
 #include <cerrno>
 #include <cstddef>
 #include <cstdlib>
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
@@ -250,8 +252,6 @@ Cgi::Cgi(): ASocketContext()
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
 {
-	std::stringstream stream;
-
 	this->protocol               =  request.httpVersion;
 	this->method                 =  request.method;
 	this->query_string           =  request.query_string;
@@ -267,6 +267,13 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = request.headers.at("Content-Type");
 	else
 		this->content_type = "application/octet-stream";
+	this->setup_environment_variables(request.headers);
+}
+
+void Cgi::setup_environment_variables(const std::map<std::string, std::string> &headers) {
+	std::stringstream stream;
+	std::string key, value;
+
 	stream << this->client_content_length;
 	this->env.push_back("REQUEST_METHOD="   + this->method);
 	this->env.push_back("QUERY_STRING="     + this->query_string);
@@ -275,8 +282,21 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->env.push_back("GATEWAY_INTERFACE=" + this->gateway_interface);
 	this->env.push_back("SCRIPT_NAME="      + this->filename);
 	this->env.push_back("PATH_TRANSLATED="  + this->filename);
-	this->env.push_back("REMOTE_ADDR="      + request.headers.at("REMOTE_ADDR"));  // TODO: Get the ip of the client and forward it to the cgi.
+	this->env.push_back("REMOTE_ADDR="      + headers.at("REMOTE_ADDR"));
 	this->env.push_back("SERVER_PROTOCOL="  + this->protocol);
+
+	// Note: send the rest headers as HTTP_*
+	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
+	{
+		key   = it->first;
+		value = it->second;
+
+		if (key == "Content-Type" || key == "Content-Length")
+			continue ;
+		std::transform(key.begin(), key.end(), key.begin(), ::toupper);
+		this->env
+			.push_back("HTTP_" + key + "=" + value);
+	}
 }
 
 void Cgi::epoll_register(void) __THROWS_STRERROR
@@ -407,6 +427,9 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	}
 	this->state = ReadingBody;
 	this->headers_parsed = true;
+
+	if (this->headers.find("Content-Type") == this->headers.end()) 
+		this->headers["Content-Type"] = TextHtml;
 	if (this->headers.find("Content-Length") == this->headers.end()) 
 	{
 		/*  this->headers["Transfer-Encoding"] = "chunked";  */

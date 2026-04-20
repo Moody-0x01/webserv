@@ -70,6 +70,7 @@ public:
 	void epoll_register(void)   __THROWS_STRERROR;
 	bool timeout(void)     __THROWS_STRERROR;
 	void gateway_failure(void);
+	void setup_environment_variables(const std::map<std::string, std::string> &headers);
 	void append_into_body_buffer(const char *buffer, ssize_t size);
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
 	bool validate_headers();
