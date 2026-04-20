@@ -73,6 +73,7 @@ void Cgi::done(void)
 		unregister_fd(this->streams[CGI_WRITE_END]);
 		this->streams[CGI_READ_END] = -1;
 		this->streams[CGI_WRITE_END] = -1;
+		Multiplexer::unintroduce_context((uint64_t)this);
 	}
 }
 
@@ -326,6 +327,7 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
         close(this->streams[CGI_WRITE_END]);
         this->streams[CGI_WRITE_END] = -1;
     }
+	Multiplexer::introduce_new_context((uint64_t)this);
 }
 
 bool Cgi::is_executable(void)

@@ -20,6 +20,8 @@ void Server::action(uint32_t e) __THROWS_STRERROR
            kernel resource limit was hit.
         */
 		// TODO: unregister_server.
+
+		Multiplexer::unintroduce_context((uint64_t)this);
 		self->servers
 			.erase(this->get_socket());
         throw "Critical error on listening socket (EPOLLERR/EPOLLHUP)";
@@ -34,5 +36,6 @@ void Server::action(uint32_t e) __THROWS_STRERROR
 					conn->get_socket());
 			throw strerror(errno);
 		}
+		Multiplexer::introduce_new_context((uint64_t)conn);
 	}
 }
