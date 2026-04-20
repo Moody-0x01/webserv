@@ -57,7 +57,6 @@ void HttpParser::handle()
                 if (i + 1 < tokens.size() && tokens[i + 1].first == HEADER_VALUE)
                 {
                     std::string headervalue = tokens[i + 1].second;
-                    /*  std::transform(headerkey.begin(), headerkey.end(), headerkey.begin(), ::tolower);  */
                     request.addHeader(headerkey, headervalue);
                     i++;
                 }
