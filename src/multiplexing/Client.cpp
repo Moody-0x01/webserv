@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <sys/socket.h>
 
 HttpParser &Client::getParser(void)
 {
@@ -23,7 +24,7 @@ Server *Client::get_server(void) const __THROWS_STRERROR {
 
 void Client::free()
 {
-	shutdown(this->get_socket(), SHUT_WR);
+	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
 }

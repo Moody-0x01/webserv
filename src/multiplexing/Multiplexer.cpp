@@ -264,13 +264,3 @@ ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERR
 	if (count <= 0) throw strerror(errno);
 	return (count);
 }
-
-Cgi   *Multiplexer::get_cgi_instance(int client_fd)
-{
-	return (&this->_cgi_instances[client_fd]);
-}
-
-void   Multiplexer::push_cgi_instance(int client)
-{
-	this->_cgi_instances[client] = Cgi();
-}

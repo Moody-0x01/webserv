@@ -300,6 +300,7 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 			} catch (const char *e) {
 				this->stage = SendingResource;
 				this->set_status(InternalServerError);
+				throw e;
 			}
 		} else {
 			this->stage = SendingResource;
