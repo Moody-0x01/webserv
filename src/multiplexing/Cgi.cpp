@@ -1,5 +1,6 @@
 #include <Server.hpp>
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <cstdlib>
@@ -264,8 +265,8 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->interpreter            =  interpreter_;
 	this->gateway_interface      =  "CGI/1.1";
 
-	if (request.headers.find("Content-Type") != request.headers.end())
-		this->content_type = request.headers.at("Content-Type");
+	if (request.headers.find("content-type") != request.headers.end())
+		this->content_type = request.headers.at("content-type");
 	else
 		this->content_type = "application/octet-stream";
 	this->setup_environment_variables(request.headers);
@@ -292,7 +293,7 @@ void Cgi::setup_environment_variables(const std::map<std::string, std::string> &
 		key   = it->first;
 		value = it->second;
 
-		if (key == "Content-Type" || key == "Content-Length")
+		if (key == "content-type" || key == "content-length")
 			continue ;
 		std::transform(key.begin(), key.end(), key.begin(), ::toupper);
 		this->env
@@ -416,27 +417,27 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	for (size_t i = 0; i < headers.size(); ++i)
 	{
 		pair = split(headers[i], " :");
-		if (pair[0] == "Status" && pair.size() == 3) {
-			//            Status:    xxx             OK?
-			this->headers[pair[0]] = pair[1] + " " + pair[2];
-		} else if (pair.size() != 2)
-		{
+		if (pair.size() != 2 && pair.size() != 3) {
 			this->gateway_failure();
 			return ;
 		}
-		else
+		std::transform(pair[0].begin(), pair[0].end(), pair[0].begin(), ::tolower);
+		if (pair[0] == "status" && pair.size() == 3) {
+			//            Status:    xxx             OK?
+			this->headers[pair[0]] = pair[1] + " " + pair[2];
+		} else
 			this->headers[pair[0]] = pair[1];
 	}
 	this->state = ReadingBody;
 	this->headers_parsed = true;
 
-	if (this->headers.find("Content-Type") == this->headers.end()) 
-		this->headers["Content-Type"] = TextHtml;
-	if (this->headers.find("Content-Length") == this->headers.end()) 
+	if (this->headers.find("content-type") == this->headers.end()) 
+		this->headers["content-type"] = TextHtml;
+	if (this->headers.find("content-length") == this->headers.end()) 
 	{
 		/*  this->headers["Transfer-Encoding"] = "chunked";  */
 		return ;
 	}
-	std::stringstream ss(this->headers.at("Content-Length"));
+	std::stringstream ss(this->headers.at("content-length"));
 	ss << this->cgi_content_length;
 }

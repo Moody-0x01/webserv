@@ -663,7 +663,7 @@ void Response::set_status(int s)
 		Response::status_lines[this->status] + "\r\n";
 	if (s != OK) {
 		this->get_error_page_html(*this->request_ptr, s);
-		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
+		this->appendheader("content-type", this->resource.getmime_type().c_str());
 	}
 }
 
