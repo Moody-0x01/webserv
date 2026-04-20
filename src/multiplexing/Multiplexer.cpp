@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <strings.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 
@@ -137,6 +138,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 			.erase(server_fd);
 		throw strerror(errno);
 	}
+	Multiplexer::introduce_new_context((uint64_t)&self->servers[server_fd].first);
 }
 
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
@@ -214,8 +216,8 @@ void Multiplexer::deinit(void)
 
 int Multiplexer::loop(void)
 {
-	int sig;
 
+	Multiplexer::introduce_new_context((uint64_t)this->signal_io);
     while (this->servers.size())
 	{
 		int ready = epoll_wait(this->epoll_fd,
@@ -227,28 +229,36 @@ int Multiplexer::loop(void)
 			return 1;
 		}
 		for (int index = 0; index < ready && (this->servers.size()); ++index)
-		{
-			// What if.. :)...
-			void *ptr = this->events[index].data.ptr;
-			if (ptr == this->signal_io)
-			{
-				(void)read(this->signal_io[0], &sig, sizeof(sig));
-				if (sig == SIGCHLD)
-					continue ;
-				std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
-				return 1;
-			}
-			else {
-				ASocketContext *handle = (ASocketContext *)ptr;
-				try {
-					handle->action(this->events[index].events);
-				} catch (const char *error) {
-					std::cerr << "[ handle->action ] " << error << "\n";
-				}
-			}
-		}
+			if (!this->execute_epoll_event(index)) return (1);
     }
 	return (0);
+}
+
+bool Multiplexer::execute_epoll_event(int epoll_index)
+{
+	void *ptr;
+	int   sig;
+
+	ptr = this->events[epoll_index].data.ptr;
+	if (!this->iscontext_valid((uint64_t)ptr))
+		return (true);
+	if (ptr == this->signal_io)
+	{
+		(void)read(this->signal_io[0], &sig, sizeof(sig));
+		if (sig == SIGCHLD)
+			return (true);
+		std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
+		return (false);
+	}
+	else {
+		ASocketContext *handle = (ASocketContext *)ptr;
+		try {
+			handle->action(this->events[epoll_index].events);
+		} catch (const char *error) {
+			std::cerr << "[ handle->action ] " << error << "\n";
+		}
+	}
+	return (true);
 }
 
 ssize_t Multiplexer::read(int fd, void *buf, size_t size) __THROWS_STRERROR
@@ -263,4 +273,31 @@ ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERR
 	ssize_t count = ::write(fd, buf, size);
 	if (count <= 0) throw strerror(errno);
 	return (count);
+}
+
+void Multiplexer::introduce_new_context(uint64_t context)
+{
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	self->_valid_context.insert(context);
+}
+
+void   Multiplexer::unintroduce_context(uint64_t context)
+{
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	self->_valid_context.erase(context);
+}
+
+bool   Multiplexer::iscontext_valid(uint64_t context)
+{
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	return (self->_valid_context.find(context) != self->_valid_context.end());
 }

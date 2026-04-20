@@ -27,6 +27,7 @@ void Client::free()
 	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
+	Multiplexer::unintroduce_context((uint64_t)this);
 }
 
 void Client::parse_request() __THROWS_STRERROR

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 # include <unistd.h>
 # include "ServerSock.hpp"
 # include <cstddef>
@@ -23,6 +24,7 @@
 # include <stdexcept>
 # include <fcntl.h>
 # include <utility>
+# include <set>
 
 # define EVENT_MAX 4096
 # define IGNORED 1
@@ -34,10 +36,12 @@ typedef std::map<int, Client> Clients;
 class Multiplexer {
 private:
 	Multiplexer() __THROWS_STRERROR;
+	std::set<uint16_t> _valid_context;
 
 public:
-	EpollEvent events[EVENT_MAX];
 
+	EpollEvent events[EVENT_MAX];
+	
 	std::map<int, ServerConfig> confs;
 	std::map<int, std::pair<Server, Clients> > servers;
 
@@ -50,13 +54,17 @@ public:
 	void   deinit(void);
 	void   init_signals(void) __THROWS_STRERROR;
 	Server *get_owner(int fd) __THROWS_STRERROR;
+	bool   execute_epoll_event(int epoll_index);
 
+	static void			introduce_new_context(uint64_t context);
+	static void			unintroduce_context(uint64_t context);
+	static bool			iscontext_valid(uint64_t context);
 	static const ServerConfig &get_conf(int fd);
-	static void     register_server(ServerConfig &conf) __THROWS_STRERROR;
-	static Client   *register_client(uint32_t e, Server *server) __THROWS_STRERROR;
-	static void unregister_client(int owner, int client) __THROWS_STRERROR;
-	static ssize_t  read(int fd, void *buf, size_t size) __THROWS_STRERROR;
-	static ssize_t  write(int fd, const void *buf, size_t size) __THROWS_STRERROR;
+	static void			register_server(ServerConfig &conf) __THROWS_STRERROR;
+	static Client		*register_client(uint32_t e, Server *server) __THROWS_STRERROR;
+	static void			unregister_client(int owner, int client) __THROWS_STRERROR;
+	static ssize_t		read(int fd, void *buf, size_t size) __THROWS_STRERROR;
+	static ssize_t		write(int fd, const void *buf, size_t size) __THROWS_STRERROR;
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
 };
