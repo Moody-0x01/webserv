@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <algorithm>
 #include <cerrno>
 #include <cstddef>
 #include <cstdlib>
@@ -7,10 +8,15 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
-#include <stdexcept>
+#include <string>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+
+bool Cgi::did_fail(void) const
+{
+	return (this->gateway_failed);
+}
 
 Cgi::~Cgi() {
 	std::cout << "brother!! Cgi is done!!\n";
@@ -156,8 +162,12 @@ void Cgi::read() __THROWS_STRERROR
 			this->append_into_headers_buffer(buffer, read_from_cgi);
 			if (this->strip_body_if_found())
 			{
-				this->parse_headers();
-				this->state = ReadingBody;
+				try {
+					this->parse_headers();
+				} catch (const char *e) {
+					this->done();
+					throw e;
+				}
 			}
 		} break;
 		case ReadingBody: {
@@ -192,16 +202,31 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	// Note: Check timeout...
 	try {
-		if (e & EPOLLERR) {
-            this->done();
-            return;
-        }
 		if (e & EPOLLIN)
             this->read(); 
         if (e & EPOLLOUT)
             this->write();
-        if ((e & EPOLLHUP) || (e & EPOLLRDHUP))
+        if (e & EPOLLHUP)
+		{
+			// I can not read from cgi anymore. this is an internal server error and cgi should be marked as done
+			// if the headers are not sent yet then we should send internal server error.
+			// else just hangup and thas it.
             this->done();
+			return ;
+		}
+        if (e & EPOLLRDHUP)
+		{
+			// I can not write body to connexion anymore..
+			// if I did not send any heades then it makes sense to just send internal server error.
+            this->done();
+			return ;
+		}
+
+		if (e & EPOLLERR) {
+			// Error !!
+            this->done();
+            return;
+        }
 	} catch (const char *e) {
 		this->done();
 		throw e;
@@ -222,12 +247,11 @@ Cgi::Cgi(): ASocketContext()
 	this->pid                    =  -1;
 	this->headers_parsed         = false;
 	this->headers_sent           = false;
+	this->gateway_failed                   = 0;
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
 {
-	std::stringstream stream;
-
 	this->protocol               =  request.httpVersion;
 	this->method                 =  request.method;
 	this->query_string           =  request.query_string;
@@ -243,6 +267,13 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = request.headers.at("Content-Type");
 	else
 		this->content_type = "application/octet-stream";
+	this->setup_environment_variables(request.headers);
+}
+
+void Cgi::setup_environment_variables(const std::map<std::string, std::string> &headers) {
+	std::stringstream stream;
+	std::string key, value;
+
 	stream << this->client_content_length;
 	this->env.push_back("REQUEST_METHOD="   + this->method);
 	this->env.push_back("QUERY_STRING="     + this->query_string);
@@ -251,8 +282,21 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->env.push_back("GATEWAY_INTERFACE=" + this->gateway_interface);
 	this->env.push_back("SCRIPT_NAME="      + this->filename);
 	this->env.push_back("PATH_TRANSLATED="  + this->filename);
-	this->env.push_back("REMOTE_ADDR="      + request.headers.at("REMOTE_ADDR"));  // TODO: Get the ip of the client and forward it to the cgi.
+	this->env.push_back("REMOTE_ADDR="      + headers.at("REMOTE_ADDR"));
 	this->env.push_back("SERVER_PROTOCOL="  + this->protocol);
+
+	// Note: send the rest headers as HTTP_*
+	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
+	{
+		key   = it->first;
+		value = it->second;
+
+		if (key == "Content-Type" || key == "Content-Length")
+			continue ;
+		std::transform(key.begin(), key.end(), key.begin(), ::toupper);
+		this->env
+			.push_back("HTTP_" + key + "=" + value);
+	}
 }
 
 void Cgi::epoll_register(void) __THROWS_STRERROR
@@ -349,14 +393,24 @@ void Cgi::execute(void) __THROWS_STRERROR
 	this->epoll_register();
 }
 
+void Cgi::gateway_failure(void)
+{
+	this->gateway_failed = BadGateway;
+	this->done();
+}
+
 void Cgi::parse_headers()    __THROWS_STRERROR
 {
 	std::vector<std::string> headers;
 	std::vector<std::string> pair;
 
-	this->headers_parsed = true;
 	headers =
 		split(this->headers_buffer, "\n");
+	if (!isheaders_valid(headers))
+	{
+		this->gateway_failure();
+		return ;
+	}
 	for (size_t i = 0; i < headers.size(); ++i)
 	{
 		pair = split(headers[i], " :");
@@ -365,12 +419,17 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 			this->headers[pair[0]] = pair[1] + " " + pair[2];
 		} else if (pair.size() != 2)
 		{
-			std::cout << "H: " << headers[i] << "\n";
-			throw "Invalid Header";
+			this->gateway_failure();
+			return ;
 		}
 		else
 			this->headers[pair[0]] = pair[1];
 	}
+	this->state = ReadingBody;
+	this->headers_parsed = true;
+
+	if (this->headers.find("Content-Type") == this->headers.end()) 
+		this->headers["Content-Type"] = TextHtml;
 	if (this->headers.find("Content-Length") == this->headers.end()) 
 	{
 		/*  this->headers["Transfer-Encoding"] = "chunked";  */

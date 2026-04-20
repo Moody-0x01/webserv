@@ -14,12 +14,7 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 void HttpParser::handle()
 {
     if (this->parent == NULL)
-	{
-		// Hello?
-		std::cout << "Hi\n";
         return;
-	}
-
     if (state() == IDLE)
     {
         size_t endOfHeaders = parent->request_buffer.find("\r\n\r\n");
@@ -62,16 +57,16 @@ void HttpParser::handle()
                 if (i + 1 < tokens.size() && tokens[i + 1].first == HEADER_VALUE)
                 {
                     std::string headervalue = tokens[i + 1].second;
-                    std::transform(headerkey.begin(), headerkey.end(), headerkey.begin(), ::tolower);
+                    /*  std::transform(headerkey.begin(), headerkey.end(), headerkey.begin(), ::tolower);  */
                     request.addHeader(headerkey, headervalue);
                     i++;
                 }
             }
         }
-		if (isHeaderValueExist("content-length"))
+		if (isHeaderValueExist("Content-Length"))
 		{
 			const std::map<std::string, std::string>& headers = this->request.getHeaders();
-			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
+			std::map<std::string, std::string>::const_iterator it = headers.find("Content-Length");
 			if (it != headers.end())
 			{
 				this->targetBodySize = std::atoi(it->second.c_str());

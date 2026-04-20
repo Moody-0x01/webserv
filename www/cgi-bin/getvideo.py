@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import requests
+import time
 
 # 1. Use \r\n for headers
 # 2. Don't send headers until you know the remote request worked
@@ -13,7 +14,6 @@ try:
         sys.stdout.buffer.write(b"Content-Type: video/mp4\r\n")
         sys.stdout.buffer.write(b"\r\n") # End of headers
         sys.stdout.buffer.flush()
-
         # Stream the chunks directly to the server
         for chunk in response.iter_content(chunk_size=4096):
             if chunk:

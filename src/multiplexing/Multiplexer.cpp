@@ -1,4 +1,6 @@
 #include <Server.hpp>
+#include <sys/epoll.h>
+#include <sys/socket.h>
 
 
 Multiplexer *Multiplexer::get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *)
@@ -126,7 +128,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 	self->servers[server_fd] = std::make_pair(Server(), Clients());
 	self->confs[server_fd]   = conf;
 	self->servers[server_fd].first.set_socket(server_fd);
-	event.events = EPOLLIN;
+	event.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
 	event.data.ptr = &self->servers[server_fd].first;
 	code = epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, server_fd, &event);
 	if (code < 0)
@@ -165,9 +167,10 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
 	client.getParser().setParent(&client);
 	std::cout << "register_client: " << &client << std::endl;
+	/*  close(server->get_socket());  */
+	/*  shutdown(server->get_socket(), SHUT_RD);  */ // Only to test server fd failure.
 	return (&client);
 }
-
 
 void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 {
@@ -213,7 +216,7 @@ int Multiplexer::loop(void)
 {
 	int sig;
 
-    while (true)
+    while (this->servers.size())
 	{
 		int ready = epoll_wait(this->epoll_fd,
 						 this->events, EVENT_MAX, 100);
@@ -223,8 +226,9 @@ int Multiplexer::loop(void)
 			std::cerr << "[ Multiplexer::loop ] epoll_wait: " << strerror(errno) << "\n";
 			return 1;
 		}
-		for (int index = 0; index < ready; ++index)
+		for (int index = 0; index < ready && (this->servers.size()); ++index)
 		{
+			// What if.. :)...
 			void *ptr = this->events[index].data.ptr;
 			if (ptr == this->signal_io)
 			{
@@ -241,7 +245,6 @@ int Multiplexer::loop(void)
 				} catch (const char *error) {
 					std::cerr << "[ handle->action ] " << error << "\n";
 				}
-
 			}
 		}
     }

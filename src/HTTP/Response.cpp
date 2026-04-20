@@ -1,4 +1,4 @@
-#include "HTTP/Response.hpp"
+ #include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <dirent.h>
 #include <cstdlib>
@@ -329,6 +329,13 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
 			this->resource.cgi
 				.send_body_chunk(request.conn);
+		} else if (this->resource.cgi.state == DONE && !this->resource.cgi.headers_sent) {
+			this->stage = SendingResource;
+			if (this->resource.cgi.did_fail()) {
+				this->set_status(BadGateway);
+			} else
+				this->set_status(InternalServerError);
+			return ;
 		}
 		if (this->resource.cgi.state == DONE)
 			this->stage = DoneSending;

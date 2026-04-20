@@ -18,3 +18,4 @@ bool check_permissions(std::string file);
 bool exists(std::string file);
 /*  std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);  */
 void print_buffer(std::vector<char> &buffer, const char *label);
+bool isheaders_valid(std::vector<std::string> &headers);

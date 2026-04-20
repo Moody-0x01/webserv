@@ -4,6 +4,7 @@ import os
 
 print("Content-Type: text/html")
 print("Status: 200 OK")
+print("x")
 print()  # blank line = end of headers
 
 print("<html>")

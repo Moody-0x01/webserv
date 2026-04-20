@@ -59,9 +59,9 @@ void Lexer::handleHeaderline(std::string &buff, size_t &endofkey)
         endofkey++; // skip white spaces and tabs
     std::string value = buff.substr(endofkey);
     // to lower all keys are lower
-    for (std::size_t i = 0; i < key.length(); ++i) {
-        key[i] = std::tolower(static_cast<unsigned char>(key[i]));
-    }
+    /*  for (std::size_t i = 0; i < key.length(); ++i) {  */
+    /*      key[i] = std::tolower(static_cast<unsigned char>(key[i]));  */
+    /*  }  */
     tokens.push_back(Token(HEADER_NAME, key));
     tokens.push_back(Token(HEADER_VALUE, value));
 }
