@@ -14,12 +14,7 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 void HttpParser::handle()
 {
     if (this->parent == NULL)
-	{
-		// Hello?
-		std::cout << "Hi\n";
         return;
-	}
-
     if (state() == IDLE)
     {
         size_t endOfHeaders = parent->request_buffer.find("\r\n\r\n");
@@ -62,7 +57,6 @@ void HttpParser::handle()
                 if (i + 1 < tokens.size() && tokens[i + 1].first == HEADER_VALUE)
                 {
                     std::string headervalue = tokens[i + 1].second;
-                    std::transform(headerkey.begin(), headerkey.end(), headerkey.begin(), ::tolower);
                     request.addHeader(headerkey, headervalue);
                     i++;
                 }

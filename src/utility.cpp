@@ -188,3 +188,27 @@ void print_buffer(std::vector<char> &buffer, const char *label)
 	}
 	std::cout << std::endl;
 }
+
+bool isheaders_valid(std::vector<std::string> &headers)
+{
+	for (size_t k = 0; k < headers.size(); k++)
+	{
+		if (headers[k].size() && headers[k][headers[k].size() - 1] == '\r')
+			headers[k].erase(headers[k].size() - 1);
+		if (!headers.size())
+			return (false);
+		for (size_t p = 0; p < headers[k].size() && headers[k][p] != ':'; p++)
+		{
+			if (headers[k][p] < 33 || headers[k][p] > 126)
+                return (false);
+		}
+	}
+	return (true);
+}
+
+
+
+
+
+
+

@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <sys/socket.h>
 
 HttpParser &Client::getParser(void)
 {
@@ -23,9 +24,10 @@ Server *Client::get_server(void) const __THROWS_STRERROR {
 
 void Client::free()
 {
-	shutdown(this->get_socket(), SHUT_WR);
+	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
+	Multiplexer::unintroduce_context((uint64_t)this);
 }
 
 void Client::parse_request() __THROWS_STRERROR
@@ -41,22 +43,21 @@ void Client::parse_request() __THROWS_STRERROR
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-		/*  std::cout << "Read Gen[request]: At -> " << count << " Heyy \n";  */
 		if (this->response.get_resource_ref().cgi.state == WritingBody)
 			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
 		else {
-		this->request_buffer.append(buff, count);
-		clientP.handle();
-		if (clientP.state() == READY)
-		{
-			cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
-			cev.data.ptr = this;
-			if (epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+			this->request_buffer.append(buff, count);
+			clientP.handle();
+			if (clientP.state() == READY)
 			{
-				std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
-				this->free();
+				cev.events = EPOLLOUT | EPOLLHUP | EPOLLERR;
+				cev.data.ptr = this;
+				if (epoll_ctl(self->epoll_fd, EPOLL_CTL_MOD, conn, &cev) == -1)
+				{
+					std::cerr << "epoll_ctl: " << strerror(errno) << "\n";
+					this->free();
+				}
 			}
-		}
 		}
 	} catch (const char *e) {
 		this->free();
@@ -90,17 +91,29 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
-		std::cout << "EPOLLOUT at " << this->get_socket() << "\n";
 		this->generate_response();
 		return ;
 	}
-	if (e & EPOLLERR) {
+	if (e & EPOLLHUP)
+	{
+		// I can not read from cgi anymore. this is an internal server error and cgi should be marked as free
+		// if the headers are not sent yet then we should send internal server error.
+		// else just hangup and thas it.
 		this->free();
 		return ;
 	}
-	if (e & EPOLLHUP) {
+	if (e & EPOLLRDHUP)
+	{
+		// I can not write body to connexion anymore..
+		// if I did not send any heades then it makes sense to just send internal server error.
 		this->free();
 		return ;
+	}
+
+	if (e & EPOLLERR) {
+		// Error !!
+		this->free();
+		return;
 	}
 	} catch (const char *e) {
 		this->free();

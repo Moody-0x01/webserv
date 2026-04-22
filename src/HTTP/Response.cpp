@@ -1,8 +1,9 @@
-#include "HTTP/Response.hpp"
+ #include "HTTP/Response.hpp"
 #include <Server.hpp>
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
+#include <fstream>
 #include <ios>
 #include <iostream>
 #include <map>
@@ -298,8 +299,8 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 				this->resource.cgi.execute();
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
-				this->stage = SendingResource;
 				this->set_status(InternalServerError);
+				throw e;
 			}
 		} else {
 			this->stage = SendingResource;
@@ -315,7 +316,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		{
 			if (!this->resource.cgi.headers_sent) {
 				std::cout << "Timout but headers were not sent.\n";
-				this->stage = SendingResource;
 				this->set_status(RequestTimeout);
 				return ;
 			}
@@ -329,6 +329,12 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
 			this->resource.cgi
 				.send_body_chunk(request.conn);
+		} else if (this->resource.cgi.state == DONE && !this->resource.cgi.headers_sent) {
+			if (this->resource.cgi.did_fail()) {
+				this->set_status(BadGateway);
+			} else
+				this->set_status(InternalServerError);
+			return ;
 		}
 		if (this->resource.cgi.state == DONE)
 			this->stage = DoneSending;
@@ -510,26 +516,48 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	std::cout << "---------------------------------" << std::endl;
-	std::cout << std::boolalpha;
-	std::cout << "is Bad?: " << request.isbadrequest << std::endl;
-	std::cout << "Method: " << request.method << std::endl;
-	std::cout << "Uri: " << request.uri << std::endl;
-	std::cout << "httpVersion: " << request.httpVersion << std::endl;
-	std::cout << "Query String: " << request.query_string << std::endl;
-	std::cout << "Content-lenght: " << request.content_length << std::endl;
-	std::cout << "Code: " << request.code << std::endl;
-	std::cout << "Body: " << request.body << std::endl;
 	if (request.content_length == 0)
 	{
 		this->set_status(ContentLengthRequired);
 		return;
 	}
+
+	std::string file = this->resolved_results.filesystem_path;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	{
+		this->set_status(Forbidden);
+		return;
+	}
+
+	std::fstream out_file(file.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out_file.is_open())
+	{
+		this->set_status(InternalServerError);
+		return;
+	}
+
+	out_file.write(request.body.c_str(), request.body.size());
+	if (out_file.fail())
+	{
+		out_file.close();
+		this->set_status(InternalServerError);
+		return;
+	}
+	this->set_status(Created);
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
+	this->resource.set_stream_buffer(
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>201 Created</title></head>\n"
+        "<body><h1>201 Created</h1><p>File successfully uploaded.</p></body>\n"
+        "</html>\n"
+    );
 }
 
 void Response::handle_delete(const HttpRequest &request)
 {
-	(void)request;;
+	(void)request;
 }
 
 void Response::get_error_page_html(const HttpRequest &request, int code)
@@ -655,7 +683,8 @@ void Response::set_status(int s)
 		Response::status_lines[this->status] + "\r\n";
 	if (s != OK) {
 		this->get_error_page_html(*this->request_ptr, s);
-		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
+		this->appendheader("content-type", this->resource.getmime_type().c_str());
+		this->stage = SendingResource;
 	}
 }
 
