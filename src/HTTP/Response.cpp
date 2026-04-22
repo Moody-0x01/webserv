@@ -123,8 +123,9 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		if (!exists(resolved.filesystem_path))
+		if (!exists(resolved.filesystem_path)) {
 			resolved.resource_type = UriResolutionResult::None;
+		}
 	}
 }
 
@@ -294,7 +295,7 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
-		if (this->resolved_results.resource_type == UriResolutionResult::cgi) {
+		if (this->resource.getresource_type() == CGI) {
 			try {
 				this->resource.cgi.execute();
 				this->stage = ProcessingCgi;
@@ -302,8 +303,6 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 				this->set_status(InternalServerError);
 				throw e;
 			}
-		} else {
-			this->stage = SendingResource;
 		}
 	}
 	if (this->stage == SendingResource)
@@ -384,8 +383,8 @@ void Response::setup_response(const HttpRequest &request)
 	{
 		this->resource.setresource_type(CGI);
 		this->resource.cgi.setup(request, 
-				this->resolved_results.cgi_script.first, 
-				this->resolved_results.cgi_script.second);
+			this->resolved_results.cgi_script.first, 
+			this->resolved_results.cgi_script.second);
 		return ;
 	}
 	switch (Response::classify_method(request.method))
@@ -683,7 +682,7 @@ void Response::set_status(int s)
 		Response::status_lines[this->status] + "\r\n";
 	if (s != OK) {
 		this->get_error_page_html(*this->request_ptr, s);
-		this->appendheader("content-type", this->resource.getmime_type().c_str());
+		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
 		this->stage = SendingResource;
 	}
 }

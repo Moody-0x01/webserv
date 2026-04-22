@@ -7,12 +7,8 @@
 #include <unistd.h>
 #include <vector>
 
-int main_cgi_test();
 int main(int ac, char **av)
-/*  int main()  */
 {
-
-	/*  return main_cgi_test();  */
 	std::string config_file = DEFAULT_CONF;
 
 	if (ac > 1) config_file = av[1];

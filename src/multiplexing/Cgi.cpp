@@ -340,6 +340,7 @@ bool Cgi::is_executable(void)
 
 void Cgi::execute(void) __THROWS_STRERROR
 {
+	
 	char *args[3] = {
 		(char*)this->interpreter.c_str(),
 		(char*)this->filename.c_str(), 
