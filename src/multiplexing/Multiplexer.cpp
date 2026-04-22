@@ -209,12 +209,13 @@ Multiplexer::~Multiplexer()
 void Multiplexer::deinit(void)
 {
 	close(this->epoll_fd);
-	if (this->signal_io[0] != -1) close(this->signal_io[0]);
-	if (this->signal_io[1] != -1) close(this->signal_io[1]);
-	// TODO: Cleanup other stuff..
+	if (this->signal_io[0] != -1)
+		close(this->signal_io[0]);
+	if (this->signal_io[1] != -1)
+		close(this->signal_io[1]);
 }
 
-int Multiplexer::loop(void)
+int Multiplexer::run(void)
 {
 	Multiplexer::introduce_new_context((uint64_t)this->signal_io);
     while (this->servers.size())

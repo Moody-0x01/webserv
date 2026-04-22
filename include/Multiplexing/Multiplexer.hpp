@@ -50,7 +50,7 @@ public:
 
 	~Multiplexer();
 	void   init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *);
-	int    loop(void);
+	int    run(void);
 	void   deinit(void);
 	void   init_signals(void) __THROWS_STRERROR;
 	Server *get_owner(int fd) __THROWS_STRERROR;
