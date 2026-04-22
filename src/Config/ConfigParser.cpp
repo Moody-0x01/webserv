@@ -27,6 +27,7 @@ ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
         client_max_body_size  = other.client_max_body_size;
         root                  = other.root;
         index                 = other.index;
+        autoindex             = other.autoindex;
         mime_types            = other.mime_types;
         error_pages           = other.error_pages;
         locations             = other.locations;
