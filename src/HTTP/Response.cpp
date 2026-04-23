@@ -163,70 +163,21 @@ static std::string escape_html(const std::string &input)
 
 static std::string build_default_error_html(int code)
 {
-    std::string reason = reason_phrase_for_status(code);
-    std::stringstream ss;
-    
-    ss << "<!DOCTYPE html>\n"
-       << "<html lang=\"en\">\n"
-       << "<head>\n"
-       << "    <meta charset=\"UTF-8\">\n"
-       << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-       << "    <title>" << code << " " << reason << "</title>\n"
-       << "    <style>\n"
-       << "        body {\n"
-       << "            font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n"
-       << "            background-color: #f3f4f6;\n"
-       << "            color: #1f2937;\n"
-       << "            display: flex;\n"
-       << "            justify-content: center;\n"
-       << "            align-items: center;\n"
-       << "            height: 100vh;\n"
-       << "            margin: 0;\n"
-       << "        }\n"
-       << "        .error-container {\n"
-       << "            background-color: #ffffff;\n"
-       << "            padding: 3rem 4rem;\n"
-       << "            border-radius: 8px;\n"
-       << "            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);\n"
-       << "            text-align: center;\n"
-       << "            max-width: 500px;\n"
-       << "            width: 90%;\n"
-       << "        }\n"
-       << "        h1 {\n"
-       << "            font-size: 5rem;\n"
-       << "            margin: 0;\n"
-       << "            color: #ef4444;\n"
-       << "            line-height: 1;\n"
-       << "        }\n"
-       << "        h2 {\n"
-       << "            font-size: 1.5rem;\n"
-       << "            margin-top: 1rem;\n"
-       << "            font-weight: 500;\n"
-       << "            color: #4b5563;\n"
-       << "        }\n"
-       << "        hr {\n"
-       << "            border: none;\n"
-       << "            border-top: 1px solid #e5e7eb;\n"
-       << "            margin: 2rem 0;\n"
-       << "        }\n"
-       << "        .server-footer {\n"
-       << "            color: #9ca3af;\n"
-       << "            font-size: 0.875rem;\n"
-       << "            margin: 0;\n"
-       << "        }\n"
-       << "    </style>\n"
-       << "</head>\n"
-       << "<body>\n"
-       << "    <div class=\"error-container\">\n"
-       << "        <h1>" << code << "</h1>\n"
-       << "        <h2>" << reason << "</h2>\n"
-       << "        <hr>\n"
-       << "        <p class=\"server-footer\">webserv</p>\n"
-       << "    </div>\n"
-       << "</body>\n"
-       << "</html>\n";
+	std::string reason = reason_phrase_for_status(code);
+	std::string escaped_reason = escape_html(reason);
+	std::stringstream ss;
 
-    return ss.str();
+	ss << "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">\n"
+	   << "<html><head>\n"
+	   << "<title>" << code << " " << escaped_reason << "</title>\n"
+	   << "</head><body>\n"
+	   << "<h1>" << escaped_reason << "</h1>\n"
+	   << "<p>The server encountered an error while processing your request.</p>\n"
+	   << "<hr>\n"
+	   << "<address>webserv Server</address>\n"
+	   << "</body></html>\n";
+
+	return ss.str();
 }
 
 Response::MethodKind Response::classify_method(const std::string &method)
