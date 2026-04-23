@@ -72,8 +72,9 @@ void Client::generate_response(void) __THROWS_STRERROR
 		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
-		if (this->response.getstage() == DoneSending)
+		if (this->response.getstage() == DoneSending) {
 			this->free();
+		}
 	} catch (const char *e) {
 		this->free();
 		throw e;

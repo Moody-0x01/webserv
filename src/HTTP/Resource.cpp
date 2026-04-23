@@ -86,23 +86,14 @@ response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (__isbuf)
 	{
-		while (this->bytes_sent < this->__stream_buffer.size())
-		{
-			size_t remaining = this->__stream_buffer.size() - this->bytes_sent;
-			size_t to_send = std::min(remaining, static_cast<size_t>(WRITE_CHUNK_SIZE));
-			ssize_t sent = ::write(request.conn,
-				this->__stream_buffer.c_str() + this->bytes_sent,
-				to_send);
-			if (sent < 0)
-				throw strerror(errno);
-			if (sent == 0)
-				throw "client disconnected while sending response";
-			this->bytes_sent += static_cast<size_t>(sent);
-		}
+		ssize_t sent = ::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
+		if (sent < 0)
+			throw strerror(errno);
+		if (sent == 0)
+			throw "client disconnected while sending response";
 		this->__done = true;
 		return (DoneSending);
 	}
-
 	if (this->resource_type == File && this->__rstream && this->__rstream->is_open())
 	{
 		char buffer[READ_CHUNK_SIZE];

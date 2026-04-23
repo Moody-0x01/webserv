@@ -308,8 +308,7 @@ void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 	if (this->stage == SendingResource)
 	{
 		this->send_headers(request.conn);
-		this->resource.send(request);
-		this->stage = DoneSending;
+		this->stage = this->resource.send(request);
 	} else if (this->stage == ProcessingCgi) {	
 		if (this->resource.cgi.timeout())
 		{
@@ -432,7 +431,6 @@ void Response::list_dir(void)
 		entries.push_back(std::make_pair(name, is_directory));
 	}
 	::closedir(directory);
-
 	std::sort(entries.begin(), entries.end());
 
 	std::string request_uri = this->resolved_results.request_path;
@@ -593,22 +591,8 @@ void Response::serialize_headers(void) {
 
 void Response::send_headers(int conn) __THROWS_STRERROR
 {
-	if (this->headers_as_str.empty())
-		this->serialize_headers();
-	std::cout << this->headers_as_str;
-	while (this->bytes_sent < static_cast<int>(this->headers_as_str.size()))
-	{
-		size_t remaining = this->headers_as_str.size() - static_cast<size_t>(this->bytes_sent);
-		size_t to_send = std::min(remaining, static_cast<size_t>(WRITE_CHUNK_SIZE));
-		ssize_t sent = ::write(conn,
-			this->headers_as_str.c_str() + this->bytes_sent,
-			to_send);
-		if (sent < 0)
-			throw strerror(errno);
-		if (sent == 0)
-			throw "client disconnected while sending headers";
-		this->bytes_sent += static_cast<int>(sent);
-	}
+	this->serialize_headers();
+	Multiplexer::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
 
