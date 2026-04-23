@@ -1,5 +1,6 @@
  #include "HTTP/Response.hpp"
 #include <Server.hpp>
+#include <algorithm>
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
@@ -398,7 +399,7 @@ void Response::setup_response(const HttpRequest &request)
 			this->handle_post(request);
 			break ;
 		case MethodDelete:
-			this->handle_delete(request);
+			this->handle_delete();
 			break ;
 		default:
 			this->set_status(BadRequest);
@@ -555,9 +556,35 @@ void Response::handle_post(const HttpRequest &request)
     );
 }
 
-void Response::handle_delete(const HttpRequest &request)
+void Response::handle_delete()
 {
-	(void)request;
+	std::string file_path = this->resolved_results.filesystem_path;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	{
+		this->set_status(Forbidden);
+		return;
+	}
+
+	if (std::remove(file_path.c_str()) != 0)
+	{
+		if (errno == ENOENT)
+			this->set_status(NotFound);
+		else if (errno == EACCES || errno == EPERM)
+			this->set_status(Forbidden);
+		else
+			this->set_status(InternalServerError);
+		return;
+	}
+	this->set_status(NoContent);
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
+	this->resource.set_stream_buffer(
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>Deleted</title></head>\n"
+        "<body><h1>696969696969 Deleted</h1><span>yes new status code handle it, don't send another request to this server again. will get another new code<span><p>File successfully deleted.</p></body>\n"
+        "</html>\n"
+    );
 }
 
 void Response::get_error_page_html(const HttpRequest &request, int code)
