@@ -423,16 +423,12 @@ void Response::list_dir(void)
 	while ((entry = ::readdir(directory)) != NULL)
 	{
 		std::string name = entry->d_name;
-
-		std::cout << " \n\n" << name << " \n\n";
 		if (name == ".") continue;
-
 		bool is_directory = false;
 		std::string full_entry_path = join_fs_path(directory_path, name);
 		struct stat entry_stat;
 		if (::stat(full_entry_path.c_str(), &entry_stat) == 0)
 			is_directory = S_ISDIR(entry_stat.st_mode);
-
 		entries.push_back(std::make_pair(name, is_directory));
 	}
 	::closedir(directory);
