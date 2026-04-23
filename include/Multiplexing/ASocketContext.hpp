@@ -10,6 +10,12 @@
 # include <Parser/Config/Config.hpp>
 # include <HTTP/Request.hpp>
 
+typedef enum socket_mode_e {
+	READING = EPOLLIN | EPOLLRDHUP | EPOLLERR,
+	WRITING = EPOLLOUT | EPOLLHUP  | EPOLLERR,
+	QUIETMODE = EPOLLRDHUP | EPOLLERR,
+} socket_mode_t;
+
 # define __THROWS_STRERROR throw(const char *)
 typedef struct ASocketContext
 {

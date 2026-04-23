@@ -14,6 +14,7 @@ public:
 	Server *get_server(void) const __THROWS_STRERROR;
 	void parse_request(void)  __THROWS_STRERROR;
 	void generate_response(void) __THROWS_STRERROR;
+	void switch_mode(socket_mode_t mode) __THROWS_STRERROR;
 	void set_owner(int owner);
 	int  get_owner(void) const;
 

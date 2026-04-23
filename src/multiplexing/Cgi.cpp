@@ -20,8 +20,16 @@ bool Cgi::did_fail(void) const
 }
 
 Cgi::~Cgi() {
-	std::cout << "brother!! Cgi is done!!\n";
 	this->done();
+}
+
+void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
+{
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	if (!epoll_switch(self->epoll_fd, fd, mode, this))
+		throw strerror(errno);
 }
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)

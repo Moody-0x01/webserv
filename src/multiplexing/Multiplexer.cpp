@@ -168,9 +168,6 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
 	client.getParser().setParent(&client);
-	std::cout << "register_client: " << &client << std::endl;
-	/*  close(server->get_socket());  */
-	/*  shutdown(server->get_socket(), SHUT_RD);  */ // Only to test server fd failure.
 	return (&client);
 }
 
@@ -181,10 +178,8 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-	std::cout << ">> Destructor entrance\n";
 	self->servers[owner].second
 		.erase(client);
-	std::cout << "<< Destructor Out\n";
 }
 
 void unregister_fd(int fd)
@@ -194,7 +189,6 @@ void unregister_fd(int fd)
 
 	if (fd >= 0) {
 		self = Multiplexer::get_multiplexer(NULL);
-		std::cout << "Closing :: " << fd << std::endl;
 		if (!self) throw "Well, failed to get a Multiplexer class";
 		epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, &dummy);
 		close(fd);

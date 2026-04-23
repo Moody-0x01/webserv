@@ -5,13 +5,10 @@
 void Server::action(uint32_t e) __THROWS_STRERROR
 {
 	Client *conn;
-	static int iter;
 	Multiplexer *self;
 	struct epoll_event cev;
-	std::cout << "[    " << iter++ << "    ]\n";
 
 	self = Multiplexer::get_multiplexer(NULL);
-	std::cout << "Action::Server fd=" << this->get_socket() << std::endl;
 	if (!self) throw "Well, failed to get a Multiplexer class";
 	if ((e & EPOLLERR) || (e & EPOLLHUP)) 
     {

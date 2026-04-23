@@ -57,7 +57,7 @@ public:
 	cgi_state_t state;
 	std::vector<char> headers_buffer;
 	std::vector<char> body_buffer;
-
+	void switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR;
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)          __THROWS_STRERROR;
 	void send_headers(int conn) __THROWS_STRERROR;

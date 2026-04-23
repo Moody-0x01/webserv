@@ -483,8 +483,9 @@ void Response::serve_file(void)
 		else
 			this->set_status(open_status);
 	}
-	else
+	else {
 		this->set_status(OK);
+	}
 
 	std::string content_type = this->resource.getmime_type();
 	this->appendheader("Content-Type", content_type.c_str());
@@ -497,14 +498,13 @@ void Response::handle_get(const HttpRequest &request)
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
-		{
 			list_dir();
-			return ;
-		}
-		this->set_status(NotFound);
+		else
+			this->set_status(NotFound);
 	}
 	else
 		serve_file();
+	this->stage = SendingResource;
 }
 
 void Response::handle_post(const HttpRequest &request)

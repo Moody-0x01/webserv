@@ -206,9 +206,13 @@ bool isheaders_valid(std::vector<std::string> &headers)
 	return (true);
 }
 
+bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer)
+{
+	struct epoll_event event;
 
-
-
-
-
-
+	event.events   = mask;
+	event.data.ptr = pointer;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event) < 0)
+		return (false);
+	return (true);
+}
