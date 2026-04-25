@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <iostream>
 #include <sys/socket.h>
 
 HttpParser &Client::getParser(void)
@@ -56,18 +57,19 @@ void Client::parse_request() __THROWS_STRERROR
 			// Send to post data.
 			// if the data that is added to the buffer is more than 5kb
 			// then maybe it is better to switch to writing..
-			this->request_buffer.append(buff, count);
-			if (this->request_buffer.size() >= READ_CHUNK_SIZE * 2)
+			push_into_buffer(this->_buffer, buff, count);
+			if (this->_buffer.size() >= READ_CHUNK_SIZE * 2)
 				this->switch_mode(WRITING);
 		} else if (this->response.getstage() == ProcessingCgi) {	
 			cgi_instance.append_into_cgi_body_buffer(buff, count);
 			if (cgi_instance.client_done)
 				this->switch_mode(WRITING);
 		} else {
-			this->request_buffer.append(buff, count);
+			push_into_buffer(this->_buffer, buff, count);
 			clientP.handle();
-			if (clientP.state() == READY)
+			if (clientP.state() == READY) {
 				this->switch_mode(WRITING);
+			}
 		}
 	} catch (const char *e) {
 		this->free();

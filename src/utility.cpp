@@ -225,3 +225,12 @@ void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size)
 			src,
 			src + size);
 }
+
+std::string collect(std::vector<char> &vector, size_t end)
+{
+	std::string result;
+
+	for (size_t i = 0; (i < end) && (i < vector.size()); ++i)
+		result.push_back(vector[i]);
+	return (result);
+}

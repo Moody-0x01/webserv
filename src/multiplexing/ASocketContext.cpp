@@ -2,11 +2,11 @@
 #include <cstddef>
 #include <sys/epoll.h>
 
-ASocketContext::ASocketContext() : request_buffer(""), response_buffer(""), _sockfd(-1), _owns_fd(true)
+ASocketContext::ASocketContext() : _sockfd(-1), _owns_fd(true)
 {
 }
 
-ASocketContext::ASocketContext(int sock) : request_buffer(""), response_buffer(""), _sockfd(sock), _owns_fd(true)
+ASocketContext::ASocketContext(int sock) : _sockfd(sock), _owns_fd(true)
 {
 }
 

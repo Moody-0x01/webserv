@@ -23,3 +23,5 @@ void print_buffer(std::vector<char> &buffer, const char *label);
 bool isheaders_valid(std::vector<std::string> &headers);
 bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer);
 void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size);
+std::string collect(std::vector<char> &vector, size_t end);
+std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);

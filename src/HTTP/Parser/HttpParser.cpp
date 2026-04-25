@@ -2,10 +2,12 @@
 #include "HTTP/Response.hpp"
 #include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
+#include <algorithm>
 #include <cstddef>
 #include <iostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
@@ -17,12 +19,13 @@ void HttpParser::handle()
         return;
     if (state() == IDLE)
     {
-        size_t endOfHeaders = parent->request_buffer.find("\r\n\r\n");
-        if (endOfHeaders != std::string::npos)
+		std::vector<char>::iterator it = search(parent->_buffer, "\r\n\r\n");
+        if (it != parent->_buffer.end())
         {
-            endOfHeaders += 4;
-            std::string headersOnly = parent->request_buffer.substr(0, endOfHeaders);
-            parent->request_buffer.erase(0, endOfHeaders);
+			size_t endOfHeaders = (it + 4) - parent->_buffer.begin();
+            std::string headersOnly = collect(parent->_buffer, endOfHeaders);
+            parent->_buffer.erase(parent->_buffer.begin(),
+					parent->_buffer.begin() + endOfHeaders);
             this->lexerInstence.tokenize(headersOnly);
             if (lexerInstence.isBadRequest()) // for now am doing it from here.
             {
@@ -103,16 +106,6 @@ void HttpParser::parseParams(std::string &uri)
         }
         start = amp + 1;
     }
-}
-
-std::string &HttpParser::getRequestBuffer()
-{
-    return parent->request_buffer;
-}
-
-std::string &HttpParser::getResponseBuffer()
-{
-    return parent->response_buffer;
 }
 
 ParserState HttpParser::state() const

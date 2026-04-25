@@ -32,8 +32,6 @@ public:
     HttpParser();
     void handle();
     void parseParams(std::string  &uri);
-    std::string &getRequestBuffer();
-    std::string &getResponseBuffer();
     Request &getRequestObject();
     ParserState state() const;
 

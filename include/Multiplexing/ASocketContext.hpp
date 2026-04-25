@@ -23,10 +23,6 @@ public:
 	ASocketContext(int sock);
 	ASocketContext();
 	virtual ~ASocketContext();
-
-
-	std::string request_buffer;
-	std::string response_buffer;
 	void virtual action(uint32_t e) __THROWS_STRERROR = 0;
 
 	void set_socket(int sockfd);
