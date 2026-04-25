@@ -1,7 +1,7 @@
 #include "HTTP/Response.hpp"
 #include <Server.hpp>
 
-Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string(""))
+Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string("")), __headers_sent(false)
 {
 	this->__stream_buffer = "";
 	this->bytes_sent = 0;
@@ -80,6 +80,16 @@ bool Resource::isdone(void)
 bool Resource::isopen(void)
 {
 	return (this->__isopen);
+}
+
+bool Resource::headers_sent(void)
+{
+	return (this->__headers_sent);
+}
+
+void Resource::set_headers_sent(void)
+{
+	this->__headers_sent = true;
 }
 
 response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR

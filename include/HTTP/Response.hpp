@@ -76,6 +76,7 @@ class Resource
 	// char         buffer[WRITE_CHUNK_SIZE]; Well be used to send chuncks
 	size_t       bytes_sent;
 	std::string  type;
+	bool         __headers_sent;
 
 
 	public:
@@ -88,6 +89,8 @@ class Resource
 		~Resource();
 		bool isdone(void);
 		bool isopen(void);
+		bool headers_sent(void);
+		void set_headers_sent(void);
 		response_stage_t send(const HttpRequest &request) __THROWS_STRERROR;
 		void set_stream_buffer(const std::string &s);
 		const std::string &get_stream_buffer(void) const;
@@ -166,6 +169,8 @@ public:
 	void setup_response(const HttpRequest &request);
 	void continue_processing(const HttpRequest &request) __THROWS_STRERROR;
 	bool is_method_allowed(std::string method);
+	void send_resource(const HttpRequest &request);
+	void process_cgi_instance(const HttpRequest &request);
 	Resource &get_resource_ref(void);
 	response_stage_t getstage(void) const;
 };

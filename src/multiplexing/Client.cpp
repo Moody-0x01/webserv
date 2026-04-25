@@ -43,6 +43,7 @@ void Client::parse_request() __THROWS_STRERROR
 	int conn = this->get_socket();
 	Multiplexer *self;
 	char buff[READ_CHUNK_SIZE];
+	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
@@ -50,9 +51,19 @@ void Client::parse_request() __THROWS_STRERROR
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-		if (this->response.get_resource_ref().cgi.state == WritingBody)
-			this->response.get_resource_ref().cgi.append_into_body_buffer(buff, count);
-		else {
+
+		if (this->response.getstage() == SendingResource) {
+			// Send to post data.
+			// if the data that is added to the buffer is more than 5kb
+			// then maybe it is better to switch to writing..
+			this->request_buffer.append(buff, count);
+			if (this->request_buffer.size() >= READ_CHUNK_SIZE * 2)
+				this->switch_mode(WRITING);
+		} else if (this->response.getstage() == ProcessingCgi) {	
+			cgi_instance.append_into_cgi_body_buffer(buff, count);
+			if (cgi_instance.client_done)
+				this->switch_mode(WRITING);
+		} else {
 			this->request_buffer.append(buff, count);
 			clientP.handle();
 			if (clientP.state() == READY)
@@ -66,14 +77,21 @@ void Client::parse_request() __THROWS_STRERROR
 
 void Client::generate_response(void) __THROWS_STRERROR
 {
-	try {	
-		HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
+	HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
+	// Cgi &cgi = this->response.get_resource_ref().cgi;
+
+	try {
 		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
-		if (this->response.getstage() == DoneSending) {
-			this->free();
+		if (request.method == "POST")
+		{
+			this->switch_mode(READING); // switch_mode to Reading body from the client.
+										// any kind of post needs to go back to recv mode
+			return ;
 		}
+		if (this->response.getstage() == DoneSending)
+			this->free();
 	} catch (const char *e) {
 		this->free();
 		throw e;

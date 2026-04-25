@@ -285,58 +285,75 @@ UriResolutionResult::UriResolutionResult()
 
 Resource &Response::get_resource_ref(void) { return (this->resource);};
 
-/*  []  */
-/*  [headers | body]  */
+void Response::send_resource(const HttpRequest &request)
+{
+	Resource &resource = this->resource;
+
+	if (!resource.headers_sent())
+	{
+		this->send_headers(request.conn);
+		resource.set_headers_sent();
+	}
+	this->stage =
+		this->resource.send(request);
+}
 
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
 		this->request_ptr = &request;
+
+	Cgi &cgi = this->resource.cgi;
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
 		if (this->resource.getresource_type() == CGI) {
 			try {
-				this->resource.cgi.execute();
+				cgi.execute();
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
 				this->set_status(InternalServerError);
-				throw e;
 			}
 		}
 	}
-	if (this->stage == SendingResource)
+	switch (this->stage) {
+		case SendingResource: {
+			this->send_resource(request);
+		} break;
+		case ProcessingCgi: {
+			this->process_cgi_instance(request);
+		} break;
+		default: {};
+	}
+}
+
+void Response::process_cgi_instance(const HttpRequest &request)
+{
+	Cgi &cgi = this->resource.cgi;
+
+	if (cgi.timeout())
 	{
-		this->send_headers(request.conn);
-		this->stage = this->resource.send(request);
-	} else if (this->stage == ProcessingCgi) {	
-		if (this->resource.cgi.timeout())
-		{
-			if (!this->resource.cgi.headers_sent) {
-				std::cout << "Timout but headers were not sent.\n";
-				this->set_status(RequestTimeout);
-				return ;
-			}
-			std::cout << "Timout but headers already sent.\n";
-			this->stage = DoneSending;
+		if (!cgi.headers_sent) {
+			this->set_status(RequestTimeout);
 			return ;
 		}
-		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
-			this->resource.cgi
-				.send_headers(request.conn);
-		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
-			this->resource.cgi
-				.send_body_chunk(request.conn);
-		} else if (this->resource.cgi.state == DONE && !this->resource.cgi.headers_sent) {
-			if (this->resource.cgi.did_fail()) {
-				this->set_status(BadGateway);
-			} else
-				this->set_status(InternalServerError);
-			return ;
-		}
-		if (this->resource.cgi.state == DONE)
-			this->stage = DoneSending;
+		this->stage = DoneSending;
+		return ;
 	}
+	if (!cgi.headers_sent && cgi.headers_parsed)
+		cgi.send_headers(request.conn);
+	else if (cgi.headers_sent && cgi.state == ReadingBody)
+		cgi.send_body_chunk(request.conn);
+	else if (cgi.state == DONE && !cgi.headers_sent) {
+		if (cgi.did_fail()) {
+			this->set_status(BadGateway);
+			return ;
+		}
+		this->set_status(InternalServerError);
+		return ;
+	}
+	if (cgi.state == DONE)
+		this->stage = DoneSending;
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -605,27 +622,6 @@ bool Response::isdone(void)
 	// what if it is a file? cgi?..
 	return (true);
 }
-
-// void Response::write(int conn) __THROWS_STRERROR
-// {
-// 	ssize_t count;
-// 	size_t  write_size;
-//
-// 	if (!this->__is_serialized)
-// 		this->serialize(); // NOTE: converts headers and body into client writable form in __serialized_response
-//
-// 	write_size = WRITE_CHUNK_SIZE;
-// 	if (write_size > this->__serialized_response.size() - this->sent)
-// 		write_size = this->__serialized_response.size() - this->sent;
-//
-// 	count = ::write(conn,
-// 		this->__serialized_response.c_str() + this->sent,
-// 		write_size);
-// 	if (count <= 0) throw strerror(errno);
-// 	this->sent += count;
-// 	// TODO: Well, lazy loading files is probably better.
-// 	// html files, audio, video files. should be loaded.
-// }
 
 void Response::init_status_lines()
 {

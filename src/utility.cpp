@@ -216,3 +216,12 @@ bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer)
 		return (false);
 	return (true);
 }
+
+void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size)
+{
+	if (!size || !src)
+		return ;
+	buff.insert(buff.end(),
+			src,
+			src + size);
+}

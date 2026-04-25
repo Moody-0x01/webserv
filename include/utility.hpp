@@ -1,9 +1,10 @@
 # pragma once
-#include <algorithm>
-#include <cstring>
+# include <algorithm>
+# include <cstring>
 # include <vector>
 # include <map>
 # include <string>
+# include <stdint.h>
 
 std::vector<std::string> split(std::string str, char delim);
 std::vector<std::string> split(std::string str, std::string delim);
@@ -21,3 +22,4 @@ bool exists(std::string file);
 void print_buffer(std::vector<char> &buffer, const char *label);
 bool isheaders_valid(std::vector<std::string> &headers);
 bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer);
+void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size);
