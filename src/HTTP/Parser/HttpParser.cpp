@@ -26,6 +26,7 @@ void HttpParser::handle()
             std::string headersOnly = collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);
+			this->getRequestObject().setBody(&parent->_buffer);
             this->lexerInstence.tokenize(headersOnly);
             if (lexerInstence.isBadRequest()) // for now am doing it from here.
             {

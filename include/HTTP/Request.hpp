@@ -3,6 +3,7 @@
 #include <string>
 #include <map>
 #include <sys/types.h>
+#include <vector>
 
 #define  READ_CHUNK_SIZE      4096
 #define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE // 4kb each time.
@@ -17,7 +18,7 @@ typedef struct HttpRequest {
     std::string httpVersion;
     std::map<std::string, std::string> headers;
     std::map<std::string, std::string> params;
-    std::string body;
+	std::vector<char> *body;
     std::string query_string;
 	ssize_t content_length;
 } HttpRequest;
@@ -35,13 +36,13 @@ public:
     void setURI(const std::string &u);
     void setHttpVersion(const std::string &v);
     void addHeader(const std::string &key, const std::string &value);
-    void setBody(const std::string &b);
+	void setBody(std::vector<char> *b);
 
     const std::string &getMethod() const;
     const std::string &getURI() const;
     const std::string &getHttpVersion() const;
     const std::map<std::string, std::string> &getHeaders() const;
-    const std::string &getBody() const;
+    const std::vector<char> *getBody() const;
 	// TODO: This function sets up who are the server and client that are responsible for this current request aka owner and conn
 	void set_sockets(const int server, const int client);
 	const HttpRequest &getHttpRequest(void) const;

@@ -532,7 +532,6 @@ void Response::handle_post(const HttpRequest &request)
 		this->set_status(ContentLengthRequired);
 		return;
 	}
-
 	std::string file = this->resolved_results.filesystem_path;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
@@ -546,14 +545,16 @@ void Response::handle_post(const HttpRequest &request)
 		this->set_status(InternalServerError);
 		return;
 	}
+	out_file.write(request.body->data(), request.body->size());
 
-	out_file.write(request.body.c_str(), request.body.size());
 	if (out_file.fail())
 	{
 		out_file.close();
 		this->set_status(InternalServerError);
 		return;
 	}
+	this->bytes_sent += request.body->size();
+	request.body->clear();
 	this->set_status(Created);
 	this->resource.setresource_type(Text);
 	this->resource.setmime_type(TextHtml);
