@@ -102,7 +102,8 @@ struct UriResolutionResult {
 		None,
 		directory,
 		cgi,
-		file
+		file,
+		redirect
 	};
 	UriResolutionResult();
 	type						resource_type;

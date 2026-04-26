@@ -135,7 +135,7 @@ static std::string reason_phrase_for_status(int code)
 	{
 		std::stringstream c;
 		c << code;
-		std::string auto_reason = "HTTP/1.0 " + c.str() + " Error";
+		std::string auto_reason = "HTTP/1.0 " + c.str() + ((code < 300 || code > 399) ? " Error" : " Redirection");
 		return auto_reason;
 	}
 	return it->second;
@@ -172,7 +172,7 @@ static std::string build_default_error_html(int code)
 	   << "<title>" << code << " " << escaped_reason << "</title>\n"
 	   << "</head><body>\n"
 	   << "<h1>" << escaped_reason << "</h1>\n"
-	   << "<p>The server encountered an error while processing your request.</p>\n"
+	   << ((code < 300 || code > 399) ? "<p>The server encountered an error while processing your request.</p>\n" : "")
 	   << "<hr>\n"
 	   << "<address>webserv Server</address>\n"
 	   << "</body></html>\n";
@@ -320,6 +320,12 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}	
 	this->resolved_results = Response::resolve_uri_to_path(request);
+	if (this->resolved_results.resource_type == UriResolutionResult::redirect)
+	{
+		this->appendheader("Location", this->resolved_results.matched_location->return_loc.second.c_str());
+		this->set_status(resolved_results.matched_location->return_loc.first);
+		return ;
+	}
 	if (!this->is_method_allowed(request.method))
 	{
 		this->set_status(MethodNotAllowed);
@@ -664,6 +670,13 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
 	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
+
+	if (resolved.matched_location && !resolved.matched_location->return_loc.second.empty())
+	{
+		resolved.resource_type = UriResolutionResult::redirect;
+		return resolved;
+	}
+
 	resolved.resource_type = get_resource_type(resolved.filesystem_path);
 	if (resolved.resource_type == UriResolutionResult::file)
 		resolve_cgi_script(resolved, best_location);
