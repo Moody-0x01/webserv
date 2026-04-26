@@ -10,6 +10,12 @@
 # include <Parser/Config/Config.hpp>
 # include <HTTP/Request.hpp>
 
+typedef enum socket_mode_e {
+	READING = EPOLLIN | EPOLLRDHUP | EPOLLERR,
+	WRITING = EPOLLOUT | EPOLLHUP  | EPOLLERR,
+	QUIETMODE = EPOLLRDHUP | EPOLLERR,
+} socket_mode_t;
+
 # define __THROWS_STRERROR throw(const char *)
 typedef struct ASocketContext
 {
@@ -17,10 +23,6 @@ public:
 	ASocketContext(int sock);
 	ASocketContext();
 	virtual ~ASocketContext();
-
-
-	std::string request_buffer;
-	std::string response_buffer;
 	void virtual action(uint32_t e) __THROWS_STRERROR = 0;
 
 	void set_socket(int sockfd);

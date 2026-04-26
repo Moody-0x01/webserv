@@ -44,7 +44,7 @@ void Request::setHttpVersion(const std::string &v)
     this->request.httpVersion = v;
 }
 
-void Request::setBody(const std::string &b)
+void Request::setBody(std::vector<char> *b)
 {
     this->request.body = b;
 }
@@ -74,7 +74,7 @@ const std::map<std::string, std::string> &Request::getHeaders() const
     return this->request.headers;
 }
 
-const std::string &Request::getBody() const
+const std::vector<char> *Request::getBody() const
 {
     return this->request.body;
 }

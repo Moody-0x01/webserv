@@ -1,7 +1,7 @@
 #include "HTTP/Response.hpp"
 #include <Server.hpp>
 
-Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string(""))
+Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string("")), __headers_sent(false)
 {
 	this->__stream_buffer = "";
 	this->bytes_sent = 0;
@@ -82,27 +82,28 @@ bool Resource::isopen(void)
 	return (this->__isopen);
 }
 
+bool Resource::headers_sent(void)
+{
+	return (this->__headers_sent);
+}
+
+void Resource::set_headers_sent(void)
+{
+	this->__headers_sent = true;
+}
+
 response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (__isbuf)
 	{
-		while (this->bytes_sent < this->__stream_buffer.size())
-		{
-			size_t remaining = this->__stream_buffer.size() - this->bytes_sent;
-			size_t to_send = std::min(remaining, static_cast<size_t>(WRITE_CHUNK_SIZE));
-			ssize_t sent = ::write(request.conn,
-				this->__stream_buffer.c_str() + this->bytes_sent,
-				to_send);
-			if (sent < 0)
-				throw strerror(errno);
-			if (sent == 0)
-				throw "client disconnected while sending response";
-			this->bytes_sent += static_cast<size_t>(sent);
-		}
+		ssize_t sent = ::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
+		if (sent < 0)
+			throw strerror(errno);
+		if (sent == 0)
+			throw "client disconnected while sending response";
 		this->__done = true;
 		return (DoneSending);
 	}
-
 	if (this->resource_type == File && this->__rstream && this->__rstream->is_open())
 	{
 		char buffer[READ_CHUNK_SIZE];

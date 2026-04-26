@@ -1,5 +1,6 @@
  #include "HTTP/Response.hpp"
 #include <Server.hpp>
+#include <algorithm>
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
@@ -123,8 +124,9 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		if (!exists(resolved.filesystem_path))
+		if (!exists(resolved.filesystem_path)) {
 			resolved.resource_type = UriResolutionResult::None;
+		}
 	}
 }
 
@@ -235,61 +237,75 @@ UriResolutionResult::UriResolutionResult()
 
 Resource &Response::get_resource_ref(void) { return (this->resource);};
 
-/*  []  */
-/*  [headers | body]  */
+void Response::send_resource(const HttpRequest &request)
+{
+	Resource &resource = this->resource;
+
+	if (!resource.headers_sent())
+	{
+		this->send_headers(request.conn);
+		resource.set_headers_sent();
+	}
+	this->stage =
+		this->resource.send(request);
+}
 
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
 		this->request_ptr = &request;
+
+	Cgi &cgi = this->resource.cgi;
 	if (this->stage == Setup)
 	{
 		this->setup_response(request);
-		if (this->resolved_results.resource_type == UriResolutionResult::cgi) {
+		if (this->resource.getresource_type() == CGI) {
 			try {
-				this->resource.cgi.execute();
+				cgi.execute();
 				this->stage = ProcessingCgi;
 			} catch (const char *e) {
 				this->set_status(InternalServerError);
-				throw e;
 			}
-		} else {
-			this->stage = SendingResource;
 		}
 	}
-	if (this->stage == SendingResource)
+	switch (this->stage) {
+		case SendingResource: {
+			this->send_resource(request);
+		} break;
+		case ProcessingCgi: {
+			this->process_cgi_instance(request);
+		} break;
+		default: {};
+	}
+}
+
+void Response::process_cgi_instance(const HttpRequest &request)
+{
+	Cgi &cgi = this->resource.cgi;
+
+	if (cgi.timeout())
 	{
-		this->send_headers(request.conn);
-		this->resource.send(request);
+		if (!cgi.headers_sent) {
+			this->set_status(RequestTimeout);
+			return ;
+		}
 		this->stage = DoneSending;
-	} else if (this->stage == ProcessingCgi) {	
-		if (this->resource.cgi.timeout())
-		{
-			if (!this->resource.cgi.headers_sent) {
-				std::cout << "Timout but headers were not sent.\n";
-				this->set_status(RequestTimeout);
-				return ;
-			}
-			std::cout << "Timout but headers already sent.\n";
-			this->stage = DoneSending;
-			return ;
-		}
-		if (!this->resource.cgi.headers_sent && this->resource.cgi.headers_parsed) {
-			this->resource.cgi
-				.send_headers(request.conn);
-		} else if (this->resource.cgi.headers_sent && this->resource.cgi.state == ReadingBody) {
-			this->resource.cgi
-				.send_body_chunk(request.conn);
-		} else if (this->resource.cgi.state == DONE && !this->resource.cgi.headers_sent) {
-			if (this->resource.cgi.did_fail()) {
-				this->set_status(BadGateway);
-			} else
-				this->set_status(InternalServerError);
-			return ;
-		}
-		if (this->resource.cgi.state == DONE)
-			this->stage = DoneSending;
+		return ;
 	}
+	if (!cgi.headers_sent && cgi.headers_parsed)
+		cgi.send_headers(request.conn);
+	else if (cgi.headers_sent && cgi.state == ReadingBody)
+		cgi.send_body_chunk(request.conn);
+	else if (cgi.state == DONE && !cgi.headers_sent) {
+		if (cgi.did_fail()) {
+			this->set_status(BadGateway);
+			return ;
+		}
+		this->set_status(InternalServerError);
+		return ;
+	}
+	if (cgi.state == DONE)
+		this->stage = DoneSending;
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -341,8 +357,8 @@ void Response::setup_response(const HttpRequest &request)
 	{
 		this->resource.setresource_type(CGI);
 		this->resource.cgi.setup(request, 
-				this->resolved_results.cgi_script.first, 
-				this->resolved_results.cgi_script.second);
+			this->resolved_results.cgi_script.first, 
+			this->resolved_results.cgi_script.second);
 		return ;
 	}
 	switch (Response::classify_method(request.method))
@@ -355,7 +371,7 @@ void Response::setup_response(const HttpRequest &request)
 			this->handle_post(request);
 			break ;
 		case MethodDelete:
-			this->handle_delete(request);
+			this->handle_delete();
 			break ;
 		default:
 			this->set_status(BadRequest);
@@ -381,20 +397,15 @@ void Response::list_dir(void)
 	while ((entry = ::readdir(directory)) != NULL)
 	{
 		std::string name = entry->d_name;
-
-		std::cout << " \n\n" << name << " \n\n";
 		if (name == ".") continue;
-
 		bool is_directory = false;
 		std::string full_entry_path = join_fs_path(directory_path, name);
 		struct stat entry_stat;
 		if (::stat(full_entry_path.c_str(), &entry_stat) == 0)
 			is_directory = S_ISDIR(entry_stat.st_mode);
-
 		entries.push_back(std::make_pair(name, is_directory));
 	}
 	::closedir(directory);
-
 	std::sort(entries.begin(), entries.end());
 
 	std::string request_uri = this->resolved_results.request_path;
@@ -447,8 +458,9 @@ void Response::serve_file(void)
 		else
 			this->set_status(open_status);
 	}
-	else
+	else {
 		this->set_status(OK);
+	}
 
 	std::string content_type = this->resource.getmime_type();
 	this->appendheader("Content-Type", content_type.c_str());
@@ -461,14 +473,13 @@ void Response::handle_get(const HttpRequest &request)
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		if ((resolved_results.matched_location && resolved_results.matched_location->autoindex) || (!resolved_results.matched_location && server_conf.autoindex))
-		{
 			list_dir();
-			return ;
-		}
-		this->set_status(NotFound);
+		else
+			this->set_status(NotFound);
 	}
 	else
 		serve_file();
+	this->stage = SendingResource;
 }
 
 void Response::handle_post(const HttpRequest &request)
@@ -478,7 +489,6 @@ void Response::handle_post(const HttpRequest &request)
 		this->set_status(ContentLengthRequired);
 		return;
 	}
-
 	std::string file = this->resolved_results.filesystem_path;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
@@ -492,14 +502,16 @@ void Response::handle_post(const HttpRequest &request)
 		this->set_status(InternalServerError);
 		return;
 	}
+	out_file.write(request.body->data(), request.body->size());
 
-	out_file.write(request.body.c_str(), request.body.size());
 	if (out_file.fail())
 	{
 		out_file.close();
 		this->set_status(InternalServerError);
 		return;
 	}
+	this->bytes_sent += request.body->size();
+	request.body->clear();
 	this->set_status(Created);
 	this->resource.setresource_type(Text);
 	this->resource.setmime_type(TextHtml);
@@ -512,9 +524,35 @@ void Response::handle_post(const HttpRequest &request)
     );
 }
 
-void Response::handle_delete(const HttpRequest &request)
+void Response::handle_delete()
 {
-	(void)request;
+	std::string file_path = this->resolved_results.filesystem_path;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	{
+		this->set_status(Forbidden);
+		return;
+	}
+
+	if (std::remove(file_path.c_str()) != 0)
+	{
+		if (errno == ENOENT)
+			this->set_status(NotFound);
+		else if (errno == EACCES || errno == EPERM)
+			this->set_status(Forbidden);
+		else
+			this->set_status(InternalServerError);
+		return;
+	}
+	this->set_status(NoContent);
+	this->resource.setresource_type(Text);
+	this->resource.setmime_type(TextHtml);
+	this->resource.set_stream_buffer(
+        "<!DOCTYPE html>\n"
+        "<html>\n"
+        "<head><title>Deleted</title></head>\n"
+        "<body><h1>696969696969 Deleted</h1><span>yes new status code handle it, don't send another request to this server again. will get another new code<span><p>File successfully deleted.</p></body>\n"
+        "</html>\n"
+    );
 }
 
 void Response::get_error_page_html(const HttpRequest &request, int code)
@@ -555,22 +593,8 @@ void Response::serialize_headers(void) {
 
 void Response::send_headers(int conn) __THROWS_STRERROR
 {
-	if (this->headers_as_str.empty())
-		this->serialize_headers();
-	std::cout << this->headers_as_str;
-	while (this->bytes_sent < static_cast<int>(this->headers_as_str.size()))
-	{
-		size_t remaining = this->headers_as_str.size() - static_cast<size_t>(this->bytes_sent);
-		size_t to_send = std::min(remaining, static_cast<size_t>(WRITE_CHUNK_SIZE));
-		ssize_t sent = ::write(conn,
-			this->headers_as_str.c_str() + this->bytes_sent,
-			to_send);
-		if (sent < 0)
-			throw strerror(errno);
-		if (sent == 0)
-			throw "client disconnected while sending headers";
-		this->bytes_sent += static_cast<int>(sent);
-	}
+	this->serialize_headers();
+	Multiplexer::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
 }
 
 
@@ -583,27 +607,6 @@ bool Response::isdone(void)
 	// what if it is a file? cgi?..
 	return (true);
 }
-
-// void Response::write(int conn) __THROWS_STRERROR
-// {
-// 	ssize_t count;
-// 	size_t  write_size;
-//
-// 	if (!this->__is_serialized)
-// 		this->serialize(); // NOTE: converts headers and body into client writable form in __serialized_response
-//
-// 	write_size = WRITE_CHUNK_SIZE;
-// 	if (write_size > this->__serialized_response.size() - this->sent)
-// 		write_size = this->__serialized_response.size() - this->sent;
-//
-// 	count = ::write(conn,
-// 		this->__serialized_response.c_str() + this->sent,
-// 		write_size);
-// 	if (count <= 0) throw strerror(errno);
-// 	this->sent += count;
-// 	// TODO: Well, lazy loading files is probably better.
-// 	// html files, audio, video files. should be loaded.
-// }
 
 void Response::init_status_lines()
 {
@@ -640,7 +643,7 @@ void Response::set_status(int s)
 		Response::status_lines[this->status] + "\r\n";
 	if (s != OK) {
 		this->get_error_page_html(*this->request_ptr, s);
-		this->appendheader("content-type", this->resource.getmime_type().c_str());
+		this->appendheader("Content-Type", this->resource.getmime_type().c_str());
 		this->stage = SendingResource;
 	}
 }

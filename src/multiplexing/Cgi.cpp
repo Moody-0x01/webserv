@@ -20,8 +20,16 @@ bool Cgi::did_fail(void) const
 }
 
 Cgi::~Cgi() {
-	std::cout << "brother!! Cgi is done!!\n";
 	this->done();
+}
+
+void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
+{
+	Multiplexer *self;
+	self = Multiplexer::get_multiplexer(NULL);
+	if (!self) throw "Well, failed to get a Multiplexer class";
+	if (!epoll_switch(self->epoll_fd, fd, mode, this))
+		throw strerror(errno);
 }
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
@@ -32,11 +40,31 @@ void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
 			buffer + size);
 }
 
-void Cgi::append_into_body_buffer(const char *buffer, ssize_t size)
+void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 {
-	this->body_buffer.insert(this->body_buffer.end(),
-			buffer,
-			buffer + size);
+	// Appends to the body that will be sent to the client.
+	if (size <= 0) {
+		this->cgi_done = true;
+		return ;
+	}
+	push_into_buffer(this->client_body_buffer, buffer, size);
+	this->client_read_bytes += size; 
+	if (this->client_read_bytes >= this->cgi_content_length)
+		this->cgi_done = true;
+}
+
+void Cgi::append_into_cgi_body_buffer(const char *buffer, ssize_t size)
+{
+	// Appends to the body that will be sent to the cgi.
+	// if the client has written everything then. we set it up and then return.
+	if (size <= 0) {
+		this->client_done = true;
+		return ;
+	}
+	push_into_buffer(this->cgi_body_buffer, buffer, size);
+	this->cgi_read_bytes += size; 
+	if (this->cgi_read_bytes >= this->client_content_length)
+		this->client_done = true;
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -52,7 +80,9 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 			this->body_buffer.erase(
 				this->body_buffer.begin(),
 				this->body_buffer.begin() + sent);
-		} else this->done();
+		} else {
+			this->done();
+		}
 	}
 }
 
@@ -67,32 +97,31 @@ void Cgi::done(void)
 {
 	if (this->state != DONE && this->state != Idle) {
 		this->state = DONE;
-		std::cout << "We done reading!\n";
-		std::cout << "Now close pipes: \n";
-
 		unregister_fd(this->streams[CGI_READ_END]);
 		unregister_fd(this->streams[CGI_WRITE_END]);
 		this->streams[CGI_READ_END] = -1;
 		this->streams[CGI_WRITE_END] = -1;
 		Multiplexer::unintroduce_context((uint64_t)this);
+		std::cout << "We done reading!\n";
+		std::cout << "Now close pipes: \n";
 	}
 }
 
 void Cgi::write() __THROWS_STRERROR
 {
 	ssize_t sent;
-	if (this->state == WritingBody)
-	{
+
+	if (this->cgi_body_buffer.size()) {
+
 		sent = Multiplexer::write(this->streams[CGI_WRITE_END],
-					&this->body_buffer[0],
-					this->body_buffer.size());
+					&this->cgi_body_buffer[0],
+					std::min((unsigned long)WRITE_CHUNK_SIZE, this->cgi_body_buffer.size()));
 		if (sent > 0) {
-			this->body_buffer.erase(this->body_buffer.begin(), this->body_buffer.begin() + sent);
-			this->client_read_bytes += sent;
+			this->cgi_body_buffer
+				.erase(this->cgi_body_buffer.begin(), this->cgi_body_buffer.begin() + sent);
 		}
-		if (this->client_content_length >= this->client_read_bytes) {
-			this->state = ReadingHeaders;
-		}
+		if ((this->client_done && this->cgi_body_buffer.size()) == 0 || sent < 0)
+			this->switch_mode(QUIETMODE, this->streams[CGI_WRITE_END]);
 	}
 }
 
@@ -124,7 +153,7 @@ bool Cgi::strip_body_if_found(void)
 	if (seperator.first == this->headers_buffer.end())
 		return (false);
 	headers_length = ((seperator.first - this->headers_buffer.begin()));
-	this->append_into_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
+	this->append_into_client_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
 				this->headers_buffer.size() - headers_length - seperator.second);
 	this->headers_buffer
 		.resize(headers_length);
@@ -156,10 +185,6 @@ void Cgi::read() __THROWS_STRERROR
 			std::cout << "Wtf bro this should be done in write\n";
 			abort();
 		} break;        // Idk what is this for tho???
-		case WritingBody: {
-			std::cout << "Wtf bro this should be done in write\n";
-			abort();
-		} break; // this is done somewhere else??
 		case ReadingHeaders: {
 			this->append_into_headers_buffer(buffer, read_from_cgi);
 			if (this->strip_body_if_found())
@@ -173,11 +198,9 @@ void Cgi::read() __THROWS_STRERROR
 			}
 		} break;
 		case ReadingBody: {
-			this->append_into_body_buffer(buffer, read_from_cgi);
-			this->cgi_read_bytes += read_from_cgi; 
-			if ((this->cgi_content_length != -1)
-				&& (this->cgi_read_bytes >= this->cgi_content_length))
-				this->done();
+			this->append_into_client_body_buffer(buffer, read_from_cgi);
+			if (this->cgi_done && this->client_body_buffer.size() == 0)	
+				this->switch_mode(QUIETMODE, this->streams[CGI_READ_END]);
 		} break;
 	}
 }
@@ -322,7 +345,6 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
         event.events = EPOLLOUT | EPOLLERR;
         event.data.ptr = this;
         epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[CGI_WRITE_END], &event);
-        this->state = WritingBody; 
     } else {
         this->state = ReadingHeaders;
         close(this->streams[CGI_WRITE_END]);
@@ -340,6 +362,7 @@ bool Cgi::is_executable(void)
 
 void Cgi::execute(void) __THROWS_STRERROR
 {
+	
 	char *args[3] = {
 		(char*)this->interpreter.c_str(),
 		(char*)this->filename.c_str(), 
@@ -371,9 +394,9 @@ void Cgi::execute(void) __THROWS_STRERROR
 
 		dup2(input [CGI_READ_END],  STDIN_FILENO);
 		dup2(output[CGI_WRITE_END], STDOUT_FILENO);
-
-		int logfd = open("/tmp/cgi.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
-		if (logfd != -1) {
+		int logfd = open(CGI_LOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
+		if (logfd != -1)
+		{
 			dup2(logfd, STDERR_FILENO);
 			close(logfd);
 		}

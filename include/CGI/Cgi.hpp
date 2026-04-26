@@ -4,15 +4,16 @@
 # include <string>
 # include <unistd.h>
 # include <unistd.h>
-#include <vector>
-#define CRLF "\r\n\r\n"
-#define NLNL "\n\n"
+# include <vector>
+# define CRLF "\r\n\r\n"
+# define NLNL "\n\n"
+# define CGI_LOG_FILE "/tmp/cgi.log"
 
 typedef enum cgi_state_e {
 	Idle,
 	ReadingHeaders,
-	WritingBody, // read from write to client
-	ReadingBody, // Read then send to child
+	ReadingBody,    // These two states are reading states only, if we are writing the body
+					// they dont matter.
 	DONE
 } cgi_state_t;
 
@@ -52,12 +53,19 @@ public:
 	~Cgi();
 	bool        headers_sent;
 	bool        headers_parsed;
+
+	bool cgi_done;
+	bool client_done;
 	pid_t       pid;
 	int         streams[2];
 	cgi_state_t state;
 	std::vector<char> headers_buffer;
 	std::vector<char> body_buffer;
 
+	std::vector<char>    cgi_body_buffer; // Cgi writes here and client reads from here.
+	std::vector<char> client_body_buffer; // Client writes here then Cgi reads from here.
+
+	void switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR;
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)          __THROWS_STRERROR;
 	void send_headers(int conn) __THROWS_STRERROR;
@@ -70,7 +78,8 @@ public:
 	bool timeout(void)     __THROWS_STRERROR;
 	void gateway_failure(void);
 	void setup_environment_variables(const std::map<std::string, std::string> &headers);
-	void append_into_body_buffer(const char *buffer, ssize_t size);
+	void append_into_client_body_buffer(const char *buffer, ssize_t size);
+	void append_into_cgi_body_buffer(const char *buffer, ssize_t size);
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
 	bool validate_headers();
 	bool is_executable(void);

@@ -206,9 +206,31 @@ bool isheaders_valid(std::vector<std::string> &headers)
 	return (true);
 }
 
+bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer)
+{
+	struct epoll_event event;
 
+	event.events   = mask;
+	event.data.ptr = pointer;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event) < 0)
+		return (false);
+	return (true);
+}
 
+void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size)
+{
+	if (!size || !src)
+		return ;
+	buff.insert(buff.end(),
+			src,
+			src + size);
+}
 
+std::string collect(std::vector<char> &vector, size_t end)
+{
+	std::string result;
 
-
-
+	for (size_t i = 0; (i < end) && (i < vector.size()); ++i)
+		result.push_back(vector[i]);
+	return (result);
+}

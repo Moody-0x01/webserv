@@ -1,6 +1,7 @@
 #pragma once
 #include <Multiplexing/ServerSock.hpp>
 #include <HTTP/Response.hpp>
+#include <vector>
 
 typedef struct Client: public ASocketContext {
 public:
@@ -14,6 +15,7 @@ public:
 	Server *get_server(void) const __THROWS_STRERROR;
 	void parse_request(void)  __THROWS_STRERROR;
 	void generate_response(void) __THROWS_STRERROR;
+	void switch_mode(socket_mode_t mode) __THROWS_STRERROR;
 	void set_owner(int owner);
 	int  get_owner(void) const;
 
@@ -21,7 +23,7 @@ public:
 	void setip_from_bytes(uint32_t ip_bytes);
 	std::string getip(void);
 
-
+	std::vector<char> _buffer;
 private:
 	int			 _owner;
 	std::string  ip;
