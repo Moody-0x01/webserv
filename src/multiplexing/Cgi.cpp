@@ -19,8 +19,30 @@ bool Cgi::did_fail(void) const
 	return (this->gateway_failed);
 }
 
-Cgi::~Cgi() {
+Cgi::~Cgi()
+{
+	std::cout << "~Cgi\n";
 	this->done();
+}
+
+void Cgi::close_write(void) {
+	std::cout << "close_write\n";
+	unregister_fd(this->streams[CGI_WRITE_END]);
+	this->streams[CGI_WRITE_END] = -1;
+	if (this->streams[CGI_READ_END] == -1) { // Unregister context when there is no reader nor writer
+		this->state = DONE;
+		Multiplexer::unintroduce_context((uint64_t)this);
+	}
+}
+
+void Cgi::close_read(void) {
+	std::cout << "close_read\n";
+	unregister_fd(this->streams[CGI_READ_END]);
+	this->streams[CGI_READ_END] = -1;
+	if (this->streams[CGI_WRITE_END] == -1) { // Unregister context when there is no reader nor writer
+		this->state = DONE;
+		Multiplexer::unintroduce_context((uint64_t)this);
+	}
 }
 
 void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
@@ -34,6 +56,8 @@ void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
 {
+	if (size <= 0)
+		return ;
 	this->headers_buffer.reserve(this->headers_buffer.size() + size);
 	this->headers_buffer.insert(this->headers_buffer.begin(),
 			buffer,
@@ -49,8 +73,11 @@ void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 	}
 	push_into_buffer(this->client_body_buffer, buffer, size);
 	this->client_read_bytes += size; 
-	if (this->client_read_bytes >= this->cgi_content_length)
+	if (this->cgi_content_length == -1)
+		return ;
+	if (this->client_read_bytes >= this->cgi_content_length) {
 		this->cgi_done = true;
+	}
 }
 
 void Cgi::append_into_cgi_body_buffer(const char *buffer, ssize_t size)
@@ -63,8 +90,10 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer, ssize_t size)
 	}
 	push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
-	if (this->cgi_read_bytes >= this->client_content_length)
+
+	if (this->cgi_read_bytes >= this->client_content_length) {
 		this->client_done = true;
+	}
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -72,17 +101,17 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 	ssize_t sent;
 	size_t to_send;
 
-	if (this->body_buffer.size())
+	if (this->client_body_buffer.size())
 	{
-		to_send = std::min((int)WRITE_CHUNK_SIZE, (int)this->body_buffer.size());
-		sent = ::write(conn, &this->body_buffer[0], to_send);
+		to_send = std::min((int)WRITE_CHUNK_SIZE, (int)this->client_body_buffer.size());
+		sent = ::write(conn, &this->client_body_buffer[0], to_send);
 		if (sent > 0) {
-			this->body_buffer.erase(
-				this->body_buffer.begin(),
-				this->body_buffer.begin() + sent);
-		} else {
-			this->done();
+			this->client_body_buffer.erase(
+				this->client_body_buffer.begin(),
+				this->client_body_buffer.begin() + sent);
 		}
+		else
+			this->done();
 	}
 }
 
@@ -96,14 +125,10 @@ void Cgi::send_headers(int conn) __THROWS_STRERROR
 void Cgi::done(void)
 {
 	if (this->state != DONE && this->state != Idle) {
-		this->state = DONE;
-		unregister_fd(this->streams[CGI_READ_END]);
-		unregister_fd(this->streams[CGI_WRITE_END]);
-		this->streams[CGI_READ_END] = -1;
-		this->streams[CGI_WRITE_END] = -1;
-		Multiplexer::unintroduce_context((uint64_t)this);
-		std::cout << "We done reading!\n";
-		std::cout << "Now close pipes: \n";
+		this->cgi_done = true;
+		this->client_done = true;
+		this->close_read();
+		this->close_write();
 	}
 }
 
@@ -112,16 +137,19 @@ void Cgi::write() __THROWS_STRERROR
 	ssize_t sent;
 
 	if (this->cgi_body_buffer.size()) {
-
+		std::cout << "Sending buffer that has a size of: " << this->cgi_body_buffer.size() << "\n";
 		sent = Multiplexer::write(this->streams[CGI_WRITE_END],
 					&this->cgi_body_buffer[0],
 					std::min((unsigned long)WRITE_CHUNK_SIZE, this->cgi_body_buffer.size()));
-		if (sent > 0) {
+		std::cout << "successfully sent: " << sent << "\n";
+		if (sent > 0)
+		{
 			this->cgi_body_buffer
 				.erase(this->cgi_body_buffer.begin(), this->cgi_body_buffer.begin() + sent);
+			return ;
 		}
-		if ((this->client_done && this->cgi_body_buffer.size()) == 0 || sent < 0)
-			this->switch_mode(QUIETMODE, this->streams[CGI_WRITE_END]);
+		if ((this->client_done && (this->cgi_body_buffer.size() == 0)) || sent < 0)
+			this->close_write();
 	}
 }
 
@@ -146,6 +174,7 @@ std::pair<std::vector<char>::iterator, size_t> Cgi::find_seperator(void)
 
 bool Cgi::strip_body_if_found(void)
 {
+	ssize_t leftover;
 	std::pair<std::vector<char>::iterator, size_t> seperator =
 		this->find_seperator();
 
@@ -153,8 +182,11 @@ bool Cgi::strip_body_if_found(void)
 	if (seperator.first == this->headers_buffer.end())
 		return (false);
 	headers_length = ((seperator.first - this->headers_buffer.begin()));
-	this->append_into_client_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
-				this->headers_buffer.size() - headers_length - seperator.second);
+	leftover = this->headers_buffer.size() - headers_length - seperator.second;
+	if (leftover > 0) {
+		this->append_into_client_body_buffer((&this->headers_buffer[headers_length] + seperator.second),
+					leftover);
+	}
 	this->headers_buffer
 		.resize(headers_length);
 	return (true);
@@ -168,16 +200,12 @@ void Cgi::read() __THROWS_STRERROR
 
 	if (this->state == DONE)
 		return ;
-	if (this->state == ReadingBody && this->body_buffer.size() >= 1024 * 64) // 64KB
+	if (this->state == ReadingBody && this->client_body_buffer.size() >= 1024 * 8) // 64KB
 		return ;
 	std::memset(buffer, 0, sizeof(buffer));
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
 				buffer,
 				sizeof(buffer));
-	if (read_from_cgi == 0 || read_from_cgi == -1) {
-		this->done();
-		return ;
-	}
 	switch (this->state)
 	{
 		case DONE: {} break;
@@ -192,15 +220,21 @@ void Cgi::read() __THROWS_STRERROR
 				try {
 					this->parse_headers();
 				} catch (const char *e) {
+					std::cout << "read\n";
 					this->done();
 					throw e;
 				}
 			}
+
+			if (read_from_cgi <= 0)
+				this->close_read();
 		} break;
 		case ReadingBody: {
 			this->append_into_client_body_buffer(buffer, read_from_cgi);
-			if (this->cgi_done && this->client_body_buffer.size() == 0)	
-				this->switch_mode(QUIETMODE, this->streams[CGI_READ_END]);
+			
+			if (this->cgi_done) {
+				this->close_read();
+			}
 		} break;
 	}
 }
@@ -237,21 +271,16 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 			// if the headers are not sent yet then we should send internal server error.
 			// else just hangup and thas it.
             this->done();
-			return ;
 		}
         if (e & EPOLLRDHUP)
 		{
 			// I can not write body to connexion anymore..
 			// if I did not send any heades then it makes sense to just send internal server error.
             this->done();
-			return ;
 		}
 
-		if (e & EPOLLERR) {
-			// Error !!
+		if (e & EPOLLERR)
             this->done();
-            return;
-        }
 	} catch (const char *e) {
 		this->done();
 		throw e;
@@ -261,18 +290,21 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 Cgi::Cgi(): ASocketContext()
 {
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
+
+	this->state                  =  Idle;
 	this->start_time             =  0;
 	this->cgi_read_bytes         =  -1; // tracker for body data read from cgi.
 	this->cgi_content_length     =  -1; // How much data do u expect from cgi
 	this->client_content_length  =  -1; // trac
 	this->client_read_bytes      =  -1;
-	this->state                  =  Idle;
 	this->streams[CGI_READ_END ] =  -1;
 	this->streams[CGI_WRITE_END] =  -1;
 	this->pid                    =  -1;
 	this->headers_parsed         = false;
 	this->headers_sent           = false;
-	this->gateway_failed                   = 0;
+	this->gateway_failed         = 0;
+	this->cgi_done               = false;
+	this->client_done            = false;
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
@@ -280,8 +312,9 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	this->protocol               =  request.httpVersion;
 	this->method                 =  request.method;
 	this->query_string           =  request.query_string;
-	if (this->method == "POST")
+	if (this->method == "POST") {
 		this->client_content_length  =  request.content_length;
+	}
 	this->params                 =  request.params;
 	this->filename               =  fn;
 	this->executable             =  fn;
@@ -293,6 +326,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	else
 		this->content_type = "application/octet-stream";
 	this->setup_environment_variables(request.headers);
+	this->append_into_cgi_body_buffer(request.body->data(), request.body->size());
 }
 
 void Cgi::setup_environment_variables(const std::map<std::string, std::string> &headers) {
@@ -335,6 +369,7 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 	if (set_nonblocking(this->streams[CGI_WRITE_END]) == -1) throw strerror(errno);
 	if (set_nonblocking(this->streams[CGI_READ_END]) == -1) throw strerror(errno);
 
+    this->state = ReadingHeaders;
     event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
     event.data.ptr = this; 
     epoll_ctl(self->epoll_fd,
@@ -342,11 +377,10 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 			this->streams[CGI_READ_END], &event);
 
     if (this->method == "POST") {
-        event.events = EPOLLOUT | EPOLLERR;
+        event.events = EPOLLOUT;
         event.data.ptr = this;
         epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, this->streams[CGI_WRITE_END], &event);
     } else {
-        this->state = ReadingHeaders;
         close(this->streams[CGI_WRITE_END]);
         this->streams[CGI_WRITE_END] = -1;
     }
@@ -391,7 +425,6 @@ void Cgi::execute(void) __THROWS_STRERROR
 	if (this->pid == 0)
 	{
 		if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         exit(1);
-
 		dup2(input [CGI_READ_END],  STDIN_FILENO);
 		dup2(output[CGI_WRITE_END], STDOUT_FILENO);
 		int logfd = open(CGI_LOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
@@ -422,6 +455,7 @@ void Cgi::execute(void) __THROWS_STRERROR
 void Cgi::gateway_failure(void)
 {
 	this->gateway_failed = BadGateway;
+	std::cout << "gateway_failure\n";
 	this->done();
 }
 

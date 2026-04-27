@@ -21,7 +21,7 @@ extern char **environ;
 
 # define CGI_READ_END  0
 # define CGI_WRITE_END 1
-# define SCRIPT_TIMEOUT 5
+# define SCRIPT_TIMEOUT 60
 
 typedef struct Cgi: public ASocketContext
 {
@@ -85,6 +85,8 @@ public:
 	bool is_executable(void);
 	std::pair<std::vector<char>::iterator, size_t> find_seperator(void);
 	bool strip_body_if_found(void);
+	void close_write(void);
+	void close_read(void);
 	void done(void);
 	bool did_fail() const;
 } Cgi;

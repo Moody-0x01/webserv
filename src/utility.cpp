@@ -134,7 +134,7 @@ std::string serialize_headers(std::map<std::string, std::string> &headers, bool 
 	status_line = Response::status_lines[OK] + "\r\n";
 	for (std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); ++it)
 	{
-		if (it->first == "Status") {
+		if (it->first == "status") {
 			if (setdefault_status)
 				status_line = "HTTP/1.0 " + it->second + "\r\n";
 			continue ;

@@ -1,5 +1,6 @@
 #include <Server.hpp>
 #include <iostream>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 
 HttpParser &Client::getParser(void)
@@ -21,13 +22,13 @@ Server *Client::get_server(void) const __THROWS_STRERROR {
 	return self->get_owner(this->get_socket());
 }
 
-
 void Client::free()
 {
 	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
 	Multiplexer::unintroduce_context((uint64_t)this);
+	std::cout << "Client freed!\n";
 }
 
 void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
@@ -42,21 +43,18 @@ void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
 void Client::parse_request() __THROWS_STRERROR
 {
 	int conn = this->get_socket();
+	HttpParser &clientP = this->getParser();
+	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 	Multiplexer *self;
 	char buff[READ_CHUNK_SIZE];
-	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-	HttpParser &clientP = this->getParser();
 
 	try {
 		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 
 		if (this->response.getstage() == SendingResource) {
-			// Send to post data.
-			// if the data that is added to the buffer is more than 5kb
-			// then maybe it is better to switch to writing..
 			push_into_buffer(this->_buffer, buff, count);
 			if (this->_buffer.size() >= READ_CHUNK_SIZE * 2)
 				this->switch_mode(WRITING);
@@ -67,9 +65,8 @@ void Client::parse_request() __THROWS_STRERROR
 		} else {
 			push_into_buffer(this->_buffer, buff, count);
 			clientP.handle();
-			if (clientP.state() == READY) {
+			if (clientP.state() == READY)
 				this->switch_mode(WRITING);
-			}
 		}
 	} catch (const char *e) {
 		this->free();
@@ -79,37 +76,41 @@ void Client::parse_request() __THROWS_STRERROR
 
 void Client::generate_response(void) __THROWS_STRERROR
 {
+	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 	HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
-	// Cgi &cgi = this->response.get_resource_ref().cgi;
 
 	try {
+		// std::cout <<  "At continue_processing with:  " << request.method << "\n";
 		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
-		if (request.method == "POST")
+		if (this->response.getstage() == DoneSending) {
+			this->free();
+			return ;
+		}
+		if (request.method == "POST" && !cgi_instance.client_done)
 		{
 			this->switch_mode(READING); // switch_mode to Reading body from the client.
 										// any kind of post needs to go back to recv mode
 			return ;
 		}
-		if (this->response.getstage() == DoneSending)
-			this->free();
 	} catch (const char *e) {
 		this->free();
 		throw e;
 	}
 }
 
-
 void Client::action(uint32_t e) __THROWS_STRERROR
 {
 	try {
     if (e & EPOLLIN) {
+		// std::cout << "Client::action::EPOLLIN\n";
 		this->parse_request();
 		return ;
 	}
     if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 	{
+		// std::cout << "Client::action::EPOLLOUT\n";
 		this->generate_response();
 		return ;
 	}

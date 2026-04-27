@@ -341,10 +341,15 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->stage = DoneSending;
 		return ;
 	}
-	if (!cgi.headers_sent && cgi.headers_parsed)
+	if (!cgi.headers_sent && cgi.headers_parsed) {
 		cgi.send_headers(request.conn);
-	else if (cgi.headers_sent && cgi.state == ReadingBody)
+	}
+	else if (cgi.headers_sent) {
 		cgi.send_body_chunk(request.conn);
+
+		if (request.body->size())
+			request.body->clear();
+	}
 	else if (cgi.state == DONE && !cgi.headers_sent) {
 		if (cgi.did_fail()) {
 			this->set_status(BadGateway);
@@ -353,8 +358,9 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->set_status(InternalServerError);
 		return ;
 	}
-	if (cgi.state == DONE)
+	if (cgi.state == DONE) {
 		this->stage = DoneSending;
+	}
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -402,6 +408,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->resource.cgi.setup(request, 
 			this->resolved_results.cgi_script.first, 
 			this->resolved_results.cgi_script.second);
+		std::cout << "Cgi setupd Done!\n";
 		return ;
 	}
 	switch (Response::classify_method(request.method))
