@@ -12,7 +12,7 @@
 typedef struct HttpRequest {
 	int owner, conn;
 	unsigned short code;
-	bool isbadrequest;
+	bool isbadrequest, ischunked;
     std::string method;
     std::string uri;
     std::string httpVersion;
@@ -29,8 +29,9 @@ class Request
 private:
 	HttpRequest request;
 public:
-    Request(/* args */);
+    Request();
     ~Request();
+
 
     void setMethod(const std::string &m);
     void setURI(const std::string &u);

@@ -1,16 +1,33 @@
-#include "Parser/HTTP/HttpParser.hpp"
-#include "HTTP/Response.hpp"
-#include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
-#include <algorithm>
-#include <cstddef>
-#include <iostream>
-#include <string>
-#include <utility>
-#include <vector>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
+}
+
+const std::map<std::string, std::string>::iterator HttpParser::getHeaderValue(std::string header_key)
+{
+	return search(&this->request.getHeaders(), header_key);
+}
+
+void HttpParser::setChunkedEncoding(void) 
+{
+	const std::map<std::string, std::string>& headers = this->request.getHeaders();
+}
+
+bool HttpParser::parseContentLength(void)
+{
+	const std::map<std::string, std::string>& headers = this->request.getHeaders();
+
+	std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
+	if (it != headers.end())
+	{
+		this->targetBodySize = std::atoi(it->second.c_str());
+		this->request.getHttpRequest().content_length = this->targetBodySize;
+		return (true);
+	}
+	else if (this->request.getMethod() == "POST")
+		this->request.setcode(ContentLengthRequired);
+	return (false);
 }
 
 void HttpParser::handle()
@@ -66,18 +83,10 @@ void HttpParser::handle()
                 }
             }
         }
-		if (isHeaderValueExist("content-length"))
-		{
-			const std::map<std::string, std::string>& headers = this->request.getHeaders();
-			std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
-			if (it != headers.end())
-			{
-				this->targetBodySize = std::atoi(it->second.c_str());
-			    this->request.getHttpRequest().content_length = this->targetBodySize;
-			}
-			else if (this->request.getMethod() == "POST")
-				this->request.setcode(ContentLengthRequired);
-		}
+		// TODO: Check for Content-Encoding
+		// this->fetch()
+		this->parseContentLength();
+
 		this->currentState = READY;
     }
 }

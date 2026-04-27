@@ -1,6 +1,7 @@
 #include <Server.hpp>
 
 Request::Request() {
+	this->request.ischunked = false;
 	this->request.isbadrequest = false;
 	this->request.code = NO_CODE;
 };

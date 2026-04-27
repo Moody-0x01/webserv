@@ -1,5 +1,7 @@
 #include <Server.hpp>
 #include <cstddef>
+#include <map>
+#include <string>
 #include <unistd.h>
 #include <fcntl.h>           /* Definition of AT_* constants */
 #include <unistd.h>
@@ -233,4 +235,9 @@ std::string collect(std::vector<char> &vector, size_t end)
 	for (size_t i = 0; (i < end) && (i < vector.size()); ++i)
 		result.push_back(vector[i]);
 	return (result);
+}
+
+const std::map<std::string, std::string>::iterator search(std::map<std::string, std::string> &map, std::string target)
+{
+	return (map.find(target));
 }
