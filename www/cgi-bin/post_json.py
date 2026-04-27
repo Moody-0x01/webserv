@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
 import sys
-import requests
-import time
-import json
+import os
 
-json_data = input("")
+# 1. Get the expected size from the environment variables set by your C++ server
+content_length = int(os.environ.get('CONTENT_LENGTH', 0))
 
-sys.stderr.buffer.write("Got from client: ", json_data)
-sys.stdout.buffer.write(b"Status: 200 OK\r\n")
-sys.stdout.buffer.write(b"Content-Type: text/html\r\n")
-sys.stdout.buffer.write(b"\r\n") # End of headers
+# 2. Read EXACTLY that many bytes from stdin
+# sys.stdin.read() is better for text, sys.stdin.buffer.read() for binary
+if content_length > 0:
+    json_data = sys.stdin.read(content_length)
+else:
+    json_data = ""
 
-# Sending the body
-body = f"<h1> Json </h1><p> {json_data} </p>"
-sys.stdout.buffer.write(body.encode())
-sys.stdout.buffer.flush()
+# Log to your stderr file
+print(f"Got from client[{len(json_data)}]: {json_data[:50]}...", file=sys.stderr)
+
+# 3. Send headers
+sys.stdout.write("Status: 200 OK\r\n")
+sys.stdout.write("Content-Type: text/html\r\n\r\n")
+
+# 4. Send body
+body = f"<h1> Json </h1><p> data recv size: {len(json_data)} </p>"
+body += f"<h1> Json </h1><p> data recv size: {json_data} </p>"
+sys.stdout.write(body)
+sys.stdout.flush()

@@ -11,8 +11,8 @@
 # include <HTTP/Request.hpp>
 
 typedef enum socket_mode_e {
-	READING = EPOLLIN | EPOLLRDHUP | EPOLLERR,
-	WRITING = EPOLLOUT | EPOLLHUP  | EPOLLERR,
+	READING = EPOLLIN,
+	WRITING = EPOLLOUT,
 	QUIETMODE = EPOLLRDHUP | EPOLLERR,
 } socket_mode_t;
 
