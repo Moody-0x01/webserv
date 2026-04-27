@@ -200,7 +200,7 @@ void Cgi::read() __THROWS_STRERROR
 
 	if (this->state == DONE)
 		return ;
-	if (this->state == ReadingBody && this->client_body_buffer.size() >= 1024 * 8) // 64KB
+	if (this->state == ReadingBody && this->client_body_buffer.size() >= READ_CHUNK_SIZE) // 64KB
 		return ;
 	std::memset(buffer, 0, sizeof(buffer));
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
@@ -243,6 +243,7 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 {
 	time_t now;
 
+	// Well... since the cgi can block.. checking if it blocked means checking that the cgi did not send anything for a while. instead of just 
 	now = time(NULL);
 	if (now < 0)
 	{
@@ -260,6 +261,7 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	// Note: Check timeout...
+	this->start_time = time(NULL);
 	try {
 		if (e & EPOLLIN)
             this->read(); 

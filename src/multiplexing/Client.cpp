@@ -56,7 +56,7 @@ void Client::parse_request() __THROWS_STRERROR
 
 		if (this->response.getstage() == SendingResource) {
 			push_into_buffer(this->_buffer, buff, count);
-			if (this->_buffer.size() >= READ_CHUNK_SIZE * 2)
+			if (this->_buffer.size() >= READ_CHUNK_SIZE)
 				this->switch_mode(WRITING);
 		} else if (this->response.getstage() == ProcessingCgi) {	
 			cgi_instance.append_into_cgi_body_buffer(buff, count);
