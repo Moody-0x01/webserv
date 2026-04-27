@@ -243,7 +243,6 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 {
 	time_t now;
 
-	// Well... since the cgi can block.. checking if it blocked means checking that the cgi did not send anything for a while. instead of just 
 	now = time(NULL);
 	if (now < 0)
 	{
@@ -268,19 +267,9 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
         if (e & EPOLLOUT)
             this->write();
         if (e & EPOLLHUP)
-		{
-			// I can not read from cgi anymore. this is an internal server error and cgi should be marked as done
-			// if the headers are not sent yet then we should send internal server error.
-			// else just hangup and thas it.
             this->done();
-		}
         if (e & EPOLLRDHUP)
-		{
-			// I can not write body to connexion anymore..
-			// if I did not send any heades then it makes sense to just send internal server error.
             this->done();
-		}
-
 		if (e & EPOLLERR)
             this->done();
 	} catch (const char *e) {

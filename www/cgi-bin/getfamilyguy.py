@@ -14,13 +14,11 @@ try:
         sys.stdout.buffer.write(b"Content-Type: video/mp4\r\n")
         sys.stdout.buffer.write(b"\r\n") # End of headers
         sys.stdout.buffer.flush()
-        # Stream the chunks directly to the server
         for chunk in response.iter_content(chunk_size=4096):
             if chunk:
                 sys.stdout.buffer.write(chunk)
                 sys.stdout.buffer.flush()
     else:
-        # Proper error status if the download fails
         sys.stdout.buffer.write(b"Status: 502 Bad Gateway\r\n\r\n")
         sys.stdout.buffer.write(b"Remote source returned error.")
 
