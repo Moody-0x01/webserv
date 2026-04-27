@@ -22,6 +22,7 @@ extern char **environ;
 # define CGI_READ_END  0
 # define CGI_WRITE_END 1
 # define SCRIPT_TIMEOUT 5
+# define MAX_HEADERS_SIZE (4096 * 2)
 
 typedef struct Cgi: public ASocketContext
 {

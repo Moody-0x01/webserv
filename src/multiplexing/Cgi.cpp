@@ -71,6 +71,15 @@ void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 		this->cgi_done = true;
 		return ;
 	}
+	// Note: if the cgi is chunked. then instead of just sending. send 
+	// size | \r\n | body
+	// to do:
+	//     1) read the size first. then in the next epoll event read the actually chunk.
+	//     2) If I need to send.
+
+	//         SEND_SIZE
+	//         SEND_CHUNCK (Max is WRITE_CHUNK_SIZE)
+
 	push_into_buffer(this->client_body_buffer, buffer, size);
 	this->client_read_bytes += size; 
 	if (this->cgi_content_length == -1)
@@ -88,6 +97,7 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer, ssize_t size)
 		this->client_done = true;
 		return ;
 	}
+	// TODO: If the request is chunked then it makes more since to read the size then the data...
 	push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
 
@@ -230,8 +240,7 @@ void Cgi::read() __THROWS_STRERROR
 				this->close_read();
 		} break;
 		case ReadingBody: {
-			this->append_into_client_body_buffer(buffer, read_from_cgi);
-			
+			this->append_into_client_body_buffer(buffer, read_from_cgi);	
 			if (this->cgi_done) {
 				this->close_read();
 			}
@@ -482,10 +491,7 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	if (this->headers.find("content-type") == this->headers.end()) 
 		this->headers["content-type"] = TextHtml;
 	if (this->headers.find("content-length") == this->headers.end()) 
-	{
-		/*  this->headers["Transfer-Encoding"] = "chunked";  */
 		return ;
-	}
 	std::stringstream ss(this->headers.at("content-length"));
 	ss << this->cgi_content_length;
 }
