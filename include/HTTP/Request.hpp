@@ -5,8 +5,8 @@
 #include <sys/types.h>
 #include <vector>
 
-#define  READ_CHUNK_SIZE      4096
-#define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE // 4kb each time.
+#define  READ_CHUNK_SIZE      1024 * 64
+#define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
 #define  NO_CODE 999
 
 typedef struct HttpRequest {
