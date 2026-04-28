@@ -1,0 +1,11 @@
+Tests & Assignments:
+Disc:
+-- If You Found any problem that you are not responsible for put here the exact test that fails and put the nickname of who is responsible for the fix --
+
+example:
+disc: bug in GET for URI encoding
+test: GET /%20%20ind.html gives 404 while the file '  ind.html' exists
+who: Ameen (go back to work nigga)
+state: Solved
+
+use your freedom of moving to move in cluster and slap who is responsible for the bug.
