@@ -241,3 +241,33 @@ const std::map<std::string, std::string>::const_iterator search(const std::map<s
 {
 	return (map.find(target));
 }
+
+std::string url_decode(const std::string &encoded)
+{
+	std::string decoded;
+	decoded.reserve(encoded.size());
+
+	for (size_t i = 0; i < encoded.size(); ++i)
+	{
+		if (encoded[i] == '%' && i + 2 < encoded.size())
+		{
+			std::string hex = encoded.substr(i + 1, 2);
+			char *end_ptr = NULL;
+			long value = std::strtol(hex.c_str(), &end_ptr, 16);
+
+			if (end_ptr == hex.c_str() + 2 && value >= 0 && value <= 255)
+			{
+				decoded += static_cast<char>(value);
+				i += 2;
+			}
+			else
+				decoded += encoded[i];
+		}
+		else if (encoded[i] == '+')
+			decoded += encoded[i];
+		else
+			decoded += encoded[i];
+	}
+
+	return decoded;
+}

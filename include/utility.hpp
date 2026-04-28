@@ -10,6 +10,7 @@ std::vector<std::string> split(std::string str, char delim);
 std::vector<std::string> split(std::string str, std::string delim);
 std::vector<std::string> split(std::vector<char> str, std::string delim);
 
+std::string url_decode(const std::string &encoded);
 std::string get_signal_name(int sig);
 
 int set_nonblocking(int sockfd);

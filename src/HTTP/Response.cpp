@@ -668,7 +668,8 @@ const UriResolutionResult &Response::get_resolved_results(void) const
 UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 {
 	UriResolutionResult resolved;
-	resolved.request_path = request.uri.empty() ? "/" : request.uri;
+	std::string decoded_uri = url_decode(request.uri.empty() ? "/" : request.uri);
+	resolved.request_path = decoded_uri;
 	resolved.filesystem_path = resolved.request_path;
 
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
