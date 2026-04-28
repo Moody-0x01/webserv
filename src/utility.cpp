@@ -237,7 +237,7 @@ std::string collect(std::vector<char> &vector, size_t end)
 	return (result);
 }
 
-const std::map<std::string, std::string>::iterator search(std::map<std::string, std::string> &map, std::string target)
+const std::map<std::string, std::string>::const_iterator search(const std::map<std::string, std::string> &map, std::string target)
 {
 	return (map.find(target));
 }

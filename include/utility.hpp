@@ -25,4 +25,4 @@ bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer);
 void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size);
 std::string collect(std::vector<char> &vector, size_t end);
 std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);
-const std::map<std::string, std::string>::iterator search(std::map<std::string, std::string> &map, std::string target);
+const std::map<std::string, std::string>::const_iterator search(const std::map<std::string, std::string> &map, std::string target);

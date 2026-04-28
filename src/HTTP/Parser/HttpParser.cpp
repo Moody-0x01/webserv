@@ -4,9 +4,9 @@ HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), ta
 {
 }
 
-const std::map<std::string, std::string>::iterator HttpParser::getHeaderValue(std::string header_key)
+header_iterator HttpParser::getHeaderValue(std::string header_key)
 {
-	return search(&this->request.getHeaders(), header_key);
+	return search(this->request.getHeaders(), header_key);
 }
 
 void HttpParser::setChunkedEncoding(void) 
