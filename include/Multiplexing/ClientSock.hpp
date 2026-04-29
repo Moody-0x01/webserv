@@ -18,6 +18,7 @@ public:
 	void switch_mode(socket_mode_t mode) __THROWS_STRERROR;
 	void set_owner(int owner);
 	int  get_owner(void) const;
+	void unchunkify_buffer(void);
 
 	void setip(std::string address);
 	void setip_from_bytes(uint32_t ip_bytes);

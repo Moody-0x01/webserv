@@ -1,33 +1,74 @@
 #include <Server.hpp>
+#include <string>
+#include <unistd.h>
+#include <utility>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
 }
 
-header_iterator HttpParser::getHeaderValue(std::string header_key)
+ChunkContext::ChunkContext() : hex(""), status(CHUNK_START), remaining(0), prev(0)  {}
+
+std::pair<bool, std::string> HttpParser::getHeaderValue(std::string header_key)
 {
-	return search(this->request.getHeaders(), header_key);
+	return get_value(this->request.getHeaders(), header_key);
 }
 
-void HttpParser::setChunkedEncoding(void) 
+void ChunkContext::strip_delimeter(std::vector<char> &data, ChunkStatus new_state, size_t index)
 {
-	const std::map<std::string, std::string>& headers = this->request.getHeaders();
-}
-
-bool HttpParser::parseContentLength(void)
-{
-	const std::map<std::string, std::string>& headers = this->request.getHeaders();
-
-	std::map<std::string, std::string>::const_iterator it = headers.find("content-length");
-	if (it != headers.end())
+	if (index < data.size())
 	{
-		this->targetBodySize = std::atoi(it->second.c_str());
-		this->request.getHttpRequest().content_length = this->targetBodySize;
+		if (prev == '\r')
+		{
+			if (data[index] == '\n') {
+				this->status = new_state;
+				index++;
+				prev = 0; // Stripped
+			} else
+				this->status = CHUNK_ERROR; // Malformed chunk, expected \n after \r
+		}
+		if (data[index] == '\r') index++;
+		if (index >= data.size() || (data[index] != '\n'))
+			prev = '\r'; // Not yet found \n
+		else
+			index++; // Stripped
+	}
+	if (index <= data.size())
+		data.erase(data.begin(), data.begin() + index);
+}
+
+void ChunkContext::convert_remaining_into_hex()
+{
+	std::stringstream ss;
+	unsigned long size;
+
+	ss << std::hex << this->hex;
+	if (!(ss >> size))
+		this->status = CHUNK_ERROR;
+}
+
+bool HttpParser::setChunkedEncoding(void) 
+{
+	std::pair<bool, std::string> pair = this->getHeaderValue("content-encoding");
+	if (pair.first)
+	{
+		this->request.getHttpRequest().ischunked = (pair.second == "chunked");
 		return (true);
 	}
-	else if (this->request.getMethod() == "POST")
-		this->request.setcode(ContentLengthRequired);
 	return (false);
+}
+
+void HttpParser::parseContentLength(void)
+{
+
+	std::pair<bool, std::string> pair = this->getHeaderValue("content-length");
+
+	if (pair.first)
+	{
+		this->targetBodySize = std::atoi(pair.second.c_str());
+		this->request.getHttpRequest().content_length = this->targetBodySize;
+	}
+	this->request.setcode(ContentLengthRequired);
 }
 
 void HttpParser::handle()
@@ -83,10 +124,11 @@ void HttpParser::handle()
                 }
             }
         }
-		// TODO: Check for Content-Encoding
-		// this->fetch()
-		this->parseContentLength();
-
+		if (this->request.getMethod() == "POST") {
+			if (!this->setChunkedEncoding())
+				this->parseContentLength();
+				
+		}
 		this->currentState = READY;
     }
 }

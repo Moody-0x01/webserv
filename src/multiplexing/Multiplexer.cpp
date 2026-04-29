@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <cstdlib>
 #include <strings.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
@@ -35,8 +36,6 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 {
 	if (this->epoll_fd < 0)
 		throw std::strerror(errno);
-	this->signal_io[STDOUT_FILENO] = -1;
-	this->signal_io[STDIN_FILENO ] = -1;
 	Response::init_status_lines();
 	Response::init_mimes();	
 	try {
@@ -46,10 +45,16 @@ Multiplexer::Multiplexer() __THROWS_STRERROR: epoll_fd(epoll_create(IGNORED))
 	}
 }
 
+void Multiplexer::abort(void)
+{
+	this->aborted = true;
+}
+
 void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *)
 {
 	size_t alive;
 
+	this->aborted = false;
 	alive = 0;
 	for (size_t c = 0; c < confs.size(); c++)
 	{
@@ -66,25 +71,9 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 
 void Multiplexer::init_signals(void) __THROWS_STRERROR
 {
-    struct epoll_event event;
-    int code;
-
-    if (pipe(this->signal_io) < 0)			 throw strerror(errno);
-    if (set_nonblocking(this->signal_io[0])) throw strerror(errno);
-    if (set_nonblocking(this->signal_io[1])) throw strerror(errno);
-
-    event.events = EPOLLIN;
-    event.data.ptr = this->signal_io; 
-    code = epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, 
-                    this->signal_io[0], &event);
-    if (code < 0) throw strerror(errno);
-
-    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)         throw strerror(errno);
-    if (signal(SIGINT,  signal_handler) == SIG_ERR)  throw strerror(errno);
-    if (signal(SIGTERM, signal_handler) == SIG_ERR)  throw strerror(errno);
-    if (signal(SIGHUP,  signal_handler) == SIG_ERR)  throw strerror(errno);
-    if (signal(SIGQUIT, signal_handler) == SIG_ERR) throw strerror(errno);
-	if (signal(SIGCHLD, sigpipe_handler) == SIG_ERR)  throw strerror(errno);	
+	this->signal_handler.init();
+	this->signal_handler.epoll_register(this->epoll_fd);
+	this->signal_handler.setup_signal_handlers();
 }
 
 static std::string resolve_host(const std::string &host)
@@ -102,7 +91,6 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 	struct addrinfo hints, *res;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	conf.host = resolve_host(conf.host);
 	std::memset(&hints, 0, sizeof(hints));
     hints.ai_family   = AF_INET;
@@ -151,7 +139,6 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	(void)e;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 
 	len = sizeof(addr);
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
@@ -177,7 +164,6 @@ void Multiplexer::unregister_client(int owner, int client) __THROWS_STRERROR
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	self->servers[owner].second
 		.erase(client);
 }
@@ -189,7 +175,6 @@ void unregister_fd(int fd)
 
 	if (fd >= 0) {
 		self = Multiplexer::get_multiplexer(NULL);
-		if (!self) throw "Well, failed to get a Multiplexer class";
 		epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, fd, &dummy);
 		close(fd);
 	}
@@ -203,16 +188,12 @@ Multiplexer::~Multiplexer()
 void Multiplexer::deinit(void)
 {
 	close(this->epoll_fd);
-	if (this->signal_io[0] != -1)
-		close(this->signal_io[0]);
-	if (this->signal_io[1] != -1)
-		close(this->signal_io[1]);
 }
 
 int Multiplexer::run(void)
 {
-	Multiplexer::introduce_new_context((uint64_t)this->signal_io);
-    while (this->servers.size())
+	Multiplexer::introduce_new_context((uint64_t)&this->signal_handler);
+    while (this->servers.size() && !this->aborted)
 	{
 		int ready = epoll_wait(this->epoll_fd,
 						 this->events, EVENT_MAX, 100);
@@ -222,37 +203,25 @@ int Multiplexer::run(void)
 			std::cerr << "[ Multiplexer::loop ] epoll_wait: " << strerror(errno) << "\n";
 			return 1;
 		}
-		for (int index = 0; index < ready && (this->servers.size()); ++index)
-			if (!this->execute_epoll_event(index)) return (1);
+		for (int index = 0; index < ready && (this->servers.size()) && !this->aborted; ++index)
+			this->execute_epoll_event(index);
     }
-	return (0);
+	return (this->aborted ? 0 : 1);
 }
 
-bool Multiplexer::execute_epoll_event(int epoll_index)
+void Multiplexer::execute_epoll_event(int epoll_index)
 {
 	void *ptr;
-	int   sig;
 
 	ptr = this->events[epoll_index].data.ptr;
 	if (!this->iscontext_valid((uint64_t)ptr))
-		return (true);
-	if (ptr == this->signal_io)
-	{
-		(void)read(this->signal_io[0], &sig, sizeof(sig));
-		if (sig == SIGCHLD)
-			return (true);
-		std::cerr << "[ Multiplexer::loop ] Encountered " << get_signal_name(sig) << "\n";
-		return (false);
+		return ;
+	ASocketContext *handle = (ASocketContext *)ptr;
+	try {
+		handle->action(this->events[epoll_index].events);
+	} catch (const char *error) {
+		std::cerr << "[ handle->action ] " << error << "\n";
 	}
-	else {
-		ASocketContext *handle = (ASocketContext *)ptr;
-		try {
-			handle->action(this->events[epoll_index].events);
-		} catch (const char *error) {
-			std::cerr << "[ handle->action ] " << error << "\n";
-		}
-	}
-	return (true);
 }
 
 ssize_t Multiplexer::read(int fd, void *buf, size_t size) __THROWS_STRERROR
@@ -274,7 +243,6 @@ void Multiplexer::introduce_new_context(uint64_t context)
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	self->_valid_context.insert(context);
 }
 
@@ -283,7 +251,6 @@ void   Multiplexer::unintroduce_context(uint64_t context)
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	self->_valid_context.erase(context);
 }
 
@@ -292,6 +259,13 @@ bool   Multiplexer::iscontext_valid(uint64_t context)
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	return (self->_valid_context.find(context) != self->_valid_context.end());
+}
+
+void Multiplexer::kill(void)
+{
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	self->abort();
 }
