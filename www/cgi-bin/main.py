@@ -3,7 +3,7 @@
 import os
 import time
 
-time.sleep(100)
+# time.sleep(100)
 print("Content-Type: text/html")
 print("Status: 200 OK")
 print()  # blank line = end of headers

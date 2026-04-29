@@ -6,12 +6,13 @@
 # include <string>
 # include <stdint.h>
 
+typedef const std::map<std::string, std::string>::const_iterator map_iterator;
+
 std::vector<std::string> split(std::string str, char delim);
 std::vector<std::string> split(std::string str, std::string delim);
 std::vector<std::string> split(std::vector<char> str, std::string delim);
 
 std::string url_decode(const std::string &encoded);
-std::string get_signal_name(int sig);
 
 int set_nonblocking(int sockfd);
 void signal_handler(int sig);
@@ -26,4 +27,5 @@ bool epoll_switch(int epoll_fd, int fd, uint32_t mask, void *pointer);
 void push_into_buffer(std::vector<char> &buff, const char *src, ssize_t size);
 std::string collect(std::vector<char> &vector, size_t end);
 std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);
-const std::map<std::string, std::string>::const_iterator search(const std::map<std::string, std::string> &map, std::string target);
+map_iterator search(const std::map<std::string, std::string> &map, std::string target);
+std::pair<bool, std::string> get_value(const std::map<std::string, std::string> &map, std::string target);

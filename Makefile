@@ -9,7 +9,7 @@ RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/ASocketContext.cpp \
 	$(SOURCE_DIR)/multiplexing/Server.cpp $(SOURCE_DIR)/multiplexing/Client.cpp\
-	$(SOURCE_DIR)/HTTP/Parser/Lexer.cpp \
+	$(SOURCE_DIR)/HTTP/Parser/Lexer.cpp $(SOURCE_DIR)/multiplexing/SignalHandler.cpp\
 	$(SOURCE_DIR)/HTTP/Parser/HttpParser.cpp  $(SOURCE_DIR)/HTTP/Request.cpp $(SOURCE_DIR)/HTTP/Response.cpp \
 	$(SOURCE_DIR)/HTTP/Resource.cpp \
 	$(SOURCE_DIR)/Config/Lexer.cpp $(SOURCE_DIR)/Config/ConfigParser.cpp\

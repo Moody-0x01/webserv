@@ -3,6 +3,7 @@
 #include <stdint.h>
 # include <unistd.h>
 # include "ServerSock.hpp"
+#include "SignalHandler.hpp"
 # include <cstddef>
 # include <Multiplexing/ClientSock.hpp>
 # include <map>
@@ -37,16 +38,16 @@ class Multiplexer {
 private:
 	Multiplexer() __THROWS_STRERROR;
 	std::set<uint16_t> _valid_context;
+	bool aborted;
 
 public:
-
 	EpollEvent events[EVENT_MAX];
 	
 	std::map<int, ServerConfig> confs;
 	std::map<int, std::pair<Server, Clients> > servers;
 
 	const int epoll_fd;
-	int signal_io[2];
+	SignalHandler signal_handler;
 
 	~Multiplexer();
 	void   init(std::vector<ServerConfig> &confs) throw(std::runtime_error, const char *);
@@ -54,8 +55,10 @@ public:
 	void   deinit(void);
 	void   init_signals(void) __THROWS_STRERROR;
 	Server *get_owner(int fd) __THROWS_STRERROR;
-	bool   execute_epoll_event(int epoll_index);
+	void   execute_epoll_event(int epoll_index);
+	void   abort(void);
 
+	static void         kill(void);
 	static void			introduce_new_context(uint64_t context);
 	static void			unintroduce_context(uint64_t context);
 	static bool			iscontext_valid(uint64_t context);

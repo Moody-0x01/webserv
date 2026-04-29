@@ -93,38 +93,20 @@ int set_nonblocking(int sockfd)
     return 0;
 }
 
-std::string get_signal_name(int sig)
-{
-    static std::map<int, std::string> sig_map;
-
-    sig_map[SIGINT]  =  "SIGINT (Interrupt)";
-    sig_map[SIGTERM] =  "SIGTERM (Termination)";
-    sig_map[SIGHUP]  =  "SIGHUP (Hangup/Reload)";
-    sig_map[SIGUSR1] =  "SIGUSR1 (User Defined 1)";
-    sig_map[SIGUSR2] =  "SIGUSR2 (User Defined 2)";
-    sig_map[SIGQUIT] =  "SIGQUIT (Quit/Core Dump)";
-    if (sig_map.count(sig)) return sig_map[sig];
-    return "Unknown Signal";
-}
-
 void signal_handler(int sig)
 {
-	unsigned char* data;
     int saved_errno = errno;
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-	data = (unsigned char*)&sig;
-    write(self->signal_io[1],
-		data,
-		sizeof(int));
+	self->signal_handler.write_signal(sig);
     errno = saved_errno;
 }
 
 void sigpipe_handler(int sig)
 {
-	signal_handler(sig);	
+	signal_handler(sig);
 	while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
@@ -237,9 +219,17 @@ std::string collect(std::vector<char> &vector, size_t end)
 	return (result);
 }
 
-const std::map<std::string, std::string>::const_iterator search(const std::map<std::string, std::string> &map, std::string target)
+map_iterator search(const std::map<std::string, std::string> &map, std::string target)
 {
 	return (map.find(target));
+}
+
+std::pair<bool, std::string> get_value(const std::map<std::string, std::string> &map, std::string target)
+{
+	map_iterator ref = search(map, target);
+	if (ref != map.end())
+		return std::make_pair(false, "");
+	return std::make_pair(true, ref->second);
 }
 
 std::string url_decode(const std::string &encoded)

@@ -1,10 +1,11 @@
 #include <Server.hpp>
+#include <cctype>
+#include <cstdlib>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 
-HttpParser &Client::getParser(void)
-{
+HttpParser &Client::getParser(void) {
 	return this->parserInstance;
 }
 
@@ -40,30 +41,60 @@ void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
 		throw strerror(errno);
 }
 
+void Client::unchunkify_buffer(void)
+{
+	HttpRequest  &request = this->getParser().getRequestObject().getHttpRequest();
+	ChunkContext &chunk = request.chunked_context;
+	size_t       hex_size;
+	
+	if (!request.ischunked)
+		return ; // Not chunked, nothing to do.
+
+	if (request.chunked_context.status == CHUNK_START || request.chunked_context.status == CHUNK_SIZE) {
+		hex_size = 0;
+		while (isxdigit(this->_buffer[hex_size]))
+			chunk.hex.push_back(this->_buffer[hex_size++]);
+		chunk.strip_delimeter(this->_buffer, CHUNK_DATA, hex_size);
+		if (chunk.status == CHUNK_DATA)
+			chunk.convert_remaining_into_hex();
+	}
+	if (request.chunked_context.status == CHUNK_DATA) {
+		if (chunk.remaining == 0) {
+			chunk.status = CHUNK_COMPLETE;
+			return ;
+		}
+		size_t to_copy = std::min(chunk.remaining, this->_buffer.size());
+		chunk.remaining -= to_copy;
+	}
+}
+
 void Client::parse_request() __THROWS_STRERROR
 {
+	Multiplexer *self;
+	ssize_t      count;
+	char         buff[READ_CHUNK_SIZE];
+
 	int conn = this->get_socket();
 	HttpParser &clientP = this->getParser();
 	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
-	Multiplexer *self;
-	char buff[READ_CHUNK_SIZE];
 
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 
 	try {
-		ssize_t count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
+		count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
+		push_into_buffer(this->_buffer, buff, count); // Read..
 
+		if (clientP.state() == READY)
+			this->unchunkify_buffer(); // Unchunkify if needed..
 		if (this->response.getstage() == SendingResource) {
-			push_into_buffer(this->_buffer, buff, count);
 			if (this->_buffer.size() >= READ_CHUNK_SIZE)
 				this->switch_mode(WRITING);
 		} else if (this->response.getstage() == ProcessingCgi) {	
-			cgi_instance.append_into_cgi_body_buffer(buff, count);
+			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), count);
 			if (cgi_instance.client_done)
 				this->switch_mode(WRITING);
 		} else {
-			push_into_buffer(this->_buffer, buff, count);
 			clientP.handle();
 			if (clientP.state() == READY)
 				this->switch_mode(WRITING);
