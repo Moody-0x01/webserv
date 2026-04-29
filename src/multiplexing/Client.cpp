@@ -49,10 +49,10 @@ void Client::unchunkify_buffer(void)
 	
 	if (!request.ischunked)
 		return ; // Not chunked, nothing to do.
-
+	
 	if (request.chunked_context.status == CHUNK_START || request.chunked_context.status == CHUNK_SIZE) {
 		hex_size = 0;
-		while (isxdigit(this->_buffer[hex_size]))
+		while (hex_size < this->_buffer.size() && isxdigit(this->_buffer[hex_size]))
 			chunk.hex.push_back(this->_buffer[hex_size++]);
 		chunk.strip_delimeter(this->_buffer, CHUNK_DATA, hex_size);
 		if (chunk.status == CHUNK_DATA)
@@ -63,8 +63,6 @@ void Client::unchunkify_buffer(void)
 			chunk.status = CHUNK_COMPLETE;
 			return ;
 		}
-		size_t to_copy = std::min(chunk.remaining, this->_buffer.size());
-		chunk.remaining -= to_copy;
 	}
 }
 
