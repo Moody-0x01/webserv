@@ -19,6 +19,7 @@ struct LocationConfig;
 #define  NotFound             404
 #define  MethodNotAllowed     405
 #define  ContentLengthRequired 411
+#define  RequestEntityTooLarge 413
 #define  RequestTimeout       408
 #define  InternalServerError  500
 #define  NotImplemented       501
@@ -131,7 +132,8 @@ private:
 
 	int status;
 	const HttpRequest *request_ptr;
-	// Will be generated last after headers and opening the file resource
+    size_t             client_max_body_size;
+
 	std::string status_line; // HTTP/1.0 Code Message
 	// isfile?
 
@@ -158,6 +160,7 @@ public:
 	static std::map<int, std::string> status_lines;
 	static void init_status_lines();
 
+	void setup_max_body_size(const int owner);
 	void send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);

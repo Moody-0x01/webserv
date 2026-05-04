@@ -30,6 +30,7 @@ enum ConfigParserState {
 };
 
 struct LocationConfig {
+
     std::string                         uri;
     std::string                         root;
     std::string                         index;

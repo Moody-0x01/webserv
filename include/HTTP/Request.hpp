@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+#include <stdint.h>
 #include <sstream>
 #include <string>
 #include <map>
@@ -7,27 +9,46 @@
 #include <vector>
 
 typedef const std::map<std::string, std::string>::const_iterator map_iterator;
-#define  READ_CHUNK_SIZE      1024 * 64
-#define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
-#define  NO_CODE 999
+# define  READ_CHUNK_SIZE      1024 * 64
+# define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
+# define  NO_CODE 999
+# define CR '\r'
+# define LF '\n'
+// # define CRLF "\r\n"
+typedef uint8_t ChunkStatusBit;
 
-enum ChunkStatus {
-    CHUNK_START,      // Initial state, ready to find hex size
-    CHUNK_SIZE,       // Currently reading the hex string (e.g., "1A\r\n")
-    CHUNK_DATA,       // Currently reading the actual payload
-    CHUNK_TRAILER,    // Waiting for the final \r\n after the data
-    CHUNK_COMPLETE,   // Hit the 0\r\n\r\n; ready to send response
-    CHUNK_ERROR       // Malformed chunk detected
-};
+# define CHUNK_START     1  <<  0  //  0000 | 0001
+# define CHUNK_SIZE      1  <<  1  //  0000 | 0010
+# define CHUNK_DATA      1  <<  2  //  0000 | 0100
+# define CHUNK_TRAILER   1  <<  3  //  0000 | 1000
+# define CHUNK_COMPLETE  1  <<  4  //  0001 | 0000
+# define CHUNK_ERROR     1  <<  5  //  0010 | 0000
+// # define CHUNK_EXT       1  <<  6  //  0100 | 0000
 
 typedef struct ChunkContext {
-	std::string    hex;
-    ChunkStatus    status;            // Current position in the state machine
-    unsigned long  remaining; // Bytes left to read in the CURRENT chunk 
+	std::string       hex;
+    ChunkStatusBit    status_mask; // Current position in the state machine
+    unsigned long     remaining;   // Bytes left to read in the CURRENT chunk 
 							       // Cursor??	
-	char        prev;
-	void strip_delimeter(std::vector<char> &data, ChunkStatus new_state, size_t index);
+	unsigned long     cursor;
+	char              prev;
+	std::vector<char> chunk_data;
+
 	void convert_remaining_into_hex(void);
+
+	bool is_reading_size(void);
+	bool is_reading_data(void);
+	bool is_done(void);
+	bool is_reading_crlf(void);
+
+	void consume_chunk_data(std::vector<char> &buffer);
+	void consume_chunk_size(std::vector<char> &buffer);
+	void skip_crlf(std::vector<char> &buffer);
+
+	void strip_trailer(std::vector<char> &data, size_t offset);
+	void unpack(std::vector<char> &buffer);
+	void log_buffer(std::vector<char> &buffer);
+
     ChunkContext();
 } ChunkContext;
 

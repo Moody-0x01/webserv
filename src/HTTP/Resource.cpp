@@ -69,7 +69,9 @@ int Resource::open(const std::string &path)
 
 Resource::~Resource()
 {
-	if (this->__rstream) delete (this->__rstream);
+	if (this->__rstream) {
+		delete (this->__rstream);
+	}
 }
 
 bool Resource::isdone(void)

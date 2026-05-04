@@ -1,55 +1,172 @@
 #include <Server.hpp>
+#include <cstddef>
+#include <iostream>
 #include <string>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {
 }
 
-ChunkContext::ChunkContext() : hex(""), status(CHUNK_START), remaining(0), prev(0)  {}
+ChunkContext::ChunkContext() : hex(""), status_mask(CHUNK_START), remaining(0), cursor(0), prev(0)  {}
 
 std::pair<bool, std::string> HttpParser::getHeaderValue(std::string header_key)
 {
 	return get_value(this->request.getHeaders(), header_key);
 }
 
-void ChunkContext::strip_delimeter(std::vector<char> &data, ChunkStatus new_state, size_t index)
+bool ChunkContext::is_reading_size(void)
 {
-	if (index < data.size())
+	return (this->status_mask & CHUNK_START || this->status_mask & CHUNK_SIZE);
+}
+
+bool ChunkContext::is_reading_data(void)
+{
+	return (this->status_mask & CHUNK_DATA);
+}
+
+bool ChunkContext::is_reading_crlf(void)
+{
+	return (this->status_mask & CHUNK_TRAILER);
+}
+
+bool ChunkContext::is_done(void)
+{
+	return (this->status_mask & CHUNK_COMPLETE);
+}
+
+void ChunkContext::log_buffer(std::vector<char> &buffer)
+{
+	std::cout << "|";
+	for (size_t i = 0; i < buffer.size(); i++)
 	{
-		if (prev == '\r')
-		{
-			if (data[index] == '\n') {
-				this->status = new_state;
-				index++;
-				prev = 0; // Stripped
-			} else
-				this->status = CHUNK_ERROR; // Malformed chunk, expected \n after \r
-		}
-		if (data[index] == '\r') index++;
-		if (index >= data.size() || (data[index] != '\n'))
-			prev = '\r'; // Not yet found \n
+		if (buffer[i] == '\r')
+			std::cout << "\\r";
+		else if (buffer[i] == '\n')
+			std::cout << "\\n";
 		else
-			index++; // Stripped
+			std::cout << buffer[i];
 	}
-	if (index <= data.size())
-		data.erase(data.begin(), data.begin() + index);
+	std::cout << "|\n";
+}
+
+void ChunkContext::skip_crlf(std::vector<char> &buffer)
+{
+	intptr_t  mask;
+
+	switch (buffer[this->cursor])
+	{
+		case CR: {
+			this->prev = buffer[this->cursor];
+		} break ;
+		case LF: {
+			if (!this->prev)
+			{
+				this->status_mask = CHUNK_ERROR; // Malformed chunk, expected \r\n after data, 500, BadRequest :(
+				return ;
+			}
+			if (this->status_mask & CHUNK_COMPLETE)
+			{
+				this->cursor++;
+				return ;
+			}
+			mask = -static_cast<intptr_t>(!!(this->status_mask & (CHUNK_SIZE | CHUNK_START)));
+			this->status_mask = (mask & CHUNK_DATA) | (~mask & CHUNK_SIZE);
+			this->prev = 0;			
+		} break ;
+		case ';': {
+			if (this->status_mask & (CHUNK_SIZE | CHUNK_START))
+				while (this->cursor < buffer.size() && buffer[this->cursor] != CR) this->cursor++;
+			return ;
+		} break ;
+		default: { this->status_mask = CHUNK_ERROR; } return ;
+	}
+	this->cursor++;
+}
+
+void ChunkContext::consume_chunk_size(std::vector<char> &buffer)
+{
+	size_t       hex_size;
+
+	hex_size = 0;
+	while (hex_size+this->cursor < buffer.size() && isxdigit(buffer[hex_size+this->cursor]))
+	{
+		this->hex.push_back(buffer[this->cursor+hex_size]);
+		hex_size++;
+	}
+	if (hex_size == 0)	
+	{
+		this->status_mask = CHUNK_ERROR; // Malformed chunk, expected hex size
+		return ;
+	}
+	this->cursor += hex_size;
+	if (this->cursor >= buffer.size())
+		return ;
+	this->convert_remaining_into_hex();
+	this->status_mask |= CHUNK_TRAILER;
+}
+
+void ChunkContext::consume_chunk_data(std::vector<char> &buffer)
+{
+	size_t to_read;
+
+	this->status_mask |= CHUNK_TRAILER;
+	if (this->remaining == 0)
+	{
+		this->status_mask |= CHUNK_COMPLETE;
+		return ;
+	}
+	to_read = std::min((size_t)(buffer.size() - this->cursor),
+		this->remaining);
+	for (size_t i = this->cursor; i < this->cursor + to_read; i++)
+		this->chunk_data.push_back(buffer[i]);
+
+	this->remaining -= to_read;
+	this->cursor    += to_read;
+}
+
+void ChunkContext::unpack(std::vector<char> &buffer)
+{
+	this->chunk_data.clear();
+	this->chunk_data.reserve(buffer.size());
+	while (this->cursor < buffer.size()
+			&& !(this->status_mask & (CHUNK_ERROR | CHUNK_COMPLETE)))
+	{
+		if (this->is_reading_crlf())
+		{
+			this->skip_crlf(buffer);
+			if (this->status_mask & CHUNK_COMPLETE)
+				break ;
+			continue ;
+		}
+		if (this->is_reading_size())
+		{
+			this->consume_chunk_size(buffer);
+			continue ;
+		}
+		if (this->is_reading_data())
+			this->consume_chunk_data(buffer);
+	}
+	if (this->status_mask & CHUNK_COMPLETE)
+		this->status_mask = CHUNK_COMPLETE;
+	buffer.swap(this->chunk_data);
 }
 
 void ChunkContext::convert_remaining_into_hex()
 {
 	std::stringstream ss;
-	unsigned long size;
 
 	ss << std::hex << this->hex;
-	if (!(ss >> size))
-		this->status = CHUNK_ERROR;
+	if (!(ss >> this->remaining))
+		this->status_mask = CHUNK_ERROR;
+	this->hex.clear();
 }
 
 bool HttpParser::setChunkedEncoding(void) 
 {
-	std::pair<bool, std::string> pair = this->getHeaderValue("content-encoding");
+	std::pair<bool, std::string> pair = this->getHeaderValue("transfer-encoding");
 	if (pair.first)
 	{
 		this->request.getHttpRequest().ischunked = (pair.second == "chunked");
@@ -67,6 +184,7 @@ void HttpParser::parseContentLength(void)
 	{
 		this->targetBodySize = std::atoi(pair.second.c_str());
 		this->request.getHttpRequest().content_length = this->targetBodySize;
+		return ;
 	}
 	this->request.setcode(ContentLengthRequired);
 }
@@ -80,7 +198,7 @@ void HttpParser::handle()
 		std::vector<char>::iterator it = search(parent->_buffer, "\r\n\r\n");
         if (it != parent->_buffer.end())
         {
-			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin() - 1);
+			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin());
             std::string headersOnly = collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);
@@ -127,7 +245,6 @@ void HttpParser::handle()
 		if (this->request.getMethod() == "POST") {
 			if (!this->setChunkedEncoding())
 				this->parseContentLength();
-				
 		}
 		this->currentState = READY;
     }
