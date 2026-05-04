@@ -99,7 +99,7 @@ static void apply_location_override(UriResolutionResult &resolved, const Locatio
 	if (!best_location->index.empty()) resolved.index = best_location->index;
 }
 
-static std::string build_filesystem_target(const UriResolutionResult &resolved, const std::string &relative_uri)
+static std::string build_filesystem_target(const UriResolutionResult &resolved, const std::string &relative_uri, const HttpRequest &request)
 {
 	std::string filesystem_path = join_fs_path(resolved.root, relative_uri);
 	if (!resolved.index.empty())
@@ -108,7 +108,7 @@ static std::string build_filesystem_target(const UriResolutionResult &resolved, 
 		if (relative_uri == "/") needs_index = true;
 		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
 			needs_index = true;
-		if (needs_index)
+		if (needs_index && request.method == "GET")
 			filesystem_path = join_fs_path(filesystem_path, resolved.index);
 	}
 	return filesystem_path;
@@ -689,7 +689,7 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	apply_location_override(resolved, best_location);
 
 	std::string relative_uri = compute_relative_uri(resolved.request_path, best_location);
-	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri);
+	resolved.filesystem_path = build_filesystem_target(resolved, relative_uri, request);
 
 	if (resolved.matched_location && !resolved.matched_location->return_loc.second.empty())
 	{
