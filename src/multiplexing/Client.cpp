@@ -101,7 +101,10 @@ void Client::parse_request() __THROWS_STRERROR
 			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
 					(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
 			if (cgi_instance.client_done || chunk.status_mask & CHUNK_COMPLETE)
+			{
+				std::cout << "Client is done with cgi body\n";
 				this->switch_mode(WRITING);
+			}
 		} else
 			this->switch_mode(WRITING);
 	} catch (const char *e) {

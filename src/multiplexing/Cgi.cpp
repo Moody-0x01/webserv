@@ -101,12 +101,10 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 	}
 	push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
-
 	if (this->cgi_read_bytes >= this->client_content_length)
 		this->client_done = true;
-	std::cout << "Chunk:      " << chunk << "\n";
-	std::cout << "Chunk.done: " << chunk->is_done() << "\n";
-	if (chunk && chunk->is_done()) this->client_done = true;
+	if (chunk && chunk->is_done())
+		this->client_done = true;
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -150,11 +148,9 @@ void Cgi::write() __THROWS_STRERROR
 	ssize_t sent;
 
 	if (this->cgi_body_buffer.size()) {
-		std::cout << "Sending buffer that has a size of: " << this->cgi_body_buffer.size() << "\n";
 		sent = Multiplexer::write(this->streams[CGI_WRITE_END],
 					&this->cgi_body_buffer[0],
 					std::min((unsigned long)WRITE_CHUNK_SIZE, this->cgi_body_buffer.size()));
-		std::cout << "successfully sent: " << sent << "\n";
 		if (sent > 0)
 		{
 			this->cgi_body_buffer

@@ -54,6 +54,7 @@ void run_test(const char* name, const char* raw_str, size_t len, int expected_ma
         std::cout << "  PASS: Correcty identified error.\n";
     } else if (chunk.status_mask == expected_mask) {
         std::cout << "  PASS: Status matches expected value.\n";
+		std::cout << "  Buffer : " << std::string(buffer.begin(), buffer.end()) << "\n";
     } else {
         std::cout << "  FAIL: Expected " << expected_mask 
                   << " but got " << chunk.status_mask << "\n";
@@ -63,7 +64,7 @@ void run_test(const char* name, const char* raw_str, size_t len, int expected_ma
 
 void test_suite() {
     // Test 1: Standard valid chunk
-    const char* t1 = "5\r\nHello\r\n0\r\n\r\n";
+    const char* t1 = "ee\r\nHello728367291\r\n0\r\n\r\n";
     run_test("Standard Valid", t1, strlen(t1), CHUNK_COMPLETE);
 
     // Test 2: Incomplete data (Ends inside the data segment)

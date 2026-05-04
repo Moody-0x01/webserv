@@ -198,7 +198,7 @@ void HttpParser::handle()
 		std::vector<char>::iterator it = search(parent->_buffer, "\r\n\r\n");
         if (it != parent->_buffer.end())
         {
-			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin());
+			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin()) - 1;
             std::string headersOnly = collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);
