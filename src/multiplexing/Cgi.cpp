@@ -3,6 +3,7 @@
 #include <cctype>
 #include <cerrno>
 #include <cstddef>
+#include <stdint.h>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -21,7 +22,6 @@ bool Cgi::did_fail(void) const
 
 Cgi::~Cgi()
 {
-	std::cout << "~Cgi\n";
 	this->done();
 }
 
@@ -90,21 +90,23 @@ void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 	}
 }
 
-void Cgi::append_into_cgi_body_buffer(const char *buffer, ssize_t size)
+void Cgi::append_into_cgi_body_buffer(const char *buffer,
+		ssize_t size,
+		ChunkContext *chunk)
 {
-	// Appends to the body that will be sent to the cgi.
-	// if the client has written everything then. we set it up and then return.
-	if (size <= 0) {
+	if (size <= 0)
+	{
 		this->client_done = true;
 		return ;
 	}
-	// TODO: If the request is chunked then it makes more since to read the size then the data...
 	push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
 
-	if (this->cgi_read_bytes >= this->client_content_length) {
+	if (this->cgi_read_bytes >= this->client_content_length)
 		this->client_done = true;
-	}
+	std::cout << "Chunk:      " << chunk << "\n";
+	std::cout << "Chunk.done: " << chunk->is_done() << "\n";
+	if (chunk && chunk->is_done()) this->client_done = true;
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -157,7 +159,6 @@ void Cgi::write() __THROWS_STRERROR
 		{
 			this->cgi_body_buffer
 				.erase(this->cgi_body_buffer.begin(), this->cgi_body_buffer.begin() + sent);
-			return ;
 		}
 		if ((this->client_done && (this->cgi_body_buffer.size() == 0)) || sent < 0)
 			this->close_write();
@@ -217,6 +218,7 @@ void Cgi::read() __THROWS_STRERROR
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
 				buffer,
 				sizeof(buffer));
+	std::cout << "read\n";
 	switch (this->state)
 	{
 		case DONE: {} break;
@@ -231,7 +233,6 @@ void Cgi::read() __THROWS_STRERROR
 				try {
 					this->parse_headers();
 				} catch (const char *e) {
-					std::cout << "read\n";
 					this->done();
 					throw e;
 				}
@@ -259,7 +260,7 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 		this->done();
 		throw strerror(errno);
 	}
-	if ((now - this->start_time) >= SCRIPT_TIMEOUT)
+	if ((now - this->last_event_time) >= SCRIPT_TIMEOUT)
 	{
 		this->done();
 		return true;
@@ -270,7 +271,7 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	// Note: Check timeout...
-	this->start_time = time(NULL);
+	this->last_event_time = time(NULL);
 	try {
 		if (e & EPOLLIN)
             this->read(); 
@@ -293,7 +294,7 @@ Cgi::Cgi(): ASocketContext()
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
 
 	this->state                  =  Idle;
-	this->start_time             =  0;
+	this->last_event_time             =  0;
 	this->cgi_read_bytes         =  -1; // tracker for body data read from cgi.
 	this->cgi_content_length     =  -1; // How much data do u expect from cgi
 	this->client_content_length  =  -1; // trac
@@ -326,8 +327,9 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = request.headers.at("content-type");
 	else
 		this->content_type = "application/octet-stream";
+
 	this->setup_environment_variables(request.headers);
-	this->append_into_cgi_body_buffer(request.body->data(), request.body->size());
+	this->append_into_cgi_body_buffer(request.body->data(), request.body->size(), (ChunkContext*)(request.ischunked * (uint64_t)&request.chunked_context));
 }
 
 void Cgi::setup_environment_variables(const std::map<std::string, std::string> &headers) {
@@ -342,7 +344,10 @@ void Cgi::setup_environment_variables(const std::map<std::string, std::string> &
 	this->env.push_back("GATEWAY_INTERFACE=" + this->gateway_interface);
 	this->env.push_back("SCRIPT_NAME="      + this->filename);
 	this->env.push_back("PATH_TRANSLATED="  + this->filename);
-	this->env.push_back("REMOTE_ADDR="      + headers.at("REMOTE_ADDR"));
+	if (headers.find("REMOTE_ADDR") != headers.end())
+		this->env.push_back("REMOTE_ADDR="      + headers.at("REMOTE_ADDR"));
+	if (headers.find("REMOTE_PORT") != headers.end())
+		this->env.push_back("REMOTE_PORT="      + headers.at("REMOTE_PORT"));
 	this->env.push_back("SERVER_PROTOCOL="  + this->protocol);
 
 	// Note: send the rest headers as HTTP_*
@@ -439,9 +444,9 @@ void Cgi::execute(void) __THROWS_STRERROR
 		execve(this->interpreter.c_str(), args, &envp[0]);
 		_exit(127);
 	}
-	this->start_time = 
+	this->last_event_time = 
 		time(NULL);
-	if (this->start_time < 0) {
+	if (this->last_event_time < 0) {
 		close_fdlist(output);
 		close_fdlist(input);
 		throw strerror(errno);

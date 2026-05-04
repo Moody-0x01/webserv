@@ -1,9 +1,12 @@
 #include <Server.hpp>
 #include <cctype>
+#include <stdint.h>
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 HttpParser &Client::getParser(void) {
 	return this->parserInstance;
@@ -19,7 +22,6 @@ int Client::get_owner(void) const { return _owner; }
 Server *Client::get_server(void) const __THROWS_STRERROR {
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	return self->get_owner(this->get_socket());
 }
 
@@ -36,7 +38,6 @@ void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
 {
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
 	if (!epoll_switch(self->epoll_fd, this->get_socket(), mode, this))
 		throw strerror(errno);
 }
@@ -45,58 +46,64 @@ void Client::unchunkify_buffer(void)
 {
 	HttpRequest  &request = this->getParser().getRequestObject().getHttpRequest();
 	ChunkContext &chunk = request.chunked_context;
-	size_t       hex_size;
 	
 	if (!request.ischunked)
-		return ; // Not chunked, nothing to do.
-	
-	if (request.chunked_context.status == CHUNK_START || request.chunked_context.status == CHUNK_SIZE) {
-		hex_size = 0;
-		while (hex_size < this->_buffer.size() && isxdigit(this->_buffer[hex_size]))
-			chunk.hex.push_back(this->_buffer[hex_size++]);
-		chunk.strip_delimeter(this->_buffer, CHUNK_DATA, hex_size);
-		if (chunk.status == CHUNK_DATA)
-			chunk.convert_remaining_into_hex();
+		return ;
+	chunk.unpack(this->_buffer);
+}
+
+void Client::read_into_request_buffer(void) __THROWS_STRERROR {
+	char         buff[READ_CHUNK_SIZE];
+	ssize_t      count, to_read;
+	HttpParser   &clientP = this->getParser();
+	HttpRequest  &request = this->getParser().getRequestObject().getHttpRequest();
+	ChunkContext &chunk   = request.chunked_context;
+
+	if (clientP.state() == READY && request.ischunked)
+	{
+		if (chunk.is_reading_size())
+			to_read = (size_t)READ_CHUNK_SIZE;
+		else
+			to_read = std::min((size_t)READ_CHUNK_SIZE, chunk.remaining);
+		count = Multiplexer::read(this->get_socket(), buff, to_read); // NOTE: If a read fails it should throw,
+		chunk.remaining -= (count * chunk.is_reading_data()); // Haha smart
+		return ;
+	} else
+		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
+
+	push_into_buffer(this->_buffer, buff, count); // Read..
+	// std::cout << "Read " << count << " bytes from client\n";
+	if (clientP.state() != READY)
+	{
+		clientP.handle();
+		// for (size_t i = 0; i < this->_buffer.size(); i++)
+		// 	print_char_as_hex(this->_buffer[i]);
 	}
-	if (request.chunked_context.status == CHUNK_DATA) {
-		if (chunk.remaining == 0) {
-			chunk.status = CHUNK_COMPLETE;
-			return ;
-		}
+	if (clientP.state() == READY) 
+	{
+		this->unchunkify_buffer(); // Unchunkify if needed..
+		this->switch_mode(WRITING);
 	}
 }
 
 void Client::parse_request() __THROWS_STRERROR
 {
-	Multiplexer *self;
-	ssize_t      count;
-	char         buff[READ_CHUNK_SIZE];
-
-	int conn = this->get_socket();
-	HttpParser &clientP = this->getParser();
+	HttpRequest  &request = this->getParser().getRequestObject().getHttpRequest();
+	ChunkContext &chunk   = request.chunked_context;
+	// HttpParser &clientP = this->getParser();
 	Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 
-	self = Multiplexer::get_multiplexer(NULL);
-	if (!self) throw "Well, failed to get a Multiplexer class";
-
 	try {
-		count = Multiplexer::read(conn, buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-		push_into_buffer(this->_buffer, buff, count); // Read..
-
-		if (clientP.state() == READY)
-			this->unchunkify_buffer(); // Unchunkify if needed..
-		if (this->response.getstage() == SendingResource) {
-			if (this->_buffer.size() >= READ_CHUNK_SIZE)
+		this->read_into_request_buffer();
+		if (this->response.getstage() == SendingResource)
+			this->switch_mode(WRITING);
+		else if (this->response.getstage() == ProcessingCgi) {
+			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
+					(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
+			if (cgi_instance.client_done || chunk.status_mask & CHUNK_COMPLETE)
 				this->switch_mode(WRITING);
-		} else if (this->response.getstage() == ProcessingCgi) {	
-			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), count);
-			if (cgi_instance.client_done)
-				this->switch_mode(WRITING);
-		} else {
-			clientP.handle();
-			if (clientP.state() == READY)
-				this->switch_mode(WRITING);
-		}
+		} else
+			this->switch_mode(WRITING);
 	} catch (const char *e) {
 		this->free();
 		throw e;
@@ -109,18 +116,21 @@ void Client::generate_response(void) __THROWS_STRERROR
 	HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
 
 	try {
-		// std::cout <<  "At continue_processing with:  " << request.method << "\n";
-		request.headers["REMOTE_ADDR"] = this->ip;
 		this->response
 			.continue_processing(request);
 		if (this->response.getstage() == DoneSending) {
 			this->free();
 			return ;
 		}
-		if (request.method == "POST" && !cgi_instance.client_done)
+		if (request.method == "POST")
 		{
-			this->switch_mode(READING); // switch_mode to Reading body from the client.
-										// any kind of post needs to go back to recv mode
+			if (request.ischunked && !request.chunked_context.is_done())
+				this->switch_mode(READING);
+			if (this->response.getstage() == ProcessingCgi && !cgi_instance.client_done)
+			{
+				this->switch_mode(READING); // switch_mode to Reading body from the client.
+											// any kind of post needs to go back to recv switch_mode
+			}
 			return ;
 		}
 	} catch (const char *e) {
@@ -180,9 +190,19 @@ std::string Client::getip(void)
 	return (this->ip);
 }
 
+void Client::setport(std::string port)
+{
+	this->port = port;
+}
+
+std::string Client::getport(void)
+{
+	return (this->port);
+}
+
 void Client::setip_from_bytes(uint32_t ip_bytes)
 {
-
+	HttpRequest r = this->getParser().getRequestObject().getHttpRequest();
 	std::stringstream ss;
 
     ss << ((ip_bytes >> 24) & 0xFF) << "."
@@ -190,4 +210,18 @@ void Client::setip_from_bytes(uint32_t ip_bytes)
        << ((ip_bytes >> 8)  & 0xFF) << "."
        << ((ip_bytes >> 0)  & 0xFF);
     this->setip(ss.str());
+	r.headers["REMOTE_ADDR"] = this->getip();
+}
+
+void Client::setport_from_bytes(uint32_t port_bytes)
+{
+	HttpRequest r = this->getParser().getRequestObject().getHttpRequest();
+	std::stringstream ss;
+
+    ss << ((port_bytes >> 24) & 0xFF) << "."
+       << ((port_bytes >> 16) & 0xFF) << "."
+       << ((port_bytes >> 8)  & 0xFF) << "."
+       << ((port_bytes >> 0)  & 0xFF);
+    this->setport(ss.str());
+	r.headers["REMOTE_PORT"] = this->getport();
 }

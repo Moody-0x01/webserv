@@ -47,7 +47,7 @@ typedef struct Cgi: public ASocketContext
     ssize_t cgi_read_bytes; // To know when the script is done
     std::vector<std::string> env; 
 	std::map<std::string, std::string> headers;
-    time_t start_time;          // Use this in your loop to kill(pid, SIGKILL) 
+    time_t last_event_time;          // Use this in your loop to kill(pid, SIGKILL) 
                                 // if the script takes > 30 seconds.
 public:
 	Cgi();
@@ -82,6 +82,9 @@ public:
 	void append_into_client_body_buffer(const char *buffer, ssize_t size);
 	void append_into_cgi_body_buffer(const char *buffer, ssize_t size);
 	void append_into_headers_buffer(const char *buffer, ssize_t size);
+	void append_into_cgi_body_buffer(const char *buffer,
+			ssize_t size,
+			ChunkContext *chunk);
 	bool validate_headers();
 	bool is_executable(void);
 	std::pair<std::vector<char>::iterator, size_t> find_seperator(void);

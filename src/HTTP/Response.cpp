@@ -253,8 +253,10 @@ void Response::send_resource(const HttpRequest &request)
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
+	{
 		this->request_ptr = &request;
-
+		this->setup_max_body_size(request.owner);
+	}
 	Cgi &cgi = this->resource.cgi;
 	if (this->stage == Setup)
 	{
@@ -292,12 +294,10 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->stage = DoneSending;
 		return ;
 	}
-	if (!cgi.headers_sent && cgi.headers_parsed) {
+	if (!cgi.headers_sent && cgi.headers_parsed)
 		cgi.send_headers(request.conn);
-	}
 	else if (cgi.headers_sent) {
 		cgi.send_body_chunk(request.conn);
-
 		if (request.body->size())
 			request.body->clear();
 	}
@@ -309,9 +309,8 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->set_status(InternalServerError);
 		return ;
 	}
-	if (cgi.state == DONE) {
+	if (cgi.state == DONE)
 		this->stage = DoneSending;
-	}
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -336,11 +335,16 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(BadRequest);
 		return ;
 	}
+	if (request.content_length > (ssize_t)this->client_max_body_size)
+	{
+		this->set_status(RequestEntityTooLarge);
+		return ;
+	}
 	if (request.isbadrequest)
 	{
 		this->set_status(request.code);
 		return ;
-	}	
+	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (this->resolved_results.resource_type == UriResolutionResult::redirect)
 	{
@@ -358,7 +362,6 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(NotFound);
 		return ;
 	}
-
 	if (this->resolved_results.resource_type == UriResolutionResult::cgi)
 	{
 		this->resource.setresource_type(CGI);
@@ -374,9 +377,10 @@ void Response::setup_response(const HttpRequest &request)
 		case MethodGet:
 			this->handle_get(request);
 			break ;
-		case MethodPost:
+		case MethodPost: {
 			this->handle_post(request);
 			break ;
+		}
 		case MethodDelete:
 			this->handle_delete();
 			break ;
@@ -473,6 +477,12 @@ void Response::serve_file(void)
 	this->appendheader("Content-Type", content_type.c_str());
 }
 
+void Response::setup_max_body_size(const int owner)
+{
+	const ServerConfig &server_conf = Multiplexer::get_conf(owner);
+	this->client_max_body_size = server_conf.client_max_body_size;
+}
+
 void Response::handle_get(const HttpRequest &request)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(request.owner);
@@ -491,18 +501,12 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	if (request.content_length == 0)
-	{
-		this->set_status(ContentLengthRequired);
-		return;
-	}
 	std::string file = this->resolved_results.filesystem_path;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		this->set_status(Forbidden);
 		return;
 	}
-
 	std::fstream out_file(file.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out_file.is_open())
 	{
@@ -519,16 +523,20 @@ void Response::handle_post(const HttpRequest &request)
 	}
 	this->bytes_sent += request.body->size();
 	request.body->clear();
-	this->set_status(Created);
-	this->resource.setresource_type(Text);
-	this->resource.setmime_type(TextHtml);
-	this->resource.set_stream_buffer(
-        "<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head><title>201 Created</title></head>\n"
-        "<body><h1>201 Created</h1><p>File successfully uploaded.</p></body>\n"
-        "</html>\n"
-    );
+	if (this->bytes_sent >= request.content_length)
+	{
+		out_file.close();
+		this->set_status(Created);
+		this->resource.setresource_type(Text);
+		this->resource.setmime_type(TextHtml);
+		this->resource.set_stream_buffer(
+			"<!DOCTYPE html>\n"
+			"<html>\n"
+			"<head><title>Created</title></head>\n"
+			"<body><h1>File Created</h1><p>Your file has been successfully created.</p></body>\n"
+			"</html>\n"
+		);
+	}
 }
 
 void Response::handle_delete()
@@ -630,8 +638,9 @@ void Response::init_status_lines()
     Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
+    Response::status_lines[RequestEntityTooLarge] = "HTTP/1.0 413 Request Entity TooLarge";
 
-	Response::status_lines[ContentLengthRequired] = "HTTP 411 Length Required";
+	Response::status_lines[ContentLengthRequired] = "HTTP/1.0 411 Length Required";
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";
     Response::status_lines[ServiceUnavailable   ] = "HTTP/1.0 503 Service Unavailable";

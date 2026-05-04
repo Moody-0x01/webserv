@@ -132,7 +132,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERROR
 {
 	struct sockaddr_in addr;
-	uint32_t ip;
+	uint32_t ip, port;
 	Multiplexer *self;
 	int conn;
 	socklen_t len;
@@ -144,6 +144,7 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
 	ip = ntohl(addr.sin_addr.s_addr);
+	port = ntohl(addr.sin_addr.s_addr);
 	if (set_nonblocking(conn) == -1) throw strerror(errno);
 
 	self->servers[server->get_socket()].second[conn] = Client();
@@ -151,6 +152,7 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	Client &client = self->servers[server->get_socket()].second[conn];
 
 	client.setip_from_bytes(ip);
+	client.setport_from_bytes(port);
 	client.set_owner(server->get_socket());
 	client.set_socket(conn);
 	client.getParser().getRequestObject().set_sockets(server->get_socket(), conn);
@@ -218,6 +220,7 @@ void Multiplexer::execute_epoll_event(int epoll_index)
 		return ;
 	ASocketContext *handle = (ASocketContext *)ptr;
 	try {
+		// Cgi | cliet | server | signal handler |  proxy
 		handle->action(this->events[epoll_index].events);
 	} catch (const char *error) {
 		std::cerr << "[ handle->action ] " << error << "\n";

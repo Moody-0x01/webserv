@@ -227,7 +227,7 @@ map_iterator search(const std::map<std::string, std::string> &map, std::string t
 std::pair<bool, std::string> get_value(const std::map<std::string, std::string> &map, std::string target)
 {
 	map_iterator ref = search(map, target);
-	if (ref != map.end())
+	if (ref == map.end())
 		return std::make_pair(false, "");
 	return std::make_pair(true, ref->second);
 }
