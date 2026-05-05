@@ -10,6 +10,7 @@
 
 typedef const std::map<std::string, std::string>::const_iterator map_iterator;
 # define  READ_CHUNK_SIZE      1024 * 64
+# define  SENDING_CHUNK_SIZE   1024 * 16
 # define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
 # define  NO_CODE 999
 # define CR '\r'

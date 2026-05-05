@@ -96,44 +96,49 @@ void Resource::set_headers_sent(void)
 
 response_stage_t Resource::send(const HttpRequest &request) __THROWS_STRERROR
 {
-	if (__isbuf)
+	char buffer[SENDING_CHUNK_SIZE];
+
+	if (this->__stream_buffer.empty())
 	{
-		ssize_t sent = ::write(request.conn, this->__stream_buffer.c_str(), this->__stream_buffer.size());
-		if (sent < 0)
-			throw strerror(errno);
-		if (sent == 0)
-			throw "client disconnected while sending response";
+		if (this->__isbuf)
+		{
+			this->__done = true;
+			return (DoneSending);
+		}
+		if (this->resource_type != File || !this->__rstream || !this->__rstream->is_open())
+		{
+			this->__done = true;
+			return (DoneSending);
+		}
+		this->__rstream->read(buffer, sizeof(buffer));
+		std::streamsize bytes_read = this->__rstream->gcount();
+		if (bytes_read <= 0)
+		{
+			if (this->__rstream->bad())
+				throw "failed reading resource file";
+			this->__done = true;
+			return (DoneSending);
+		}
+		this->__stream_buffer.assign(buffer, buffer + bytes_read);
+		this->bytes_sent = 0;
+	}
+
+	ssize_t sent = ::write(request.conn,
+		this->__stream_buffer.data() + this->bytes_sent,
+		this->__stream_buffer.size() - this->bytes_sent);
+	if (sent <= 0)
+		throw "client disconnected while sending response";
+	this->bytes_sent += static_cast<size_t>(sent);
+	if (this->bytes_sent < this->__stream_buffer.size())
+		return (SendingResource);
+	this->__stream_buffer.clear();
+	this->bytes_sent = 0;
+	if (this->__isbuf)
+	{
 		this->__done = true;
 		return (DoneSending);
 	}
-	if (this->resource_type == File && this->__rstream && this->__rstream->is_open())
-	{
-		char buffer[READ_CHUNK_SIZE];
-		while (this->__rstream->good())
-		{
-			this->__rstream->read(buffer, sizeof(buffer));
-			std::streamsize bytes_read = this->__rstream->gcount();
-			if (bytes_read <= 0)
-				break;
-
-			size_t sent_total = 0;
-			while (sent_total < static_cast<size_t>(bytes_read))
-			{
-				ssize_t sent = ::write(request.conn,
-					buffer + sent_total,
-					static_cast<size_t>(bytes_read) - sent_total);
-				if (sent < 0)
-					throw strerror(errno);
-				if (sent == 0)
-					throw "client disconnected while sending file";
-				sent_total += static_cast<size_t>(sent);
-			}
-		}
-		if (this->__rstream->bad())
-			throw "failed reading resource file";
-	}
-	this->__done = true;
-	return (DoneSending);
+	return (SendingResource);
 }
 
 std::string Resource::getmime_type(void)

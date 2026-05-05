@@ -140,7 +140,7 @@ private:
 	std::map<std::string, std::string> headers;
 	response_stage_t stage;
 	std::string headers_as_str;
-	int bytes_sent;
+	size_t bytes_sent;
 
 	Resource             resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
 	UriResolutionResult  resolved_results; // holds the resultion struct
@@ -161,7 +161,7 @@ public:
 	static void init_status_lines();
 
 	void setup_max_body_size(const int owner);
-	void send_headers(int conn) __THROWS_STRERROR;
+	bool send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);
 	void appendheader(const char *key, const char  *value);

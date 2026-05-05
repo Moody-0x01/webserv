@@ -243,7 +243,8 @@ void Response::send_resource(const HttpRequest &request)
 
 	if (!resource.headers_sent())
 	{
-		this->send_headers(request.conn);
+		if (!this->send_headers(request.conn))
+			return ;
 		resource.set_headers_sent();
 	}
 	this->stage =
@@ -523,7 +524,7 @@ void Response::handle_post(const HttpRequest &request)
 	}
 	this->bytes_sent += request.body->size();
 	request.body->clear();
-	if (this->bytes_sent >= request.content_length)
+	if (this->bytes_sent >= static_cast<size_t>(request.content_length))
 	{
 		out_file.close();
 		this->set_status(Created);
@@ -606,10 +607,20 @@ void Response::serialize_headers(void) {
 }
 
 
-void Response::send_headers(int conn) __THROWS_STRERROR
+bool Response::send_headers(int conn) __THROWS_STRERROR
 {
-	this->serialize_headers();
-	Multiplexer::write(conn, this->headers_as_str.c_str(), this->headers_as_str.size());
+	if (this->headers_as_str.empty())
+		this->serialize_headers();
+	if (this->bytes_sent < this->headers_as_str.size())
+	{
+		ssize_t sent = ::write(conn,
+			this->headers_as_str.c_str() + this->bytes_sent,
+			this->headers_as_str.size() - this->bytes_sent);
+		if (sent <= 0)
+			throw "client disconnected while sending headers";
+		this->bytes_sent += static_cast<size_t>(sent);
+	}
+	return (this->bytes_sent >= this->headers_as_str.size());
 }
 
 
