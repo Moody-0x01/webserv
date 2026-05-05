@@ -1,5 +1,6 @@
 #include <Server.hpp>
 #include <cstddef>
+#include <iostream>
 #include <map>
 #include <string>
 #include <unistd.h>
@@ -108,6 +109,21 @@ void sigpipe_handler(int sig)
 {
 	signal_handler(sig);
 	while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
+void logr(std::string &buffer)
+{
+	std::cout << "|";
+	for (size_t i = 0; i < buffer.size(); i++)
+	{
+		if (buffer[i] == '\r')
+			std::cout << "\\r";
+		else if (buffer[i] == '\n')
+			std::cout << "\\n";
+		else
+			std::cout << buffer[i];
+	}
+	std::cout << "|\n";
 }
 
 std::string serialize_headers(std::map<std::string, std::string> &headers, bool setdefault_status)

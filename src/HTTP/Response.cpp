@@ -1,4 +1,5 @@
  #include "HTTP/Response.hpp"
+#include "Multiplexing/Multiplexer.hpp"
 #include <Server.hpp>
 #include <algorithm>
 #include <dirent.h>
@@ -243,8 +244,7 @@ void Response::send_resource(const HttpRequest &request)
 
 	if (!resource.headers_sent())
 	{
-		if (!this->send_headers(request.conn))
-			return ;
+		this->send_headers(request.conn);
 		resource.set_headers_sent();
 	}
 	this->stage =
@@ -601,26 +601,19 @@ Response::~Response()
 }
 
 void Response::serialize_headers(void) {
-
+	// Max header size will be <= 16Kb so we need to just serialize it then send
+	// Then check for any error. and close in case.
 	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
 
 
-bool Response::send_headers(int conn) __THROWS_STRERROR
+void Response::send_headers(int conn) __THROWS_STRERROR
 {
-	if (this->headers_as_str.empty())
-		this->serialize_headers();
-	if (this->bytes_sent < this->headers_as_str.size())
-	{
-		ssize_t sent = ::write(conn,
-			this->headers_as_str.c_str() + this->bytes_sent,
-			this->headers_as_str.size() - this->bytes_sent);
-		if (sent <= 0)
-			throw "client disconnected while sending headers";
-		this->bytes_sent += static_cast<size_t>(sent);
-	}
-	return (this->bytes_sent >= this->headers_as_str.size());
+	this->serialize_headers();
+	Multiplexer::write(  conn,
+		 this->headers_as_str.data(),
+		 this->headers_as_str.size());
 }
 
 
@@ -660,7 +653,6 @@ void Response::init_status_lines()
 void Response::appendheader(const char *key, const char  *value)
 {
 	this->headers[key] = value;
-	this->headers[key] += "\r\n";
 }
 
 void Response::set_status(int s)

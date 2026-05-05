@@ -29,3 +29,5 @@ std::string collect(std::vector<char> &vector, size_t end);
 std::vector<char>::iterator search(std::vector<char> &vector, const char *pattern);
 map_iterator search(const std::map<std::string, std::string> &map, std::string target);
 std::pair<bool, std::string> get_value(const std::map<std::string, std::string> &map, std::string target);
+void logr(std::string &buffer);
+

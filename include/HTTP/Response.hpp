@@ -161,7 +161,7 @@ public:
 	static void init_status_lines();
 
 	void setup_max_body_size(const int owner);
-	bool send_headers(int conn) __THROWS_STRERROR;
+	void send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);
 	void appendheader(const char *key, const char  *value);
