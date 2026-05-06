@@ -63,6 +63,7 @@ typedef enum response_stage_e {
 	Setup,
 	SendingResource,
 	ProcessingCgi,
+	ProcessingPost,
 	DoneSending
 } response_stage_t;
 
@@ -140,7 +141,7 @@ private:
 	std::map<std::string, std::string> headers;
 	response_stage_t stage;
 	std::string headers_as_str;
-	size_t bytes_sent;
+	ssize_t bytes_sent;
 
 	Resource             resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
 	UriResolutionResult  resolved_results; // holds the resultion struct

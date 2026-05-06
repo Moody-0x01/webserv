@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <utility>
 #include <vector>
+#include <ctime>
 
 std::map<int, std::string> Response::status_lines;
 std::map<std::string, std::string> Response::mimes;
@@ -222,7 +223,7 @@ Response::Response()
 	this->request_ptr = NULL;
 	this->status = OK;
 	this->status_line = "HTTP/1.0 200 OK\r\n";
-	this->bytes_sent = 0;
+	this->bytes_sent = -1;
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -502,18 +503,30 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	std::string file = this->resolved_results.filesystem_path;
-	if (this->resolved_results.resource_type == UriResolutionResult::directory)
+	if ((this->bytes_sent == -1) && (this->resolved_results.resource_type == UriResolutionResult::directory))
 	{
-		this->set_status(Forbidden);
-		return;
+		std::string new_file_path = this->resolved_results.filesystem_path;
+		time_t timestamp = time(NULL);
+		std::ostringstream oss;
+		oss << timestamp;
+		if (!new_file_path.empty() && new_file_path[new_file_path.length() - 1] != '/') {
+			new_file_path += "/";
+		}
+		new_file_path += oss.str();
+		this->resolved_results.filesystem_path = new_file_path;
+		this->resolved_results.resource_type = UriResolutionResult::file;
+		std::cout << "Target File: " << new_file_path << std::endl;
+		this->stage = ProcessingPost;
+		this->bytes_sent = 0;
 	}
-	std::fstream out_file(file.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
+	std::fstream out_file(this->resolved_results.filesystem_path.c_str(), std::ios::out | std::ios::binary | std::ios::app);
 	if (!out_file.is_open())
 	{
 		this->set_status(InternalServerError);
 		return;
 	}
+	std::cout << "request.body.size() " << request.body->size() << "\n";
+	std::cout << "request.content_length " << request.content_length << "\n";
 	out_file.write(request.body->data(), request.body->size());
 
 	if (out_file.fail())
@@ -524,9 +537,9 @@ void Response::handle_post(const HttpRequest &request)
 	}
 	this->bytes_sent += request.body->size();
 	request.body->clear();
-	if (this->bytes_sent >= static_cast<size_t>(request.content_length))
+	if (this->bytes_sent >= request.content_length)
 	{
-		out_file.close();
+		this->stage = SendingResource;
 		this->set_status(Created);
 		this->resource.setresource_type(Text);
 		this->resource.setmime_type(TextHtml);
@@ -538,6 +551,7 @@ void Response::handle_post(const HttpRequest &request)
 			"</html>\n"
 		);
 	}
+	out_file.close();
 }
 
 void Response::handle_delete()
@@ -566,7 +580,7 @@ void Response::handle_delete()
         "<!DOCTYPE html>\n"
         "<html>\n"
         "<head><title>Deleted</title></head>\n"
-        "<body><h1>696969696969 Deleted</h1><span>yes new status code handle it, don't send another request to this server again. will get another new code<span><p>File successfully deleted.</p></body>\n"
+        "<body><h1>200 Deleted</h1><span>....</body>\n"
         "</html>\n"
     );
 }

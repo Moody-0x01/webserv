@@ -164,5 +164,5 @@ resource_type_t Resource::getresource_type(void) const
 
 void Resource::setresource_type(resource_type_t t)
 {
-this->resource_type = t;
+	this->resource_type = t;
 }

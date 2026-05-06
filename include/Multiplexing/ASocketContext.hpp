@@ -29,6 +29,6 @@ public:
 	int get_socket(void) const;
 	void disown(void);
 private:
-	int  _sockfd;
+	int  _sockfd; // Server. Client....
 	bool _owns_fd;
 } ASocketContext;

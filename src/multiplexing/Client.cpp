@@ -1,3 +1,5 @@
+#include "HTTP/Response.hpp"
+#include "Multiplexing/ASocketContext.hpp"
 #include <Server.hpp>
 #include <cctype>
 #include <stdint.h>
@@ -72,13 +74,8 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 
 	push_into_buffer(this->_buffer, buff, count); // Read..
-	// std::cout << "Read " << count << " bytes from client\n";
 	if (clientP.state() != READY)
-	{
 		clientP.handle();
-		// for (size_t i = 0; i < this->_buffer.size(); i++)
-		// 	print_char_as_hex(this->_buffer[i]);
-	}
 	if (clientP.state() == READY) 
 	{
 		this->unchunkify_buffer(); // Unchunkify if needed..
@@ -95,8 +92,9 @@ void Client::parse_request() __THROWS_STRERROR
 
 	try {
 		this->read_into_request_buffer();
-		if (this->response.getstage() == SendingResource)
+		if (this->response.getstage() == ProcessingPost) {
 			this->switch_mode(WRITING);
+		}
 		else if (this->response.getstage() == ProcessingCgi) {
 			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
 					(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
@@ -127,12 +125,16 @@ void Client::generate_response(void) __THROWS_STRERROR
 		}
 		if (request.method == "POST")
 		{
+			std::cout << "Yoooo Switch To Read!\n";
 			if (request.ischunked && !request.chunked_context.is_done())
 				this->switch_mode(READING);
 			if (this->response.getstage() == ProcessingCgi && !cgi_instance.client_done)
 			{
 				this->switch_mode(READING); // switch_mode to Reading body from the client.
 											// any kind of post needs to go back to recv switch_mode
+			}
+			if (this->response.getstage() == ProcessingPost) {
+				this->switch_mode(READING);
 			}
 			return ;
 		}
