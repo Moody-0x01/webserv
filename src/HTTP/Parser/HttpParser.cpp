@@ -22,6 +22,11 @@ bool ChunkContext::is_reading_size(void)
 	return (this->status_mask & CHUNK_START || this->status_mask & CHUNK_SIZE);
 }
 
+bool ChunkContext::just_started(void)
+{
+	return (this->status_mask & CHUNK_START);
+}
+
 bool ChunkContext::is_reading_data(void)
 {
 	return (this->status_mask & CHUNK_DATA);
@@ -54,8 +59,6 @@ void ChunkContext::log_buffer(std::vector<char> &buffer)
 
 void ChunkContext::skip_crlf(std::vector<char> &buffer)
 {
-	intptr_t  mask;
-
 	switch (buffer[this->cursor])
 	{
 		case CR: {
@@ -67,21 +70,20 @@ void ChunkContext::skip_crlf(std::vector<char> &buffer)
 				this->status_mask = CHUNK_ERROR; // Malformed chunk, expected \r\n after data, 500, BadRequest :(
 				return ;
 			}
-			if (this->status_mask & CHUNK_COMPLETE)
-			{
-				this->cursor++;
-				return ;
-			}
-			mask = -static_cast<intptr_t>(!!(this->status_mask & (CHUNK_SIZE | CHUNK_START)));
-			this->status_mask = (mask & CHUNK_DATA) | (~mask & CHUNK_SIZE);
-			this->prev = 0;			
+			if (this->status_mask & CHUNK_DATA)
+				this->status_mask = CHUNK_SIZE;
+			else if (this->status_mask & (CHUNK_SIZE|CHUNK_START))
+				this->status_mask = CHUNK_DATA;
+			this->prev = 0;
 		} break ;
 		case ';': {
 			if (this->status_mask & (CHUNK_SIZE | CHUNK_START))
 				while (this->cursor < buffer.size() && buffer[this->cursor] != CR) this->cursor++;
 			return ;
 		} break ;
-		default: { this->status_mask = CHUNK_ERROR; } return ;
+		default: {
+			this->status_mask = CHUNK_ERROR;
+		} return ;
 	}
 	this->cursor++;
 }
@@ -105,6 +107,14 @@ void ChunkContext::consume_chunk_size(std::vector<char> &buffer)
 	if (this->cursor >= buffer.size())
 		return ;
 	this->convert_remaining_into_hex();
+
+	// for (size_t i = 0; i < buffer.size(); i++)
+	// 	std::cout << std::hex << (int)buffer[i] << " ";
+	if (this->status_mask & CHUNK_ERROR) {
+		return ;
+	}
+	if (this->remaining == 0)
+		this->status_mask |= CHUNK_COMPLETE;
 	this->status_mask |= CHUNK_TRAILER;
 }
 
@@ -112,43 +122,61 @@ void ChunkContext::consume_chunk_data(std::vector<char> &buffer)
 {
 	size_t to_read;
 
-	this->status_mask |= CHUNK_TRAILER;
-	if (this->remaining == 0)
-	{
-		this->status_mask |= CHUNK_COMPLETE;
+	to_read = std::min((size_t)(buffer.size() - this->cursor), this->remaining);
+	if (to_read == 0)
 		return ;
-	}
-	to_read = std::min((size_t)(buffer.size() - this->cursor),
-		this->remaining);
 	for (size_t i = this->cursor; i < this->cursor + to_read; i++)
 		this->chunk_data.push_back(buffer[i]);
-
 	this->remaining -= to_read;
 	this->cursor    += to_read;
+	if (this->remaining == 0)
+		this->status_mask |= CHUNK_TRAILER;
 }
 
 void ChunkContext::unpack(std::vector<char> &buffer)
 {
+	this->cursor = 0;
 	this->chunk_data.clear();
 	this->chunk_data.reserve(buffer.size());
+	// std::cout << "Unpacking data: " << "\n";
+	// for (size_t i = 0; i < buffer.size(); i++)
+	// 	std::cout << std::hex << (int)buffer[i] << " ";
+	// std::cout << "\n";
+	// std::cin.get();
+
+
 	while (this->cursor < buffer.size()
 			&& !(this->status_mask & (CHUNK_ERROR | CHUNK_COMPLETE)))
 	{
 		if (this->is_reading_crlf())
 		{
 			this->skip_crlf(buffer);
-			if (this->status_mask & CHUNK_COMPLETE)
-				break ;
 			continue ;
 		}
-		if (this->is_reading_size())
-		{
+		if (this->is_reading_size()) {
 			this->consume_chunk_size(buffer);
 			continue ;
 		}
 		if (this->is_reading_data())
 			this->consume_chunk_data(buffer);
 	}
+	// std::cout << "Stopped at    : " << this->cursor    << "\n";
+	// std::cout << "rest    at    : " << this->remaining << "\n";
+	// std::cout << "Available was : " << buffer.size()   << "\n";
+	// std::cout << "Unchunked     : " << this->chunk_data.size()   << "\n";
+	//
+	// if (this->status_mask & CHUNK_ERROR)
+	// 	std::cout << "Chunk parsing error\n";
+	// if (this->status_mask & CHUNK_COMPLETE)
+	// 	std::cout << "Chunk parsing complete\n";
+	// if (this->status_mask & CHUNK_TRAILER)
+	// 	std::cout << "Chunk parsing trailer\n";
+	// if (this->status_mask & CHUNK_DATA)
+	// 	std::cout << "Chunk parsing data\n";
+	// if (this->status_mask & CHUNK_SIZE)
+	// 	std::cout << "Chunk parsing size\n";
+	// std::cin.get();
+
 	if (this->status_mask & CHUNK_COMPLETE)
 		this->status_mask = CHUNK_COMPLETE;
 	buffer.swap(this->chunk_data);
@@ -182,8 +210,12 @@ void HttpParser::parseContentLength(void)
 
 	if (pair.first)
 	{
-		this->targetBodySize = std::atoi(pair.second.c_str());
-		this->request.getHttpRequest().content_length = this->targetBodySize;
+		std::stringstream ss(pair.second);
+		if (!(ss >> this->targetBodySize)) {
+			this->request.setcode(BadRequest);
+		}
+		else
+			this->request.getHttpRequest().content_length = this->targetBodySize;
 		return ;
 	}
 	this->request.setcode(ContentLengthRequired);
@@ -198,7 +230,7 @@ void HttpParser::handle()
 		std::vector<char>::iterator it = search(parent->_buffer, "\r\n\r\n");
         if (it != parent->_buffer.end())
         {
-			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin()) - 1;
+			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin());
             std::string headersOnly = collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);

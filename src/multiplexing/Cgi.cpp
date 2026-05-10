@@ -22,6 +22,7 @@ bool Cgi::did_fail(void) const
 
 Cgi::~Cgi()
 {
+	std::cout << "Cgi~\n";
 	this->done();
 }
 
@@ -94,17 +95,15 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 		ssize_t size,
 		ChunkContext *chunk)
 {
-	if (size <= 0)
+	if (size <= 0 || this->client_done)
 	{
 		this->client_done = true;
 		return ;
 	}
 	push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
-	if (this->cgi_read_bytes >= this->client_content_length)
-		this->client_done = true;
-	if (chunk && chunk->is_done())
-		this->client_done = true;
+	if (!chunk && this->cgi_read_bytes >= this->client_content_length) this->client_done = true;
+	if (chunk && chunk->is_done()) this->client_done = true;
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -140,6 +139,7 @@ void Cgi::done(void)
 		this->client_done = true;
 		this->close_read();
 		this->close_write();
+		Multiplexer::unintroduce_context((uint64_t)this);
 	}
 }
 
@@ -156,8 +156,9 @@ void Cgi::write() __THROWS_STRERROR
 			this->cgi_body_buffer
 				.erase(this->cgi_body_buffer.begin(), this->cgi_body_buffer.begin() + sent);
 		}
-		if ((this->client_done && (this->cgi_body_buffer.size() == 0)) || sent < 0)
+		if ((this->client_done && !this->cgi_body_buffer.size()) || sent < 0)
 			this->close_write();
+		std::cout << "Sent to cgi: " << sent << "\n";
 	}
 }
 
@@ -214,7 +215,6 @@ void Cgi::read() __THROWS_STRERROR
 	read_from_cgi = Multiplexer::read(this->streams[CGI_READ_END],
 				buffer,
 				sizeof(buffer));
-	std::cout << "read\n";
 	switch (this->state)
 	{
 		case DONE: {} break;
@@ -229,6 +229,7 @@ void Cgi::read() __THROWS_STRERROR
 				try {
 					this->parse_headers();
 				} catch (const char *e) {
+					std::cout << "Failed to parse headers\n";
 					this->done();
 					throw e;
 				}
@@ -268,17 +269,26 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	// Note: Check timeout...
 	this->last_event_time = time(NULL);
+	if (this->timeout())
+	{
+		std::cout << "Cgi timeout\n";
+		this->done();
+		return ;
+	}
 	try {
 		if (e & EPOLLIN)
             this->read(); 
         if (e & EPOLLOUT)
             this->write();
-        if (e & EPOLLHUP)
-            this->done();
-        if (e & EPOLLRDHUP)
-            this->done();
-		if (e & EPOLLERR)
-            this->done();
+		if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
+		{
+			if (e & EPOLLERR)   std::cerr << "Crit: EPOLLERR\n";
+			if (e & EPOLLHUP)   std::cerr << "Info: EPOLLHUP\n";
+			if (e & EPOLLRDHUP) std::cerr << "Info: EPOLLRDHUP\n";
+    
+			this->done();
+			this->gateway_failure();
+		}
 	} catch (const char *e) {
 		this->done();
 		throw e;
@@ -325,7 +335,13 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 		this->content_type = "application/octet-stream";
 
 	this->setup_environment_variables(request.headers);
-	this->append_into_cgi_body_buffer(request.body->data(), request.body->size(), (ChunkContext*)(request.ischunked * (uint64_t)&request.chunked_context));
+	if (request.body->size())
+	{
+		this->append_into_cgi_body_buffer(request.body->data(),
+				request.body->size(),
+				(ChunkContext*)(request.ischunked * (uint64_t)&request.chunked_context));
+		request.body->clear();
+	}
 }
 
 void Cgi::setup_environment_variables(const std::map<std::string, std::string> &headers) {
@@ -495,5 +511,5 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	if (this->headers.find("content-length") == this->headers.end()) 
 		return ;
 	std::stringstream ss(this->headers.at("content-length"));
-	ss << this->cgi_content_length;
+	if (!(ss >> this->cgi_content_length)) this->gateway_failure();
 }

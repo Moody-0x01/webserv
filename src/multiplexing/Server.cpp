@@ -33,6 +33,6 @@ void Server::action(uint32_t e) __THROWS_STRERROR
 					conn->get_socket());
 			throw strerror(errno);
 		}
-		Multiplexer::introduce_new_context((uint64_t)conn);
+		Multiplexer::introduce_new_context((uint64_t)conn, true);
 	}
 }

@@ -61,9 +61,10 @@ typedef enum resource_type_e
 
 typedef enum response_stage_e {
 	Setup,
-	SendingResource,
-	ProcessingCgi,
-	ProcessingPost,
+	SendingResource, // IN this state send body. or switch in this case.
+	// Both read to body. no switch needed.
+	ProcessingCgi, // Needs to keep switching.
+	ProcessingPost, // Switch once u r done?
 	DoneSending
 } response_stage_t;
 
@@ -178,5 +179,9 @@ public:
 	void process_cgi_instance(const HttpRequest &request);
 	Resource &get_resource_ref(void);
 	response_stage_t getstage(void) const;
+	response_stage_t &getstage(void);
+
+	void setup(const HttpRequest &request); // TODO: Once the server finishes reading the headers. call this so anything that needs to be done before trying to get the body is actually done, including..
+	
 };
 

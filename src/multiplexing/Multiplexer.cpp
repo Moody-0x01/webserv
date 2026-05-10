@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <stdint.h>
 #include <cstdlib>
 #include <strings.h>
 #include <sys/epoll.h>
@@ -197,6 +198,7 @@ int Multiplexer::run(void)
 	Multiplexer::introduce_new_context((uint64_t)&this->signal_handler);
     while (this->servers.size() && !this->aborted)
 	{
+		this->check_connections_timeout();
 		int ready = epoll_wait(this->epoll_fd,
 						 this->events, EVENT_MAX, 100);
 		if (ready < 0)
@@ -216,7 +218,7 @@ void Multiplexer::execute_epoll_event(int epoll_index)
 	void *ptr;
 
 	ptr = this->events[epoll_index].data.ptr;
-	if (!this->iscontext_valid((uint64_t)ptr))
+	if (!this->iscontext_valid((uintptr_t)ptr))
 		return ;
 	ASocketContext *handle = (ASocketContext *)ptr;
 	try {
@@ -241,12 +243,17 @@ ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERR
 	return (count);
 }
 
-void Multiplexer::introduce_new_context(uint64_t context)
+void Multiplexer::introduce_new_context(uint64_t context, bool is_client)
 {
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	self->_valid_context.insert(context);
+	if (is_client)
+	{
+		Client *client = (Client*)context;
+		self->connected_clients.insert(client);
+	}
 }
 
 void   Multiplexer::unintroduce_context(uint64_t context)
@@ -255,6 +262,8 @@ void   Multiplexer::unintroduce_context(uint64_t context)
 
 	self = Multiplexer::get_multiplexer(NULL);
 	self->_valid_context.erase(context);
+	if (self->connected_clients.find((Client*)context) != self->connected_clients.end())
+		self->connected_clients.erase((Client*)context);
 }
 
 bool   Multiplexer::iscontext_valid(uint64_t context)
@@ -271,4 +280,16 @@ void Multiplexer::kill(void)
 
 	self = Multiplexer::get_multiplexer(NULL);
 	self->abort();
+}
+
+void Multiplexer::check_connections_timeout(void)
+{
+	Multiplexer *self;
+
+	self = Multiplexer::get_multiplexer(NULL);
+	for (std::set<Client*>::iterator it = self->connected_clients.begin(); it != self->connected_clients.end(); ++it)
+	{
+		Client *client = *it;
+		if (client->timeout()) client->free();
+	}
 }

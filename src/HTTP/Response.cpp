@@ -252,6 +252,46 @@ void Response::send_resource(const HttpRequest &request)
 		this->resource.send(request);
 }
 
+
+
+void Response::setup(const HttpRequest &request)
+{
+	this->request_ptr = &request;
+	this->setup_max_body_size(request.owner);
+	this->setup_response(request);
+
+	if (this->status != OK) 
+		return ;
+	if (this->resource.getresource_type() == CGI)
+	{
+		try {
+			this->resource.cgi.execute();
+			this->stage = ProcessingCgi;
+		} catch (const char *e) {
+			this->set_status(InternalServerError);
+		}
+		return ;
+	}
+	switch (Response::classify_method(request.method))
+	{
+		// Note: any method other than Get in this section is MethodNotAllowed
+		case MethodGet:
+			this->handle_get(request);
+			break ;
+		case MethodDelete:
+			this->handle_delete();
+			break ;
+
+		case MethodPost: {
+			this->handle_post(request);
+			break ;
+		}
+		default:
+			this->set_status(BadRequest);
+			break;
+	}
+}
+
 void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
 {
 	if (!this->request_ptr)
@@ -296,23 +336,25 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->stage = DoneSending;
 		return ;
 	}
-	if (!cgi.headers_sent && cgi.headers_parsed)
+
+	if (!cgi.headers_sent && cgi.headers_parsed) {
 		cgi.send_headers(request.conn);
+	}
 	else if (cgi.headers_sent) {
 		cgi.send_body_chunk(request.conn);
 		if (request.body->size())
 			request.body->clear();
 	}
 	else if (cgi.state == DONE && !cgi.headers_sent) {
-		if (cgi.did_fail()) {
+		if (cgi.did_fail())
+		{
 			this->set_status(BadGateway);
 			return ;
 		}
 		this->set_status(InternalServerError);
 		return ;
 	}
-	if (cgi.state == DONE)
-		this->stage = DoneSending;
+	if (cgi.state == DONE) this->stage = DoneSending;
 }
 
 bool Response::is_method_allowed(std::string method)
@@ -337,7 +379,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(BadRequest);
 		return ;
 	}
-	if (request.content_length > (ssize_t)this->client_max_body_size)
+	if (request.content_length != -1 && request.content_length > (ssize_t)this->client_max_body_size)
 	{
 		this->set_status(RequestEntityTooLarge);
 		return ;
@@ -370,25 +412,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->resource.cgi.setup(request, 
 			this->resolved_results.cgi_script.first, 
 			this->resolved_results.cgi_script.second);
-		std::cout << "Cgi setupd Done!\n";
 		return ;
-	}
-	switch (Response::classify_method(request.method))
-	{
-		// Note: any method other than Get in this section is MethodNotAllowed
-		case MethodGet:
-			this->handle_get(request);
-			break ;
-		case MethodPost: {
-			this->handle_post(request);
-			break ;
-		}
-		case MethodDelete:
-			this->handle_delete();
-			break ;
-		default:
-			this->set_status(BadRequest);
-			break;
 	}
 }
 
@@ -724,3 +748,9 @@ response_stage_t Response::getstage(void) const
 {
 	return (this->stage);
 }
+
+response_stage_t &Response::getstage(void)
+{
+	return (this->stage);
+}
+

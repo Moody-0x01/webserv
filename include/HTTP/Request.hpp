@@ -48,6 +48,7 @@ typedef struct ChunkContext {
 
 	void strip_trailer(std::vector<char> &data, size_t offset);
 	void unpack(std::vector<char> &buffer);
+	bool just_started(void);
 	void log_buffer(std::vector<char> &buffer);
 
     ChunkContext();

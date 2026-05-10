@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 import sys
 import os
 
@@ -12,10 +12,8 @@ if content_length > 0:
 else:
     json_data = ""
 
-# Log to your stderr file
 print(f"Got from client[{len(json_data)}]: {json_data[:50]}...", file=sys.stderr)
 
-# 3. Send headers
 sys.stdout.write("Status: 200 OK\r\n")
 sys.stdout.write("Content-Type: text/html\r\n\r\n")
 

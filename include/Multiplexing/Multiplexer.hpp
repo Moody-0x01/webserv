@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdint.h>
 # include <unistd.h>
 # include "ServerSock.hpp"
 #include "SignalHandler.hpp"
@@ -22,7 +23,6 @@
 # include <errno.h>
 # include <cstddef>
 # include <cstring>
-# include <stdexcept>
 # include <fcntl.h>
 # include <utility>
 # include <set>
@@ -37,7 +37,8 @@ typedef std::map<int, Client> Clients;
 class Multiplexer {
 private:
 	Multiplexer() __THROWS_STRERROR;
-	std::set<uint16_t> _valid_context;
+	std::set<uintptr_t> _valid_context;
+	std::set<Client*>   connected_clients;
 	bool aborted;
 
 public:
@@ -59,7 +60,7 @@ public:
 	void   abort(void);
 
 	static void         kill(void);
-	static void			introduce_new_context(uint64_t context);
+	static void			introduce_new_context(uintptr_t context, bool is_client = false);
 	static void			unintroduce_context(uint64_t context);
 	static bool			iscontext_valid(uint64_t context);
 	static const ServerConfig &get_conf(int fd);
@@ -70,6 +71,7 @@ public:
 	static ssize_t		write(int fd, const void *buf, size_t size) __THROWS_STRERROR;
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
+	void check_connections_timeout(void);
 };
 
 void unregister_fd(int fd);

@@ -3,8 +3,11 @@
 #include <HTTP/Response.hpp>
 #include <vector>
 
+# define CLIENT_TIMEOUT 5
+
 typedef struct Client: public ASocketContext {
 public:
+	Client();
 	~Client();
 	void action(uint32_t e) __THROWS_STRERROR;
 	HttpParser parserInstance;
@@ -28,8 +31,10 @@ public:
 	void setport_from_bytes(uint32_t ip_bytes);
 	std::string getport(void);
 	void setport(std::string port);
+	bool timeout(void);
 
 	std::vector<char> _buffer;
+    time_t            last_event_time;          // Use this in your loop to kill(pid, SIGKILL) 
 private:
 	int			 _owner;
 	std::string  ip;

@@ -57,42 +57,27 @@ void run_test(const char* name, const char* raw_str, size_t len, int expected_ma
 		std::cout << "  Buffer : " << std::string(buffer.begin(), buffer.end()) << "\n";
     } else {
         std::cout << "  FAIL: Expected " << expected_mask 
-                  << " but got " << chunk.status_mask << "\n";
+                  << " but got --> " << (int)(chunk.status_mask) << "\n";
     }
     std::cout << "---------------------------------------\n";
 }
 
 void test_suite() {
-    // Test 1: Standard valid chunk
-    const char* t1 = "ee\r\nHello728367291\r\n0\r\n\r\n";
+    const char* t1 = "e\r\nHello728367291\r\n0\r\n\r\n";
     run_test("Standard Valid", t1, strlen(t1), CHUNK_COMPLETE);
 
-    // Test 2: Incomplete data (Ends inside the data segment)
     const char* t2 = "5\r\nHel";
-    run_test("Incomplete Data", t2, strlen(t2), CHUNK_DATA | CHUNK_TRAILER);
+    run_test("Incomplete Data", t2, strlen(t2), (CHUNK_DATA));
 
-    // Test 3: Malformed size (Not Hex)
     const char* t3 = "Z\r\n";
     run_test("Invalid Hex Size", t3, strlen(t3), CHUNK_ERROR);
 
-    // Test 4: Empty body (Immediate terminator)
     const char* t4 = "0\r\n\r\n";
     run_test("Empty Body", t4, strlen(t4), CHUNK_COMPLETE);
-    
-    // Test 5: Missing LF after CR
+
     const char* t5 = "5\r Hello"; 
     run_test("Missing LF", t5, 8, CHUNK_ERROR);
 
-	// Extensions: Valid chunk with Extensions
-	// Note: The current implementation does not handle extensions, so this will be treated as an error.
-	// In a full implementation, you would want to parse the extensions and not treat them as an error.
-	// For this test, we expect an error due to the presence of extensions which are not currently supported.
-	// If the implementation is updated to handle extensions, this test should be updated to reflect the expected behavior.
-	// const char* t6 = "5;ex1=12781728\r\nHello\r\n0\r\n\r\n";
-	// example of extensions: 
-	//     1. chunk-size (hex) followed by optional chunk-extension, then CRLF
-	//     2. chunk-extension is a semicolon followed by a token and optional value
-	//     e.g. "5;ex1=12781728\r\nHello\r\n0\r\n\r\n" where "5" is the chunk size, "ex1=12781728" is the extension, and "Hello" is the chunk data.
     const char* t6 = "6;ex1=12781728\r\nHelloi\r\r\n0\r\n\r\n"; 
     run_test("Missing LF", t6, strlen(t6), CHUNK_COMPLETE);
 }
