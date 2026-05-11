@@ -51,14 +51,19 @@ void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
 		throw strerror(errno);
 }
 
-void Client::unchunkify_buffer(void)
+bool Client::unchunkify_buffer(void)
 {
 	HttpRequest  &request = this->getParser().getRequestObject().getHttpRequest();
 	ChunkContext &chunk = request.chunked_context;
 	
-	if (!request.ischunked)
-		return ;
+	if (!request.ischunked) return (true);
 	chunk.unpack(this->_buffer);
+	if (chunk.is_corrupted())
+	{
+		this->response.set_status(BadRequest);
+		return (false);
+	}
+	return (true);
 }
 
 void Client::read_into_request_buffer(void) __THROWS_STRERROR {
@@ -78,6 +83,15 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 	} else
 		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
 	push_into_buffer(this->_buffer, buff, count); // Read..
+	if (clientP.state() == READY) {
+		this->body_size += count;
+		if (this->body_size > this->response.getmaxbodysize())
+		{
+			this->response.set_status(BadRequest);
+			this->switch_mode(WRITING);
+			return ;
+		}
+	}
 	if (clientP.state() != READY)
 		clientP.handle();
 }
@@ -90,37 +104,38 @@ void Client::parse_request() __THROWS_STRERROR
 	Cgi          &cgi_instance = this->response.get_resource_ref().cgi;
 
 	this->read_into_request_buffer();
-
 	if (clientP.state() != READY)
 		return ;
-	switch (this->response.getstage()) {
-		case Setup: {
-			this->response
-				.setup(request);
-		} break;
-		case ProcessingPost: {
-			// this->switch_mode(READING);
-			// TODO: Not implemented yet
-			// Post function will be placed here. once it is done. then we switch to Post in order to return the 
-			// result to the client.
-			// this->response.process_post(request); // Note that is the function that will process post.
-			// if (request.ischunked && request.chunked_context.is_done())
-			// 	this->switch_mode(WRITING);
-			this->_buffer.clear();
-		} break;
-		case ProcessingCgi: {
-			this->unchunkify_buffer(); // Unchunkify if needed..
+
+	this->unchunkify_buffer();
+	if (this->response.getstage() == Setup)
+		this->response.setup(request);
+	if (this->response.getstage() == ProcessingPost) {
+		// this->switch_mode(READING);
+		// TODO: Not implemented yet
+		// Post function will be placed here. once it is done. then we switch to Post in order to return the 
+		// result to the client.
+		// this->response.process_post(request); // Note that is the function that will process post.
+		// if (request.ischunked && request.chunked_context.is_done())
+		// 	this->switch_mode(WRITING);
+		this->_buffer.clear();
+	}
+	if (this->response.getstage() == ProcessingCgi)
+	{
+		if (this->getParser().getRequestObject().getMethod() != "POST")
+		{
+			this->switch_mode(WRITING);
+			return ;
+		}
+		if (this->_buffer.size()) {
 			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
 					(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
 			this->_buffer.clear();
-			if (cgi_instance.client_done) this->switch_mode(WRITING);
-		} break;
-		case SendingResource: {
-			this->switch_mode(WRITING);
-		} break;
-		default: {
-		};
-	}	
+		}
+		if (cgi_instance.client_done) this->switch_mode(WRITING);
+	}
+	if (this->response.getstage() == SendingResource)
+		this->switch_mode(WRITING);
 }
 
 void Client::generate_response(void) __THROWS_STRERROR

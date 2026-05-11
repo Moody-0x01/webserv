@@ -1,6 +1,7 @@
 #pragma once
 #include <Multiplexing/ServerSock.hpp>
 #include <HTTP/Response.hpp>
+#include <cstddef>
 #include <vector>
 
 # define CLIENT_TIMEOUT 5
@@ -22,7 +23,8 @@ public:
 	void   read_into_request_buffer(void) __THROWS_STRERROR;
 	void   set_owner(int owner);
 	int    get_owner(void) const;
-	void   unchunkify_buffer(void);
+	bool   unchunkify_buffer(void);
+	bool   push_into_client_buffer(const char buff[READ_CHUNK_SIZE], ssize_t count);
 
 	void setip(std::string address);
 	std::string getip(void);
@@ -34,9 +36,10 @@ public:
 	bool timeout(void);
 
 	std::vector<char> _buffer;
-    time_t            last_event_time;          // Use this in your loop to kill(pid, SIGKILL) 
+    time_t            last_event_time;   // Bytes left to read in the CURRENT chunk 
 private:
 	int			 _owner;
 	std::string  ip;
 	std::string  port;
+	size_t       body_size;
 } Client;

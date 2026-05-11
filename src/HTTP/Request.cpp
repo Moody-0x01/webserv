@@ -11,6 +11,11 @@ Request::Request() {
 
 Request::~Request() {};
 
+std::string Request::getMethod()
+{
+	return (this->request.method);
+}
+
 const HttpRequest &Request::getHttpRequest(void) const
 {
 	return (this->request);

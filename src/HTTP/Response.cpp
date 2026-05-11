@@ -224,6 +224,12 @@ Response::Response()
 	this->status = OK;
 	this->status_line = "HTTP/1.0 200 OK\r\n";
 	this->bytes_sent = -1;
+	this->client_max_body_size = 0;
+}
+
+size_t Response::getmaxbodysize(void) const
+{
+	return (this->client_max_body_size);
 }
 
 UriResolutionResult::UriResolutionResult()
@@ -336,11 +342,10 @@ void Response::process_cgi_instance(const HttpRequest &request)
 		this->stage = DoneSending;
 		return ;
 	}
-
-	if (!cgi.headers_sent && cgi.headers_parsed) {
+	if (!cgi.headers_sent && cgi.headers_parsed)
 		cgi.send_headers(request.conn);
-	}
-	else if (cgi.headers_sent) {
+	else if (cgi.headers_sent)
+	{
 		cgi.send_body_chunk(request.conn);
 		if (request.body->size())
 			request.body->clear();

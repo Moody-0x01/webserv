@@ -17,6 +17,11 @@ std::pair<bool, std::string> HttpParser::getHeaderValue(std::string header_key)
 	return get_value(this->request.getHeaders(), header_key);
 }
 
+bool ChunkContext::is_corrupted(void)
+{
+	return (this->status_mask & CHUNK_ERROR);
+}
+
 bool ChunkContext::is_reading_size(void)
 {
 	return (this->status_mask & CHUNK_START || this->status_mask & CHUNK_SIZE);
@@ -223,6 +228,8 @@ void HttpParser::parseContentLength(void)
 
 void HttpParser::handle()
 {
+	std::string headersOnly;
+
     if (this->parent == NULL)
         return;
     if (state() == IDLE)
@@ -231,7 +238,7 @@ void HttpParser::handle()
         if (it != parent->_buffer.end())
         {
 			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin());
-            std::string headersOnly = collect(parent->_buffer, endOfHeaders);
+            headersOnly = collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);
 			this->getRequestObject().setBody(&parent->_buffer);
@@ -242,11 +249,16 @@ void HttpParser::handle()
                 this->currentState = READY;
                 return;
             }
-            else 
-                this->currentState = HEADERS_DONE;
+            this->currentState = HEADERS_DONE;
         }
+		if (headersOnly.size() > MAX_HEADERS_SIZE
+			|| (!headersOnly.size() && (parent->_buffer.size() > MAX_HEADERS_SIZE)))
+		{
+			this->request.setcode(BadRequest);
+			this->currentState = READY;
+			return;
+		}
     }
-
     if (state() == HEADERS_DONE)
     {
         std::vector<Token> &tokens = lexerInstence.getTokens();

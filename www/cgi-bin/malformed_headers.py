@@ -1,3 +1,2 @@
-print("XYZZZ")
-print("Status: 200 OK")
-print()  # blank line = end of headers
+from time import sleep
+sleep(31)

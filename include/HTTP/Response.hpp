@@ -163,6 +163,8 @@ public:
 	static void init_status_lines();
 
 	void setup_max_body_size(const int owner);
+	size_t getmaxbodysize(void) const;
+	std::string getmethod();
 	void send_headers(int conn) __THROWS_STRERROR;
 	bool isdone();
 	void serialize_headers(void);

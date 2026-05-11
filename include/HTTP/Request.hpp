@@ -12,6 +12,7 @@ typedef const std::map<std::string, std::string>::const_iterator map_iterator;
 # define  READ_CHUNK_SIZE      1024 * 64
 # define  SENDING_CHUNK_SIZE   1024 * 16
 # define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
+# define  MAX_HEADER_SIZE      16 * 1024
 # define  NO_CODE 999
 # define CR '\r'
 # define LF '\n'
@@ -28,9 +29,8 @@ typedef uint8_t ChunkStatusBit;
 
 typedef struct ChunkContext {
 	std::string       hex;
-    ChunkStatusBit    status_mask; // Current position in the state machine
-    unsigned long     remaining;   // Bytes left to read in the CURRENT chunk 
-							       // Cursor??	
+    ChunkStatusBit    status_mask;
+    unsigned long     remaining;
 	unsigned long     cursor;
 	char              prev;
 	std::vector<char> chunk_data;
@@ -50,6 +50,7 @@ typedef struct ChunkContext {
 	void unpack(std::vector<char> &buffer);
 	bool just_started(void);
 	void log_buffer(std::vector<char> &buffer);
+	bool is_corrupted(void);
 
     ChunkContext();
 } ChunkContext;
@@ -66,7 +67,6 @@ typedef struct HttpRequest {
 	std::vector<char> *body;
     std::string query_string;
 	ssize_t content_length;
-	// Chunked state
 	ChunkContext chunked_context;
 } HttpRequest;
 
@@ -81,6 +81,7 @@ public:
 
 
     void setMethod(const std::string &m);
+	std::string getMethod();
     void setURI(const std::string &u);
     void setHttpVersion(const std::string &v);
     void addHeader(const std::string &key, const std::string &value);
