@@ -2,6 +2,7 @@
 #include "Multiplexing/Multiplexer.hpp"
 #include <Server.hpp>
 #include <algorithm>
+#include <cstddef>
 #include <dirent.h>
 #include <cstdlib>
 #include <cerrno>
@@ -223,7 +224,7 @@ Response::Response()
 	this->request_ptr = NULL;
 	this->status = OK;
 	this->status_line = "HTTP/1.0 200 OK\r\n";
-	this->bytes_sent = -1;
+	this->bytes_sent = 0;
 	this->client_max_body_size = 0;
 }
 
@@ -532,7 +533,9 @@ void Response::handle_get(const HttpRequest &request)
 
 void Response::handle_post(const HttpRequest &request)
 {
-	if ((this->bytes_sent == -1) && (this->resolved_results.resource_type == UriResolutionResult::directory))
+	(void)request;
+	std::cout << "File: " << this->resolved_results.filesystem_path << std::endl;
+	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		std::string new_file_path = this->resolved_results.filesystem_path;
 		time_t timestamp = time(NULL);
@@ -544,43 +547,45 @@ void Response::handle_post(const HttpRequest &request)
 		new_file_path += oss.str();
 		this->resolved_results.filesystem_path = new_file_path;
 		this->resolved_results.resource_type = UriResolutionResult::file;
-		std::cout << "Target File: " << new_file_path << std::endl;
 		this->stage = ProcessingPost;
 		this->bytes_sent = 0;
 	}
-	std::fstream out_file(this->resolved_results.filesystem_path.c_str(), std::ios::out | std::ios::binary | std::ios::app);
-	if (!out_file.is_open())
+	errno = 0;
+	this->__rstream = new std::ofstream(this->resolved_results.filesystem_path.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+	if (!this->__rstream->is_open())
 	{
-		this->set_status(InternalServerError);
-		return;
+		delete this->__rstream;
+		this->__rstream = NULL;
+        if (errno == EACCES) this->set_status(Unauthorized);
+        else this->set_status(InternalServerError);
 	}
-	std::cout << "request.body.size() " << request.body->size() << "\n";
-	std::cout << "request.content_length " << request.content_length << "\n";
-	out_file.write(request.body->data(), request.body->size());
+}
 
-	if (out_file.fail())
+void Response::dump_post_body(std::vector<char> &body)
+{
+	if(this->__rstream->write(body.data(), body.size()))
 	{
-		out_file.close();
+		this->bytes_sent += body.size();
+		std::cout << "Wrote: " << this->bytes_sent << "\n";
+		if (this->bytes_sent >= request_ptr->content_length || request_ptr->chunked_context.is_done())
+		{
+			this->set_status(Created);
+			this->resource.setresource_type(Text);
+			this->resource.setmime_type(TextHtml);
+			this->resource.set_stream_buffer(
+				"<!DOCTYPE html>\n"
+				"<html>\n"
+				"<head><title>Created</title></head>\n"
+				"<body><h1>File Created</h1><p>Your file has been successfully created.</p></body>\n"
+				"</html>\n"
+			);
+			delete this->__rstream;
+		}
+	} else {
 		this->set_status(InternalServerError);
-		return;
+		delete this->__rstream;
 	}
-	this->bytes_sent += request.body->size();
-	request.body->clear();
-	if (this->bytes_sent >= request.content_length)
-	{
-		this->stage = SendingResource;
-		this->set_status(Created);
-		this->resource.setresource_type(Text);
-		this->resource.setmime_type(TextHtml);
-		this->resource.set_stream_buffer(
-			"<!DOCTYPE html>\n"
-			"<html>\n"
-			"<head><title>Created</title></head>\n"
-			"<body><h1>File Created</h1><p>Your file has been successfully created.</p></body>\n"
-			"</html>\n"
-		);
-	}
-	out_file.close();
+	body.clear();
 }
 
 void Response::handle_delete()

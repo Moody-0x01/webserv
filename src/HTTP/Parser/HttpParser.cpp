@@ -42,7 +42,7 @@ bool ChunkContext::is_reading_crlf(void)
 	return (this->status_mask & CHUNK_TRAILER);
 }
 
-bool ChunkContext::is_done(void)
+bool ChunkContext::is_done(void) const
 {
 	return (this->status_mask & CHUNK_COMPLETE);
 }

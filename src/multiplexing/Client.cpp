@@ -110,16 +110,8 @@ void Client::parse_request() __THROWS_STRERROR
 	this->unchunkify_buffer();
 	if (this->response.getstage() == Setup)
 		this->response.setup(request);
-	if (this->response.getstage() == ProcessingPost) {
-		// this->switch_mode(READING);
-		// TODO: Not implemented yet
-		// Post function will be placed here. once it is done. then we switch to Post in order to return the 
-		// result to the client.
-		// this->response.process_post(request); // Note that is the function that will process post.
-		// if (request.ischunked && request.chunked_context.is_done())
-		// 	this->switch_mode(WRITING);
-		this->_buffer.clear();
-	}
+	if (this->response.getstage() == ProcessingPost)
+		this->response.dump_post_body(this->_buffer);
 	if (this->response.getstage() == ProcessingCgi)
 	{
 		if (this->getParser().getRequestObject().getMethod() != "POST")

@@ -39,7 +39,7 @@ typedef struct ChunkContext {
 
 	bool is_reading_size(void);
 	bool is_reading_data(void);
-	bool is_done(void);
+	bool is_done(void) const;
 	bool is_reading_crlf(void);
 
 	void consume_chunk_data(std::vector<char> &buffer);

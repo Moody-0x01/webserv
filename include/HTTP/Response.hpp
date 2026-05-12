@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <HTTP/Request.hpp>
 #include <CGI/Cgi.hpp>
+#include <vector>
 
 struct LocationConfig;
 
@@ -143,6 +144,7 @@ private:
 	response_stage_t stage;
 	std::string headers_as_str;
 	ssize_t bytes_sent;
+	std::ofstream *__rstream;
 
 	Resource             resource; // NOTE: response if the request has to be responded by some file. *.html, *.mp3, *.mp4, error page? idk
 	UriResolutionResult  resolved_results; // holds the resultion struct
@@ -185,5 +187,6 @@ public:
 
 	void setup(const HttpRequest &request); // TODO: Once the server finishes reading the headers. call this so anything that needs to be done before trying to get the body is actually done, including..
 	
+	void dump_post_body(std::vector<char> &body);
 };
 
