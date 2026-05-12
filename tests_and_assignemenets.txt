@@ -15,3 +15,7 @@ use your freedom of moving to move in cluster and slap who is responsible for th
 example: bla.bla/post/filename.dd
 
 in POST you shouldn't look for filename.dd if it exists u dumb, its gonna get created, peace!
+
+Bruh Signals don't work on my machine solve that shit lhucine
+
+
