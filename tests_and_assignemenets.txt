@@ -8,4 +8,10 @@ test: GET /%20%20ind.html gives 404 while the file '  ind.html' exists
 who: Ameen (go back to work nigga)
 state: Solved
 
+
 use your freedom of moving to move in cluster and slap who is responsible for the bug.
+
+
+example: bla.bla/post/filename.dd
+
+in POST you shouldn't look for filename.dd if it exists u dumb, its gonna get created, peace!
