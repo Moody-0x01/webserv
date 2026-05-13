@@ -535,7 +535,6 @@ void Response::handle_get(const HttpRequest &request)
 void Response::handle_post(const HttpRequest &request)
 {
 	(void)request;
-	std::cout << "File: " << this->resolved_results.filesystem_path << std::endl;
 	if (this->resolved_results.resource_type == UriResolutionResult::directory)
 	{
 		std::string new_file_path = this->resolved_results.filesystem_path;
@@ -548,11 +547,13 @@ void Response::handle_post(const HttpRequest &request)
 		new_file_path += oss.str();
 		this->resolved_results.filesystem_path = new_file_path;
 		this->resolved_results.resource_type = UriResolutionResult::file;
-		this->stage = ProcessingPost;
 		this->bytes_sent = 0;
 	}
 	errno = 0;
-	this->__rstream = new std::ofstream(this->resolved_results.filesystem_path.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+	if (this->resolved_results.filesystem_path[this->resolved_results.filesystem_path.length() - 1] != '/') this->resolved_results.filesystem_path += "/";
+	std::string fullpath = this->resolved_results.filesystem_path + this->resolved_results.post_fn;
+	std::cout << "File: " << fullpath << std::endl;
+	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary | std::ios::app);
 	if (!this->__rstream->is_open())
 	{
 		delete this->__rstream;
@@ -560,6 +561,7 @@ void Response::handle_post(const HttpRequest &request)
         if (errno == EACCES) this->set_status(Unauthorized);
         else this->set_status(InternalServerError);
 	}
+	this->stage = ProcessingPost;
 }
 
 void Response::dump_post_body(std::vector<char> &body)
