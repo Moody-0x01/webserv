@@ -109,7 +109,7 @@ static std::string build_filesystem_target(const UriResolutionResult &resolved, 
 	{
 		bool needs_index = false;
 		if (relative_uri == "/") needs_index = true;
-		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
+		else if (!resolved.request_path.empty() && resolved.resource_type == UriResolutionResult::directory)
 			needs_index = true;
 		if (needs_index && request.method == "GET")
 			filesystem_path = join_fs_path(filesystem_path, resolved.index);
