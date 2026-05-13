@@ -20,3 +20,5 @@ state: Solved, for thing, you will have the parent in URI and the file is in pos
 Bruh Signals don't work on my machine solve that shit lhucine
 
 
+disc: POST AND DELETE ARE DONE! 
+state: Solved
