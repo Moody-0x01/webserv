@@ -109,7 +109,7 @@ static std::string build_filesystem_target(const UriResolutionResult &resolved, 
 	{
 		bool needs_index = false;
 		if (relative_uri == "/") needs_index = true;
-		else if (!resolved.request_path.empty() && resolved.request_path[resolved.request_path.size() - 1] == '/')
+		else if (!resolved.request_path.empty() && resolved.resource_type == UriResolutionResult::directory)
 			needs_index = true;
 		if (needs_index && request.method == "GET")
 			filesystem_path = join_fs_path(filesystem_path, resolved.index);
@@ -397,6 +397,8 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
+	std::cout << "fs path: " << this->resolved_results.filesystem_path << std::endl;
+	std::cout << "Index: "   << this->resolved_results.index           << std::endl;
 	if (this->resolved_results.resource_type == UriResolutionResult::redirect)
 	{
 		this->appendheader("Location", this->resolved_results.matched_location->return_loc.second.c_str());
