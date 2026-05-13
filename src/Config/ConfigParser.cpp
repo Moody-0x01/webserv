@@ -1,6 +1,6 @@
 #include <Parser/Config/Config.hpp>
 
-LocationConfig::LocationConfig() : uri(""), root(""), index(""), upload_path(""), autoindex(false), upload_enabled(true) {}
+LocationConfig::LocationConfig() : uri(""), root(""), index(""), upload_path(""), autoindex(true), upload_enabled(true) {}
 
 LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     if (this != &other) {
@@ -17,7 +17,7 @@ LocationConfig& LocationConfig::operator=(const LocationConfig& other) {
     return *this;
 }
 
-ServerConfig::ServerConfig() : port(""), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index(""), autoindex(false) {}
+ServerConfig::ServerConfig() : port(""), host(""), server_name(""), client_max_body_size(1024UL * 1024UL), root(""), index(""), autoindex(true) {}
 
 ServerConfig& ServerConfig::operator=(const ServerConfig& other) {
     if (this != &other) {
@@ -326,8 +326,8 @@ void ConfigParser::handleReturn() {
 
 void ConfigParser::verifyExt(ConfigToken &t) {
     std::string ext = t.value;
-    if (ext != ".py")
-        errorLogger("Unsupported CGI extension \"" + ext + "\"", t.line);
+    // if (ext != ".py")
+    //     errorLogger("Unsupported CGI extension \"" + ext + "\"", t.line);
 }
 
 void ConfigParser::handleCgiPass() {
