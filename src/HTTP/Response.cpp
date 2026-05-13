@@ -550,7 +550,8 @@ void Response::handle_post(const HttpRequest &request)
 		this->bytes_sent = 0;
 	}
 	errno = 0;
-	if (this->resolved_results.filesystem_path[this->resolved_results.filesystem_path.length() - 1] != '/') this->resolved_results.filesystem_path += "/";
+	if (!this->resolved_results.post_fn.empty() && this->resolved_results.filesystem_path[this->resolved_results.filesystem_path.length() - 1] != '/')
+		this->resolved_results.filesystem_path += "/";
 	std::string fullpath = this->resolved_results.filesystem_path + this->resolved_results.post_fn;
 	std::cout << "File: " << fullpath << std::endl;
 	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary | std::ios::app);
@@ -560,6 +561,7 @@ void Response::handle_post(const HttpRequest &request)
 		this->__rstream = NULL;
         if (errno == EACCES) this->set_status(Unauthorized);
         else this->set_status(InternalServerError);
+		return ;
 	}
 	this->stage = ProcessingPost;
 }
