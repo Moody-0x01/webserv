@@ -119,6 +119,7 @@ struct UriResolutionResult {
 	std::string			root;
 	std::string			index;
 	std::string			filesystem_path;
+	std::string     post_fn;
 	std::pair <std::string, std::string> cgi_script; // holds full script path and interpreter, empty if not a cgi
 };
 

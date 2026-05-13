@@ -1,0 +1,94 @@
+--------------------------7b63eff036fb401e
+Content-Disposition: form-data; name="file"; filename="main.cpp"
+Content-Type: application/octet-stream
+
+#include <Server.hpp>
+#include <cstddef>
+#include <cstring>
+#include <ios>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <unistd.h>
+#include <vector>
+
+void test_chunk_context(void);
+
+// char chunked_data[] = "a\r\n1234567890\r\n4\r\nWiki\r\n3\r\nmom\r\n0\r\n\r\n";
+
+int main(int ac, char **av)
+// int main()
+{
+	std::string config_file = DEFAULT_CONF;
+	if (ac > 1) config_file = av[1];
+	try {
+		Config conf = parse_config_file(config_file);
+		std::vector<ServerConfig> servers = conf.getservers();
+		Multiplexer *multi = Multiplexer::create_multiplexer(servers);
+		conf.debug();
+		multi->run();
+	} catch (std::runtime_error &e) {
+		std::cerr << "[ Multiplexer::init ] " << e.what() << "\n";
+		return (1);
+	} catch (const char *e) {
+		std::cerr << "[ Multiplexer::init ] " << e << "\n";
+		return (1);
+	}
+	// test_chunk_context();
+}
+
+struct ChunkTest {
+    std::string name;
+    std::string data;
+    uint32_t expected_final_mask;
+    bool should_be_error;
+};
+
+void run_test(const char* name, const char* raw_str, size_t len, int expected_mask) {
+    ChunkContext chunk;
+    // Simulate incoming buffer
+    std::vector<char> buffer(raw_str, raw_str + len);
+
+    std::cout << "[TEST] " << name << "\n";
+    chunk.unpack(buffer);
+
+    bool error_detected = (chunk.status_mask & CHUNK_ERROR);
+    
+    if (error_detected && (expected_mask == CHUNK_ERROR)) {
+        std::cout << "  PASS: Correcty identified error.\n";
+    } else if (chunk.status_mask == expected_mask) {
+        std::cout << "  PASS: Status matches expected value.\n";
+		std::cout << "  Buffer : " << std::string(buffer.begin(), buffer.end()) << "\n";
+    } else {
+        std::cout << "  FAIL: Expected " << expected_mask 
+                  << " but got --> " << (int)(chunk.status_mask) << "\n";
+    }
+    std::cout << "---------------------------------------\n";
+}
+
+void test_suite() {
+    const char* t1 = "e\r\nHello728367291\r\n0\r\n\r\n";
+    run_test("Standard Valid", t1, strlen(t1), CHUNK_COMPLETE);
+
+    const char* t2 = "5\r\nHel";
+    run_test("Incomplete Data", t2, strlen(t2), (CHUNK_DATA));
+
+    const char* t3 = "Z\r\n";
+    run_test("Invalid Hex Size", t3, strlen(t3), CHUNK_ERROR);
+
+    const char* t4 = "0\r\n\r\n";
+    run_test("Empty Body", t4, strlen(t4), CHUNK_COMPLETE);
+
+    const char* t5 = "5\r Hello"; 
+    run_test("Missing LF", t5, 8, CHUNK_ERROR);
+
+    const char* t6 = "6;ex1=12781728\r\nHelloi\r\r\n0\r\n\r\n"; 
+    run_test("Missing LF", t6, strlen(t6), CHUNK_COMPLETE);
+}
+
+void test_chunk_context(void)
+{
+	test_suite();
+}
+
+--------------------------7b63eff036fb401e--

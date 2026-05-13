@@ -241,6 +241,7 @@ UriResolutionResult::UriResolutionResult()
 	root = "";
 	index = "";
 	filesystem_path = "/";
+	post_fn = "";
 	cgi_script = std::make_pair(std::string(), std::string());
 }
 
@@ -749,6 +750,18 @@ UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 	}
 
 	resolved.resource_type = get_resource_type(resolved.filesystem_path);
+	if (resolved.resource_type == UriResolutionResult::None && request.method == "POST")
+	{
+		size_t slash = resolved.filesystem_path.find_last_of('/');
+		std::string parent_path = (slash == std::string::npos || slash == 0)
+			? "/"
+			: resolved.filesystem_path.substr(0, slash);
+		resolved.post_fn = (slash == std::string::npos) ? resolved.filesystem_path : resolved.filesystem_path.substr(slash + 1);
+		resolved.filesystem_path = parent_path;
+
+		if (get_resource_type(parent_path) != UriResolutionResult::None)
+			resolved.resource_type = UriResolutionResult::file;
+	}
 	if (resolved.resource_type == UriResolutionResult::file)
 		resolve_cgi_script(resolved, best_location);
 	return resolved;
