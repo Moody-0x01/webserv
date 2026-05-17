@@ -143,12 +143,6 @@ void ChunkContext::unpack(std::vector<char> &buffer)
 	this->cursor = 0;
 	this->chunk_data.clear();
 	this->chunk_data.reserve(buffer.size());
-	// std::cout << "Unpacking data: " << "\n";
-	// for (size_t i = 0; i < buffer.size(); i++)
-	// 	std::cout << std::hex << (int)buffer[i] << " ";
-	// std::cout << "\n";
-	// std::cin.get();
-
 
 	while (this->cursor < buffer.size()
 			&& !(this->status_mask & (CHUNK_ERROR | CHUNK_COMPLETE)))
@@ -165,22 +159,6 @@ void ChunkContext::unpack(std::vector<char> &buffer)
 		if (this->is_reading_data())
 			this->consume_chunk_data(buffer);
 	}
-	// std::cout << "Stopped at    : " << this->cursor    << "\n";
-	// std::cout << "rest    at    : " << this->remaining << "\n";
-	// std::cout << "Available was : " << buffer.size()   << "\n";
-	// std::cout << "Unchunked     : " << this->chunk_data.size()   << "\n";
-	//
-	// if (this->status_mask & CHUNK_ERROR)
-	// 	std::cout << "Chunk parsing error\n";
-	// if (this->status_mask & CHUNK_COMPLETE)
-	// 	std::cout << "Chunk parsing complete\n";
-	// if (this->status_mask & CHUNK_TRAILER)
-	// 	std::cout << "Chunk parsing trailer\n";
-	// if (this->status_mask & CHUNK_DATA)
-	// 	std::cout << "Chunk parsing data\n";
-	// if (this->status_mask & CHUNK_SIZE)
-	// 	std::cout << "Chunk parsing size\n";
-	// std::cin.get();
 
 	if (this->status_mask & CHUNK_COMPLETE)
 		this->status_mask = CHUNK_COMPLETE;
@@ -210,7 +188,6 @@ bool HttpParser::setChunkedEncoding(void)
 
 void HttpParser::parseContentLength(void)
 {
-
 	std::pair<bool, std::string> pair = this->getHeaderValue("content-length");
 
 	if (pair.first)
@@ -219,11 +196,12 @@ void HttpParser::parseContentLength(void)
 		if (!(ss >> this->targetBodySize)) {
 			this->request.setcode(BadRequest);
 		}
-		else
+		else {
 			this->request.getHttpRequest().content_length = this->targetBodySize;
+		}
 		return ;
 	}
-	this->request.setcode(ContentLengthRequired);
+	this->request.setcode(BadRequest);
 }
 
 void HttpParser::handle()

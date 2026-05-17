@@ -85,15 +85,9 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 	utility::push_into_buffer(this->_buffer, buff, count); // Read..
 	if (clientP.state() == READY) {
 		this->body_size += count;
-		if (this->body_size > this->response.getmaxbodysize())
-		{
-			this->response.set_status(BadRequest);
-			this->switch_mode(WRITING);
-			return ;
-		}
+		return ;
 	}
-	if (clientP.state() != READY)
-		clientP.handle();
+	clientP.handle();
 }
 
 void Client::parse_request() __THROWS_STRERROR

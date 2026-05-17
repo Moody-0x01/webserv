@@ -266,8 +266,10 @@ void Response::setup(const HttpRequest &request)
 	this->setup_max_body_size(request.owner);
 	this->setup_response(request);
 
-	if (this->status != OK) 
+	if (this->status != OK) {
+		// std::cout << "Response setup failed with status: " << this->status << std::endl;
 		return ;
+	}
 	if (this->resource.getresource_type() == CGI)
 	{
 		try {
@@ -280,7 +282,6 @@ void Response::setup(const HttpRequest &request)
 	}
 	switch (Response::classify_method(request.method))
 	{
-		// Note: any method other than Get in this section is MethodNotAllowed
 		case MethodGet:
 			this->handle_get(request);
 			break ;
@@ -333,17 +334,17 @@ void Response::process_cgi_instance(const HttpRequest &request)
 
 bool Response::is_method_allowed(std::string method)
 {
-	if (!resolved_results.matched_location || resolved_results.matched_location->methods.empty())
-	{
-		if (method == "GET" || method == "POST" || method == "DELETE") return (true);
-		else return false;
-	}
+	if (!resolved_results.matched_location)
+		return (false);
+	if (resolved_results.matched_location->methods.empty())
+		if(!(method == "GET" || method == "POST" || method == "DELETE")) return (false);
 	for (size_t i = 0; i < resolved_results.matched_location->methods.size(); ++i)
 	{
 		if (resolved_results.matched_location->methods[i] == method)
 			return (true);
 	}
 	return (false);
+	
 }
 
 void Response::setup_response(const HttpRequest &request)
@@ -353,28 +354,30 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(BadRequest);
 		return ;
 	}
-	if (request.content_length != -1 && request.content_length > (ssize_t)this->client_max_body_size)
-	{
-		this->set_status(RequestEntityTooLarge);
-		return ;
-	}
 	if (request.isbadrequest)
 	{
 		this->set_status(request.code);
 		return ;
 	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
+	if (!this->is_method_allowed(request.method))
+	{
+		std::cout << "Method " << request.method << " is not allowed for this resource\n";
+		this->set_status(MethodNotAllowed);
+		return ;
+	}
+	if (request.content_length != -1 && request.content_length > (ssize_t)this->client_max_body_size)
+	{
+		std::cout << "Content-Length: " << request.content_length << " exceeds client_max_body_size: " << this->client_max_body_size << std::endl;
+		this->set_status(RequestEntityTooLarge);
+		return ;
+	}
 	std::cout << "fs path: " << this->resolved_results.filesystem_path << std::endl;
 	std::cout << "Index: "   << this->resolved_results.index           << std::endl;
 	if (this->resolved_results.resource_type == UriResolutionResult::redirect)
 	{
 		this->appendheader("Location", this->resolved_results.matched_location->return_loc.second.c_str());
 		this->set_status(resolved_results.matched_location->return_loc.first);
-		return ;
-	}
-	if (!this->is_method_allowed(request.method))
-	{
-		this->set_status(MethodNotAllowed);
 		return ;
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
