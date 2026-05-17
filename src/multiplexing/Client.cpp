@@ -47,7 +47,7 @@ void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
 {
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
-	if (!epoll_switch(self->epoll_fd, this->get_socket(), mode, this))
+	if (!utility::epoll_switch(self->epoll_fd, this->get_socket(), mode, this))
 		throw strerror(errno);
 }
 
@@ -82,7 +82,7 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 		count = Multiplexer::read(this->get_socket(), buff, to_read); // NOTE: If a read fails it should throw,
 	} else
 		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-	push_into_buffer(this->_buffer, buff, count); // Read..
+	utility::push_into_buffer(this->_buffer, buff, count); // Read..
 	if (clientP.state() == READY) {
 		this->body_size += count;
 		if (this->body_size > this->response.getmaxbodysize())

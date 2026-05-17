@@ -51,7 +51,7 @@ void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
 	Multiplexer *self;
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
-	if (!epoll_switch(self->epoll_fd, fd, mode, this))
+	if (!utility::epoll_switch(self->epoll_fd, fd, mode, this))
 		throw strerror(errno);
 }
 
@@ -82,7 +82,7 @@ void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 	//         SEND_SIZE
 	//         SEND_CHUNCK (Max is WRITE_CHUNK_SIZE)
 
-	push_into_buffer(this->client_body_buffer, buffer, size);
+	utility::push_into_buffer(this->client_body_buffer, buffer, size);
 	this->client_read_bytes += size; 
 	if (this->cgi_content_length == -1)
 		return ;
@@ -100,7 +100,7 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 		this->client_done = true;
 		return ;
 	}
-	push_into_buffer(this->cgi_body_buffer, buffer, size);
+	utility::push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
 	if (!chunk && this->cgi_read_bytes >= this->client_content_length) this->client_done = true;
 	if (chunk && chunk->is_done()) this->client_done = true;
@@ -127,7 +127,7 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 
 void Cgi::send_headers(int conn) __THROWS_STRERROR
 {
-	std::string headers = serialize_headers(this->headers, true);
+	std::string headers = utility::serialize_headers(this->headers, true);
 	::send(conn, headers.c_str(), headers.size(), 0);
 	this->headers_sent = true;
 }
@@ -384,8 +384,8 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 	self = Multiplexer::get_multiplexer(NULL);
 	if (!self) throw "Well, failed to get a Multiplexer class";
 
-	if (set_nonblocking(this->streams[CGI_WRITE_END]) == -1) throw strerror(errno);
-	if (set_nonblocking(this->streams[CGI_READ_END]) == -1) throw strerror(errno);
+	if (utility::set_nonblocking(this->streams[CGI_WRITE_END]) == -1) throw strerror(errno);
+	if (utility::set_nonblocking(this->streams[CGI_READ_END]) == -1) throw strerror(errno);
 
     this->state = ReadingHeaders;
     event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR;
@@ -407,8 +407,8 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
 
 bool Cgi::is_executable(void)
 {
-	if (!check_permissions(this->interpreter)) return (false);
-	if (!exists(this->filename)) return (false);
+	if (!utility::check_permissions(this->interpreter)) return (false);
+	if (!utility::exists(this->filename)) return (false);
 	return (true);
 }
 
@@ -430,14 +430,14 @@ void Cgi::execute(void) __THROWS_STRERROR
     envp.push_back(NULL);
 	if (pipe(input) == -1) throw strerror(errno);
 	if (pipe(output) == -1) {
-		close_fdlist(input);
+		utility::close_fdlist(input);
 		throw strerror(errno);
 	}
 	this->pid = fork();
 	if (this->pid == -1)
 	{
-		close_fdlist(output);
-		close_fdlist(input);
+		utility::close_fdlist(output);
+		utility::close_fdlist(input);
 		throw strerror(errno);
 	}
 	if (this->pid == 0)
@@ -451,16 +451,16 @@ void Cgi::execute(void) __THROWS_STRERROR
 			dup2(logfd, STDERR_FILENO);
 			close(logfd);
 		}
-		close_fdlist(output);
-		close_fdlist(input);
+		utility::close_fdlist(output);
+		utility::close_fdlist(input);
 		execve(this->interpreter.c_str(), args, &envp[0]);
 		_exit(127);
 	}
 	this->last_event_time = 
 		time(NULL);
 	if (this->last_event_time < 0) {
-		close_fdlist(output);
-		close_fdlist(input);
+		utility::close_fdlist(output);
+		utility::close_fdlist(input);
 		throw strerror(errno);
 	}
 	this->streams[CGI_READ_END] = output[STDIN_FILENO]; 
@@ -483,25 +483,21 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	std::vector<std::string> pair;
 
 	headers =
-		split(this->headers_buffer, "\n");
-	if (!isheaders_valid(headers))
+		utility::split(this->headers_buffer, "\n");
+	if (!utility::isheaders_valid(headers))
 	{
 		this->gateway_failure();
 		return ;
 	}
 	for (size_t i = 0; i < headers.size(); ++i)
 	{
-		pair = split(headers[i], " :");
-		if (pair.size() != 2 && pair.size() != 3) {
+		pair = utility::split_by_two(headers[i], ":");
+		if (pair.size() != 2) {
 			this->gateway_failure();
 			return ;
 		}
 		std::transform(pair[0].begin(), pair[0].end(), pair[0].begin(), ::tolower);
-		if (pair[0] == "status" && pair.size() == 3) {
-			//            Status:    xxx             OK?
-			this->headers[pair[0]] = pair[1] + " " + pair[2];
-		} else
-			this->headers[pair[0]] = pair[1];
+		this->headers[pair[0]] = pair[1];
 	}
 	this->state = ReadingBody;
 	this->headers_parsed = true;

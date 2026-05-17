@@ -169,7 +169,6 @@ public:
 	size_t getmaxbodysize(void) const;
 	std::string getmethod();
 	void send_headers(int conn) __THROWS_STRERROR;
-	bool isdone();
 	void serialize_headers(void);
 	void appendheader(const char *key, const char  *value);
 	void set_status(int s);
@@ -178,7 +177,6 @@ public:
 	static UriResolutionResult resolve_uri_to_path(const HttpRequest &request);
 	void get_error_page_html(const HttpRequest &request, int code);
 	void setup_response(const HttpRequest &request);
-	void continue_processing(const HttpRequest &request) __THROWS_STRERROR;
 	bool is_method_allowed(std::string method);
 	void send_resource(const HttpRequest &request);
 	void process_cgi_instance(const HttpRequest &request);

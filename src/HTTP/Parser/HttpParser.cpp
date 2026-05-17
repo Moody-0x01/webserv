@@ -14,7 +14,7 @@ ChunkContext::ChunkContext() : hex(""), status_mask(CHUNK_START), remaining(0), 
 
 std::pair<bool, std::string> HttpParser::getHeaderValue(std::string header_key)
 {
-	return get_value(this->request.getHeaders(), header_key);
+	return utility::get_value(this->request.getHeaders(), header_key);
 }
 
 bool ChunkContext::is_corrupted(void)
@@ -234,11 +234,11 @@ void HttpParser::handle()
         return;
     if (state() == IDLE)
     {
-		std::vector<char>::iterator it = search(parent->_buffer, "\r\n\r\n");
+		std::vector<char>::iterator it = utility::search(parent->_buffer, "\r\n\r\n");
         if (it != parent->_buffer.end())
         {
 			size_t endOfHeaders = ((it + 4) - parent->_buffer.begin());
-            headersOnly = collect(parent->_buffer, endOfHeaders);
+            headersOnly = utility::collect(parent->_buffer, endOfHeaders);
             parent->_buffer.erase(parent->_buffer.begin(),
 					parent->_buffer.begin() + endOfHeaders);
 			this->getRequestObject().setBody(&parent->_buffer);

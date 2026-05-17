@@ -110,7 +110,7 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 		throw strerror(errno);
     }
     freeaddrinfo(res);
-	if (set_nonblocking(server_fd) == -1)
+	if (utility::set_nonblocking(server_fd) == -1)
 		throw strerror(errno);
     if (listen(server_fd, SOMAXCONN) < 0)
 		throw strerror(errno);
@@ -146,7 +146,7 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	if (conn == -1) throw strerror(errno);
 	ip = ntohl(addr.sin_addr.s_addr);
 	port = ntohl(addr.sin_addr.s_addr);
-	if (set_nonblocking(conn) == -1) throw strerror(errno);
+	if (utility::set_nonblocking(conn) == -1) throw strerror(errno);
 
 	self->servers[server->get_socket()].second[conn] = Client();
 

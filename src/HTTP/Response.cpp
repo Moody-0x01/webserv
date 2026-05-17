@@ -1,4 +1,4 @@
- #include "HTTP/Response.hpp"
+#include "HTTP/Response.hpp"
 #include "Multiplexing/Multiplexer.hpp"
 #include <Server.hpp>
 #include <algorithm>
@@ -127,7 +127,7 @@ static void resolve_cgi_script(UriResolutionResult &resolved, const LocationConf
 	{
 		resolved.resource_type = UriResolutionResult::cgi;
 		resolved.cgi_script = std::make_pair(resolved.filesystem_path, cgi_it->second);
-		if (!exists(resolved.filesystem_path)) {
+		if (!utility::exists(resolved.filesystem_path)) {
 			resolved.resource_type = UriResolutionResult::None;
 		}
 	}
@@ -260,8 +260,6 @@ void Response::send_resource(const HttpRequest &request)
 		this->resource.send(request);
 }
 
-
-
 void Response::setup(const HttpRequest &request)
 {
 	this->request_ptr = &request;
@@ -297,37 +295,6 @@ void Response::setup(const HttpRequest &request)
 		default:
 			this->set_status(BadRequest);
 			break;
-	}
-}
-
-void Response::continue_processing(const HttpRequest &request) __THROWS_STRERROR
-{
-	if (!this->request_ptr)
-	{
-		this->request_ptr = &request;
-		this->setup_max_body_size(request.owner);
-	}
-	Cgi &cgi = this->resource.cgi;
-	if (this->stage == Setup)
-	{
-		this->setup_response(request);
-		if (this->resource.getresource_type() == CGI) {
-			try {
-				cgi.execute();
-				this->stage = ProcessingCgi;
-			} catch (const char *e) {
-				this->set_status(InternalServerError);
-			}
-		}
-	}
-	switch (this->stage) {
-		case SendingResource: {
-			this->send_resource(request);
-		} break;
-		case ProcessingCgi: {
-			this->process_cgi_instance(request);
-		} break;
-		default: {};
 	}
 }
 
@@ -504,9 +471,8 @@ void Response::serve_file(void)
 		else
 			this->set_status(open_status);
 	}
-	else {
+	else
 		this->set_status(OK);
-	}
 
 	std::string content_type = this->resource.getmime_type();
 	this->appendheader("Content-Type", content_type.c_str());
@@ -658,7 +624,7 @@ Response::~Response()
 void Response::serialize_headers(void) {
 	// Max header size will be <= 16Kb so we need to just serialize it then send
 	// Then check for any error. and close in case.
-	this->headers_as_str = (this->status_line + ::serialize_headers(this->headers, false));
+	this->headers_as_str = (this->status_line + utility::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
 
@@ -671,16 +637,6 @@ void Response::send_headers(int conn) __THROWS_STRERROR
 		 this->headers_as_str.size());
 }
 
-
-//
-// // status line // HTTP/1.0 200 OK
-//
-bool Response::isdone(void)
-{
-	// TODO: What if the body was not sent yet??
-	// what if it is a file? cgi?..
-	return (true);
-}
 
 void Response::init_status_lines()
 {
@@ -698,7 +654,6 @@ void Response::init_status_lines()
     Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
     Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
     Response::status_lines[RequestEntityTooLarge] = "HTTP/1.0 413 Request Entity TooLarge";
-
 	Response::status_lines[ContentLengthRequired] = "HTTP/1.0 411 Length Required";
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";
@@ -735,7 +690,7 @@ const UriResolutionResult &Response::get_resolved_results(void) const
 UriResolutionResult Response::resolve_uri_to_path(const HttpRequest &request)
 {
 	UriResolutionResult resolved;
-	std::string decoded_uri = url_decode(request.uri.empty() ? "/" : request.uri);
+	std::string decoded_uri = utility::url_decode(request.uri.empty() ? "/" : request.uri);
 	resolved.request_path = decoded_uri;
 	resolved.filesystem_path = resolved.request_path;
 
@@ -782,4 +737,3 @@ response_stage_t &Response::getstage(void)
 {
 	return (this->stage);
 }
-

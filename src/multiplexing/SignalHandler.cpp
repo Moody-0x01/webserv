@@ -27,8 +27,8 @@ void SignalHandler::set_signalio(int io[2])
 void SignalHandler::init(void) __THROWS_STRERROR
 {
     if (pipe(this->io) < 0)			 throw strerror(errno);
-    if (set_nonblocking(this->io[0])) throw strerror(errno);
-    if (set_nonblocking(this->io[1])) throw strerror(errno);
+    if (utility::set_nonblocking(this->io[0])) throw strerror(errno);
+    if (utility::set_nonblocking(this->io[1])) throw strerror(errno);
 }
 
 
@@ -45,11 +45,11 @@ void SignalHandler::epoll_register(int epoll_fd) __THROWS_STRERROR
 
 void SignalHandler::setup_signal_handlers() __THROWS_STRERROR {
     if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)          throw strerror(errno);
-    if (signal(SIGINT,  signal_handler) == SIG_ERR)   throw strerror(errno);
-    if (signal(SIGTERM, signal_handler) == SIG_ERR)   throw strerror(errno);
-    if (signal(SIGHUP,  signal_handler) == SIG_ERR)   throw strerror(errno);
-    if (signal(SIGQUIT, signal_handler) == SIG_ERR)   throw strerror(errno);
-	if (signal(SIGCHLD, sigpipe_handler) == SIG_ERR)  throw strerror(errno);
+    if (signal(SIGINT,  utility::signal_handler) == SIG_ERR)   throw strerror(errno);
+    if (signal(SIGTERM, utility::signal_handler) == SIG_ERR)   throw strerror(errno);
+    if (signal(SIGHUP,  utility::signal_handler) == SIG_ERR)   throw strerror(errno);
+    if (signal(SIGQUIT, utility::signal_handler) == SIG_ERR)   throw strerror(errno);
+	if (signal(SIGCHLD, utility::sigpipe_handler) == SIG_ERR)  throw strerror(errno);
 }
 
 void SignalHandler::write_signal(int signum) __THROWS_STRERROR
