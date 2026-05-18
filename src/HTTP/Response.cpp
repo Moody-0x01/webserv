@@ -24,6 +24,13 @@ std::map<std::string, std::string> Response::mimes;
 static bool location_matches(const std::string &request_path, const std::string &location_uri)
 {
 	if (location_uri.empty()) return false;
+	if (location_uri.size() > 0 && location_uri[0] == '.') {
+		size_t slash = request_path.find_last_of('/');
+		size_t dot = request_path.find_last_of('.');
+		if (dot == std::string::npos) return false;
+		if (slash != std::string::npos && dot < slash) return false;
+		return request_path.substr(dot) == location_uri;
+	}
 	if (location_uri == "/") return true;
 	if (request_path.compare(0, location_uri.size(), location_uri) != 0) return false;
 	if (request_path.size() == location_uri.size()) return true;
@@ -67,15 +74,29 @@ static UriResolutionResult::type get_resource_type(const std::string &path)
 
 static const LocationConfig *find_best_location(const ServerConfig &server_conf, const std::string &request_path)
 {
-	const LocationConfig *best_location = NULL;
+	const LocationConfig *best_prefix = NULL;
+	const LocationConfig *best_cgi = NULL;
+	std::string ext = extract_extension(request_path);
+
 	for (size_t i = 0; i < server_conf.locations.size(); ++i)
 	{
 		const LocationConfig &current = server_conf.locations[i];
-		if (!location_matches(request_path, current.uri)) continue;
-		if (!best_location || current.uri.size() > best_location->uri.size())
-			best_location = &current;
+		if (location_matches(request_path, current.uri)) {
+			if (!best_prefix || current.uri.size() > best_prefix->uri.size())
+				best_prefix = &current;
+			continue;
+		}
+		if (!ext.empty()) {
+			std::map<std::string, std::string>::const_iterator it = current.cgi_path.find(ext);
+			if (it != current.cgi_path.end()) {
+				if (!best_cgi || current.uri.size() > best_cgi->uri.size())
+					best_cgi = &current;
+			}
+		}
 	}
-	return best_location;
+	if (best_prefix)
+		return best_prefix;
+	return best_cgi;
 }
 
 static std::string compute_relative_uri(const std::string &request_path, const LocationConfig *best_location)
@@ -83,10 +104,14 @@ static std::string compute_relative_uri(const std::string &request_path, const L
 	std::string relative_uri = request_path;
 	if (best_location && best_location->uri != "/" && !best_location->root.empty())
 	{
+		if (best_location->uri.size() > 0 && best_location->uri[0] == '.') {
+			relative_uri = request_path;
+		} else {
 		if (request_path.size() <= best_location->uri.size())
 			relative_uri = "/";
 		else
 			relative_uri = request_path.substr(best_location->uri.size());
+		}
 	}
 
 	if (relative_uri.empty() || relative_uri[0] != '/')
