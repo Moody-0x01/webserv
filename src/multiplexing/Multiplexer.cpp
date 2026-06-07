@@ -290,6 +290,8 @@ void Multiplexer::check_connections_timeout(void)
 	for (std::set<Client*>::iterator it = self->connected_clients.begin(); it != self->connected_clients.end(); ++it)
 	{
 		Client *client = *it;
-		if (client->timeout()) client->free();
+		if (iscontext_valid((uint64_t)client) && client->timeout()) {
+			client->free();
+		}
 	}
 }

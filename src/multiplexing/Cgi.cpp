@@ -22,7 +22,6 @@ bool Cgi::did_fail(void) const
 
 Cgi::~Cgi()
 {
-	std::cout << "Cgi~\n";
 	this->done();
 }
 
@@ -67,21 +66,10 @@ void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
 
 void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
 {
-	// Appends to the body that will be sent to the client.
 	if (size <= 0) {
 		this->cgi_done = true;
 		return ;
 	}
-	// Note: if the cgi is chunked. then instead of just sending. send 
-
-	// size | \r\n | body
-	// to do:
-	//     1) read the size first. then in the next epoll event read the actually chunk.
-	//     2) If I need to send.
-
-	//         SEND_SIZE
-	//         SEND_CHUNCK (Max is WRITE_CHUNK_SIZE)
-
 	utility::push_into_buffer(this->client_body_buffer, buffer, size);
 	this->client_read_bytes += size; 
 	if (this->cgi_content_length == -1)
@@ -95,15 +83,16 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 		ssize_t size,
 		ChunkContext *chunk)
 {
-	if (size <= 0 || this->client_done)
-	{
+	if (size <= 0 || this->client_done) {
 		this->client_done = true;
 		return ;
 	}
 	utility::push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
-	if (!chunk && this->cgi_read_bytes >= this->client_content_length) this->client_done = true;
-	if (chunk && chunk->is_done()) this->client_done = true;
+	if (!chunk && this->cgi_read_bytes >= this->client_content_length)
+		this->client_done = true;
+	if (chunk && chunk->is_done())
+		this->client_done = true;
 }
 
 void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
@@ -158,7 +147,6 @@ void Cgi::write() __THROWS_STRERROR
 		}
 		if ((this->client_done && !this->cgi_body_buffer.size()) || sent < 0)
 			this->close_write();
-		std::cout << "Sent to cgi: " << sent << "\n";
 	}
 }
 
@@ -234,7 +222,6 @@ void Cgi::read() __THROWS_STRERROR
 					throw e;
 				}
 			}
-
 			if (read_from_cgi <= 0)
 				this->close_read();
 		} break;
@@ -267,7 +254,6 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
-	// Note: Check timeout...
 	this->last_event_time = time(NULL);
 	if (this->timeout())
 	{
@@ -278,7 +264,7 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 	try {
 		if (e & EPOLLIN)
             this->read(); 
-        if (e & EPOLLOUT)
+		else if (e & EPOLLOUT)
             this->write();
 		if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
 		{
@@ -301,10 +287,10 @@ Cgi::Cgi(): ASocketContext()
 
 	this->state                  =  Idle;
 	this->last_event_time             =  0;
-	this->cgi_read_bytes         =  -1; // tracker for body data read from cgi.
+	this->cgi_read_bytes         =  0; // tracker for body data read from cgi.
+	this->client_read_bytes      =  0;
 	this->cgi_content_length     =  -1; // How much data do u expect from cgi
 	this->client_content_length  =  -1; // trac
-	this->client_read_bytes      =  -1;
 	this->streams[CGI_READ_END ] =  -1;
 	this->streams[CGI_WRITE_END] =  -1;
 	this->pid                    =  -1;
@@ -361,8 +347,6 @@ void Cgi::setup_environment_variables(const std::map<std::string, std::string> &
 	if (headers.find("REMOTE_PORT") != headers.end())
 		this->env.push_back("REMOTE_PORT="      + headers.at("REMOTE_PORT"));
 	this->env.push_back("SERVER_PROTOCOL="  + this->protocol);
-
-	// Note: send the rest headers as HTTP_*
 	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 	{
 		key   = it->first;
@@ -473,7 +457,6 @@ void Cgi::execute(void) __THROWS_STRERROR
 void Cgi::gateway_failure(void)
 {
 	this->gateway_failed = BadGateway;
-	std::cout << "gateway_failure\n";
 	this->done();
 }
 

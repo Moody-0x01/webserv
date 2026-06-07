@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-# define CLIENT_TIMEOUT 5
+# define CLIENT_TIMEOUT 20
 
 typedef struct Client: public ASocketContext {
 public:
@@ -41,5 +41,4 @@ private:
 	int			 _owner;
 	std::string  ip;
 	std::string  port;
-	size_t       body_size;
 } Client;

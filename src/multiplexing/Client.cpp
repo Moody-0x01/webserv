@@ -82,9 +82,9 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 		count = Multiplexer::read(this->get_socket(), buff, to_read); // NOTE: If a read fails it should throw,
 	} else
 		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
+	std::cout << "Read " << count << " bytes from client\n";
 	utility::push_into_buffer(this->_buffer, buff, count); // Read..
 	if (clientP.state() == READY) {
-		this->body_size += count;
 		return ;
 	}
 	clientP.handle();
@@ -98,55 +98,50 @@ void Client::parse_request() __THROWS_STRERROR
 	Cgi          &cgi_instance = this->response.get_resource_ref().cgi;
 
 	this->read_into_request_buffer();
-	if (clientP.state() != READY)
-		return ;
+	if (clientP.state() != READY) return ;
 
 	this->unchunkify_buffer();
-	if (this->response.getstage() == Setup)
+	if (this->response.getstage() == Setup) {
 		this->response.setup(request);
-	if (this->response.getstage() == ProcessingPost)
-		this->response.dump_post_body(this->_buffer);
-	if (this->response.getstage() == ProcessingCgi)
-	{
-		if (this->getParser().getRequestObject().getMethod() != "POST")
+	} else {
+		switch (this->response.getstage())
 		{
-			this->switch_mode(WRITING);
-			return ;
+			case ProcessingPost: {
+				this->response.dump_post_body(this->_buffer);
+			} break;
+			case ProcessingCgi: {
+				if (this->getParser().getRequestObject().getMethod() != "POST")
+				{
+					this->switch_mode(WRITING);
+					return ;
+				}
+				cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
+						(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
+				this->_buffer.clear();
+			} break;
+			default: {} break;
 		}
-		if (this->_buffer.size()) {
-			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
-					(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
-			this->_buffer.clear();
-		}
-		if (cgi_instance.client_done) this->switch_mode(WRITING);
 	}
-	if (this->response.getstage() == SendingResource)
-		this->switch_mode(WRITING);
+	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done) this->switch_mode(WRITING);
+	if (this->response.getstage() == SendingResource)							this->switch_mode(WRITING);
 }
 
 void Client::generate_response(void) __THROWS_STRERROR
 {
-	// Cgi  &cgi_instance = this->response.get_resource_ref().cgi;
 	HttpRequest &request = this->getParser().getRequestObject().getHttpRequest();
-
 	response_stage_t &s = this->response.getstage();
+
 	switch(s)
 	{
 		case Setup:
+		case ProcessingPost:
 		case DoneSending: {
 			this->free();
 			return ;
 		} break;
 		case ProcessingCgi: {
-			// Note: Here the cgi is done reading from the client and is activally trying to send the response from cgi..
-			// So it gets data from cgi and forwards it to the client.
-			this->response.process_cgi_instance(request);
-		} break;
-		case ProcessingPost: {
-			// this->response.process_post(request);
-			// Not implemented yet..
-			// Responsible: Kooneo
-			assert(0 && "Not implemented yet by `Kooneo`");
+			this->response
+				.process_cgi_instance(request);
 		} break;
 		case SendingResource: {
 			this->response.send_resource(request);
@@ -184,9 +179,6 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 		}
 		if (e & EPOLLHUP)
 		{
-			// I can not read from cgi anymore. this is an internal server error and cgi should be marked as free
-			// if the headers are not sent yet then we should send internal server error.
-			// else just hangup and thas it.
 			this->free();
 			return ;
 		}
@@ -199,7 +191,6 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 		}
 
 		if (e & EPOLLERR) {
-			// Error !!
 			this->free();
 			return;
 		}

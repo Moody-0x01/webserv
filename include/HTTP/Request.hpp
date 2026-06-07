@@ -9,7 +9,7 @@
 #include <vector>
 
 typedef const std::map<std::string, std::string>::const_iterator map_iterator;
-# define  READ_CHUNK_SIZE      1024 * 64
+# define  READ_CHUNK_SIZE      16384
 # define  SENDING_CHUNK_SIZE   1024 * 16
 # define  WRITE_CHUNK_SIZE     READ_CHUNK_SIZE
 # define  MAX_HEADER_SIZE      16 * 1024

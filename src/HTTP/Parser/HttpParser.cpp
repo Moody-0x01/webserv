@@ -113,8 +113,6 @@ void ChunkContext::consume_chunk_size(std::vector<char> &buffer)
 		return ;
 	this->convert_remaining_into_hex();
 
-	// for (size_t i = 0; i < buffer.size(); i++)
-	// 	std::cout << std::hex << (int)buffer[i] << " ";
 	if (this->status_mask & CHUNK_ERROR) {
 		return ;
 	}
@@ -189,16 +187,14 @@ bool HttpParser::setChunkedEncoding(void)
 void HttpParser::parseContentLength(void)
 {
 	std::pair<bool, std::string> pair = this->getHeaderValue("content-length");
-
 	if (pair.first)
 	{
 		std::stringstream ss(pair.second);
 		if (!(ss >> this->targetBodySize)) {
 			this->request.setcode(BadRequest);
 		}
-		else {
+		else
 			this->request.getHttpRequest().content_length = this->targetBodySize;
-		}
 		return ;
 	}
 	this->request.setcode(BadRequest);

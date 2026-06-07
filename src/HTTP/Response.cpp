@@ -567,7 +567,6 @@ void Response::dump_post_body(std::vector<char> &body)
 	if(this->__rstream->write(body.data(), body.size()))
 	{
 		this->bytes_sent += body.size();
-		std::cout << "Wrote: " << this->bytes_sent << "\n";
 		if (this->bytes_sent >= request_ptr->content_length || request_ptr->chunked_context.is_done())
 		{
 			this->set_status(Created);
