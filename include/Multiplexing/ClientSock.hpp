@@ -33,7 +33,7 @@ public:
 	void setport_from_bytes(uint32_t ip_bytes);
 	std::string getport(void);
 	void setport(std::string port);
-	bool timeout(void);
+	bool timeout(void) __THROWS_STRERROR;
 
 	std::vector<char> _buffer;
     time_t            last_event_time;   // Bytes left to read in the CURRENT chunk 

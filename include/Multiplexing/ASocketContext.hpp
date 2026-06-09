@@ -10,6 +10,7 @@
 # include <Parser/Config/Config.hpp>
 # include <HTTP/Request.hpp>
 
+# define __THROWS_STRERROR throw(const char *)
 typedef enum socket_mode_e {
 	READING = EPOLLIN,
 	WRITING = EPOLLOUT,
@@ -23,6 +24,9 @@ public:
 	ASocketContext(int sock);
 	ASocketContext();
 	virtual ~ASocketContext();
+
+	virtual bool timeout(void) __THROWS_STRERROR;
+	virtual void free();
 	void virtual action(uint32_t e) __THROWS_STRERROR = 0;
 
 	void set_socket(int sockfd);

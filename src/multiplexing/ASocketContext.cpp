@@ -25,5 +25,14 @@ void ASocketContext::disown(void)
 	this->_owns_fd = false;
 }
 
+bool ASocketContext::timeout(void)  __THROWS_STRERROR
+{
+	return (false);
+}
+
+void ASocketContext::free()
+{
+}
+
 void ASocketContext::set_socket(int sockfd) { _sockfd = sockfd; }
 int ASocketContext::get_socket(void) const { return _sockfd; }

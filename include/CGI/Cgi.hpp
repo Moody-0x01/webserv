@@ -21,7 +21,7 @@ extern char **environ;
 
 # define CGI_READ_END  0
 # define CGI_WRITE_END 1
-# define SCRIPT_TIMEOUT 30
+# define SCRIPT_TIMEOUT 5
 # define MAX_HEADERS_SIZE (4096 * 2)
 
 typedef struct Cgi: public ASocketContext
@@ -77,6 +77,7 @@ public:
 	void parse_headers()        __THROWS_STRERROR;
 	void epoll_register(void)   __THROWS_STRERROR;
 	bool timeout(void)     __THROWS_STRERROR;
+	void free(void);
 	void gateway_failure(void);
 	void setup_environment_variables(const std::map<std::string, std::string> &headers);
 	void append_into_client_body_buffer(const char *buffer, ssize_t size);

@@ -1,4 +1,5 @@
 #include <Server.hpp>
+// #include <cstdint>
 #include <stdint.h>
 #include <cstdlib>
 #include <strings.h>
@@ -102,7 +103,12 @@ void Multiplexer::register_server(ServerConfig &conf) __THROWS_STRERROR
 	if (code != 0) throw gai_strerror(code);
 	server_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (server_fd < 0) throw strerror(errno);
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	{
+		close(server_fd);
+		freeaddrinfo(res);
+		throw strerror(errno);
+	}
     std::memset(&event, 0, sizeof(event));
     if (bind(server_fd, res->ai_addr, res->ai_addrlen) < 0)
     {
@@ -198,9 +204,9 @@ int Multiplexer::run(void)
 	Multiplexer::introduce_new_context((uint64_t)&this->signal_handler);
     while (this->servers.size() && !this->aborted)
 	{
-		this->check_connections_timeout();
 		int ready = epoll_wait(this->epoll_fd,
 						 this->events, EVENT_MAX, 100);
+		this->check_connections_timeout();
 		if (ready < 0)
 		{
 			if (errno == EINTR) continue;
@@ -243,27 +249,21 @@ ssize_t Multiplexer::write(int fd, const void *buf, size_t size) __THROWS_STRERR
 	return (count);
 }
 
-void Multiplexer::introduce_new_context(uint64_t context, bool is_client)
+void Multiplexer::introduce_new_context(uintptr_t context, bool is_client)
 {
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	self->_valid_context.insert(context);
-	if (is_client)
-	{
-		Client *client = (Client*)context;
-		self->connected_clients.insert(client);
-	}
+	if (is_client) self->connected_contexts.insert(context);
 }
 
-void   Multiplexer::unintroduce_context(uint64_t context)
+void   Multiplexer::unintroduce_context(uintptr_t context)
 {
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
 	self->_valid_context.erase(context);
-	if (self->connected_clients.find((Client*)context) != self->connected_clients.end())
-		self->connected_clients.erase((Client*)context);
 }
 
 bool   Multiplexer::iscontext_valid(uint64_t context)
@@ -282,16 +282,34 @@ void Multiplexer::kill(void)
 	self->abort();
 }
 
+
 void Multiplexer::check_connections_timeout(void)
+{
+	Multiplexer *self;
+	ContextSet  to_erase;
+	self = Multiplexer::get_multiplexer(NULL);
+
+	for (ContextSet::iterator it = self->connected_contexts.begin(); it != self->connected_contexts.end(); ++it)
+	{
+		if (!iscontext_valid(*it)) return ;
+		try {
+			ASocketContext *ctx = (ASocketContext *)*it;
+			if (ctx->timeout()) {
+				ctx->free();
+				to_erase.insert(*it);
+			}
+		} catch (const char *e) {
+			std::cerr << "[ Multiplexer::check_connections_timeout ] " << e << "\n";
+		}
+	}
+	for (ContextSet::iterator it = to_erase.begin(); it != to_erase.end(); ++it)
+		self->connected_contexts.erase(*it);
+}
+
+void Multiplexer::erase_context(uintptr_t context)
 {
 	Multiplexer *self;
 
 	self = Multiplexer::get_multiplexer(NULL);
-	for (std::set<Client*>::iterator it = self->connected_clients.begin(); it != self->connected_clients.end(); ++it)
-	{
-		Client *client = *it;
-		if (iscontext_valid((uint64_t)client) && client->timeout()) {
-			client->free();
-		}
-	}
+	self->connected_contexts.erase(context);
 }

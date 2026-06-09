@@ -1,12 +1,10 @@
 #include "HTTP/Response.hpp"
-#include "Multiplexing/ASocketContext.hpp"
 #include <Server.hpp>
 #include <cassert>
 #include <cctype>
 #include <cstdio>
 #include <stdint.h>
 #include <cstdlib>
-#include <iomanip>
 #include <iostream>
 #include <sys/epoll.h>
 #include <sys/socket.h>
@@ -22,7 +20,7 @@ Client::~Client()
 
 Client::Client() : ASocketContext(), parserInstance(), response(), _owner(-1), ip(""), port("")
 {
-	this->last_event_time = 0;
+	this->last_event_time = time(NULL);
 }
 
 void Client::set_owner(int owner) { _owner = owner; }
@@ -39,7 +37,8 @@ void Client::free()
 	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
-	Multiplexer::unintroduce_context((uint64_t)this);
+	Multiplexer::unintroduce_context((uintptr_t)this);
+	Multiplexer::erase_context((uintptr_t)this);
 	std::cout << "Client freed!\n";
 }
 
@@ -110,20 +109,16 @@ void Client::parse_request() __THROWS_STRERROR
 				this->response.dump_post_body(this->_buffer);
 			} break;
 			case ProcessingCgi: {
-				if (this->getParser().getRequestObject().getMethod() != "POST")
-				{
-					this->switch_mode(WRITING);
-					return ;
-				}
 				cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
-						(ChunkContext*)(request.ischunked * (uint64_t)&chunk));
+						(ChunkContext*)(request.ischunked * (uintptr_t)&chunk));
 				this->_buffer.clear();
 			} break;
 			default: {} break;
 		}
 	}
-	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done) this->switch_mode(WRITING);
-	if (this->response.getstage() == SendingResource)							this->switch_mode(WRITING);
+	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done)  this->switch_mode(WRITING);
+	if (this->response.getstage() == SendingResource)						     this->switch_mode(WRITING);
+	if (this->getParser().getRequestObject().getMethod() != "POST")              this->switch_mode(WRITING);
 }
 
 void Client::generate_response(void) __THROWS_STRERROR
@@ -142,23 +137,26 @@ void Client::generate_response(void) __THROWS_STRERROR
 		case ProcessingCgi: {
 			this->response
 				.process_cgi_instance(request);
+			if (s == SendingResource) {
+				this->response.send_resource(request);
+			}
 		} break;
 		case SendingResource: {
 			this->response.send_resource(request);
 		} break;
 	}
-	if (s == DoneSending) this->free();
+	if (s == DoneSending)
+		this->free();
 }
 
-bool Client::timeout(void)
+bool Client::timeout(void) __THROWS_STRERROR
 {
 	time_t now;
 
 	if (this->last_event_time == 0)
 		return (false);
 	now = time(NULL);
-	if (now < 0)
-		return (true);
+	if (now < 0) return (true);
 	return (now - this->last_event_time) >= CLIENT_TIMEOUT;
 }
 

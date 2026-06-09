@@ -330,6 +330,7 @@ void Response::process_cgi_instance(const HttpRequest &request)
 
 	if (cgi.timeout())
 	{
+		std::cout << "CGI timeout\n";
 		if (!cgi.headers_sent) {
 			this->set_status(RequestTimeout);
 			return ;

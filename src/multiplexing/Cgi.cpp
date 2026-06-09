@@ -20,6 +20,11 @@ bool Cgi::did_fail(void) const
 	return (this->gateway_failed);
 }
 
+void Cgi::free(void)
+{
+	this->done();
+}
+
 Cgi::~Cgi()
 {
 	this->done();
@@ -31,7 +36,7 @@ void Cgi::close_write(void) {
 	this->streams[CGI_WRITE_END] = -1;
 	if (this->streams[CGI_READ_END] == -1) { // Unregister context when there is no reader nor writer
 		this->state = DONE;
-		Multiplexer::unintroduce_context((uint64_t)this);
+		Multiplexer::unintroduce_context((uintptr_t)this);
 	}
 }
 
@@ -41,7 +46,7 @@ void Cgi::close_read(void) {
 	this->streams[CGI_READ_END] = -1;
 	if (this->streams[CGI_WRITE_END] == -1) { // Unregister context when there is no reader nor writer
 		this->state = DONE;
-		Multiplexer::unintroduce_context((uint64_t)this);
+		Multiplexer::unintroduce_context((uintptr_t)this);
 	}
 }
 
@@ -128,7 +133,7 @@ void Cgi::done(void)
 		this->client_done = true;
 		this->close_read();
 		this->close_write();
-		Multiplexer::unintroduce_context((uint64_t)this);
+		Multiplexer::unintroduce_context((uintptr_t)this);
 	}
 }
 
@@ -237,14 +242,19 @@ void Cgi::read() __THROWS_STRERROR
 bool Cgi::timeout(void) __THROWS_STRERROR
 {
 	time_t now;
+	static int sec = (0);
 
 	now = time(NULL);
+	if (sec != now - this->last_event_time)
+		std::cout << "ewa: " << (now - this->last_event_time) << "\n";
 	if (now < 0)
 	{
 		this->done();
 		throw strerror(errno);
 	}
-	if ((now - this->last_event_time) >= SCRIPT_TIMEOUT)
+
+	sec = (now - this->last_event_time);
+	if (sec >= SCRIPT_TIMEOUT)
 	{
 		this->done();
 		return true;
@@ -255,18 +265,12 @@ bool Cgi::timeout(void) __THROWS_STRERROR
 void Cgi::action(uint32_t e) __THROWS_STRERROR
 {
 	this->last_event_time = time(NULL);
-	if (this->timeout())
-	{
-		std::cout << "Cgi timeout\n";
-		this->done();
-		return ;
-	}
 	try {
 		if (e & EPOLLIN)
             this->read(); 
 		else if (e & EPOLLOUT)
             this->write();
-		if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
+		else if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
 		{
 			if (e & EPOLLERR)   std::cerr << "Crit: EPOLLERR\n";
 			if (e & EPOLLHUP)   std::cerr << "Info: EPOLLHUP\n";
@@ -286,7 +290,6 @@ Cgi::Cgi(): ASocketContext()
 	for (size_t i = 0; environ[i]; ++i) this->env.push_back(environ[i]);
 
 	this->state                  =  Idle;
-	this->last_event_time             =  0;
 	this->cgi_read_bytes         =  0; // tracker for body data read from cgi.
 	this->client_read_bytes      =  0;
 	this->cgi_content_length     =  -1; // How much data do u expect from cgi
@@ -299,6 +302,7 @@ Cgi::Cgi(): ASocketContext()
 	this->gateway_failed         = 0;
 	this->cgi_done               = false;
 	this->client_done            = false;
+	this->last_event_time = time(NULL);
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
@@ -325,7 +329,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 	{
 		this->append_into_cgi_body_buffer(request.body->data(),
 				request.body->size(),
-				(ChunkContext*)(request.ischunked * (uint64_t)&request.chunked_context));
+				(ChunkContext*)(request.ischunked * (uintptr_t)&request.chunked_context));
 		request.body->clear();
 	}
 }
@@ -386,7 +390,7 @@ void Cgi::epoll_register(void) __THROWS_STRERROR
         close(this->streams[CGI_WRITE_END]);
         this->streams[CGI_WRITE_END] = -1;
     }
-	Multiplexer::introduce_new_context((uint64_t)this);
+	Multiplexer::introduce_new_context((uintptr_t)this, true);
 }
 
 bool Cgi::is_executable(void)

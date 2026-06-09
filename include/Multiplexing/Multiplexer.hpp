@@ -1,5 +1,6 @@
 #pragma once
 
+// #include <cstdint>
 #include <stdint.h>
 #include <stdint.h>
 # include <unistd.h>
@@ -31,14 +32,15 @@
 # define IGNORED 1
 # define __THROWS_STRERROR throw(const char *)
 
+typedef std::set<uintptr_t> ContextSet;
 typedef struct epoll_event EpollEvent;
 typedef std::map<int, Client> Clients;
 
 class Multiplexer {
 private:
-	Multiplexer() __THROWS_STRERROR;
+	Multiplexer()       __THROWS_STRERROR;
 	std::set<uintptr_t> _valid_context;
-	std::set<Client*>   connected_clients;
+	ContextSet          connected_contexts;
 	bool aborted;
 
 public:
@@ -61,8 +63,8 @@ public:
 
 	static void         kill(void);
 	static void			introduce_new_context(uintptr_t context, bool is_client = false);
-	static void			unintroduce_context(uint64_t context);
-	static bool			iscontext_valid(uint64_t context);
+	static void			unintroduce_context(uintptr_t context);
+	static bool			iscontext_valid(uintptr_t context);
 	static const ServerConfig &get_conf(int fd);
 	static void			register_server(ServerConfig &conf) __THROWS_STRERROR;
 	static Client		*register_client(uint32_t e, Server *server) __THROWS_STRERROR;
@@ -71,6 +73,7 @@ public:
 	static ssize_t		write(int fd, const void *buf, size_t size) __THROWS_STRERROR;
 	static Multiplexer *create_multiplexer(std::vector<ServerConfig> &confs);
 	static Multiplexer *get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *);
+	static void erase_context(uintptr_t context);
 	void check_connections_timeout(void);
 };
 
