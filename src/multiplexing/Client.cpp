@@ -165,13 +165,11 @@ void Client::action(uint32_t e) __THROWS_STRERROR
 	this->last_event_time = time(NULL);
 	try {
 		if (e & EPOLLIN) {
-			// std::cout << "Client EPOLLIN event\n";
 			this->parse_request();
 			return ;
 		}
 		if ((e & EPOLLOUT) || (e & EPOLLRDHUP))
 		{
-			// std::cout << "Client EPOLLOUT event\n";
 			this->generate_response();
 			return ;
 		}

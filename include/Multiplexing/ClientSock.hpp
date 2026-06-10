@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <vector>
 
-# define CLIENT_TIMEOUT 20
+# define CLIENT_TIMEOUT 30
 
 typedef struct Client: public ASocketContext {
 public:

@@ -1,9 +1,9 @@
-[ ] Timeoout
+[*] Timeoouts
     [*] Client
-	[ ] Script
-	Note: when I sleep in a script, there is a problem in catching the timeout, fix it.
-	There is some bug in the system.
-[ ] Not Found
-    [ ] Interpreter. (Should return 404, but some servers return 500)
-	[ ] Script.      (Should return 404)
+	[*] Script
+[*] Not Found
+    [*] Interpreter. (Should return 404, but some servers return 500)
+	[*] Script.      (Should return 404)
+[ ] Different Interpreter for Script
+	[*] Py, Node, Ruby, etc.
 [ ] Bad Gateway

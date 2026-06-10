@@ -61,12 +61,11 @@ void Cgi::switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR
 
 void Cgi::append_into_headers_buffer(const char *buffer, ssize_t size)
 {
-	if (size <= 0)
-		return ;
-	this->headers_buffer.reserve(this->headers_buffer.size() + size);
-	this->headers_buffer.insert(this->headers_buffer.begin(),
-			buffer,
-			buffer + size);
+    if (size <= 0)
+        return;
+    this->headers_buffer.insert(this->headers_buffer.end(),
+            buffer,
+            buffer + size);
 }
 
 void Cgi::append_into_client_body_buffer(const char *buffer, ssize_t size)
@@ -242,19 +241,14 @@ void Cgi::read() __THROWS_STRERROR
 bool Cgi::timeout(void) __THROWS_STRERROR
 {
 	time_t now;
-	static int sec = (0);
 
 	now = time(NULL);
-	if (sec != now - this->last_event_time)
-		std::cout << "ewa: " << (now - this->last_event_time) << "\n";
 	if (now < 0)
 	{
 		this->done();
 		throw strerror(errno);
 	}
-
-	sec = (now - this->last_event_time);
-	if (sec >= SCRIPT_TIMEOUT)
+	if (now - this->last_event_time >= SCRIPT_TIMEOUT)
 	{
 		this->done();
 		return true;
@@ -268,9 +262,9 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 	try {
 		if (e & EPOLLIN)
             this->read(); 
-		else if (e & EPOLLOUT)
+		if (e & EPOLLOUT)
             this->write();
-		else if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
+		if (e & (EPOLLERR | EPOLLHUP | EPOLLRDHUP))
 		{
 			if (e & EPOLLERR)   std::cerr << "Crit: EPOLLERR\n";
 			if (e & EPOLLHUP)   std::cerr << "Info: EPOLLHUP\n";
