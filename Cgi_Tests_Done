@@ -4,6 +4,6 @@
 [*] Not Found
     [*] Interpreter. (Should return 404, but some servers return 500)
 	[*] Script.      (Should return 404)
-[ ] Different Interpreter for Script
+[*] Different Interpreter for Script
 	[*] Py, Node, Ruby, etc.
-[ ] Bad Gateway
+[*] Bad Gateway
