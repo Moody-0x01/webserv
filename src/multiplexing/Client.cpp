@@ -81,7 +81,6 @@ void Client::read_into_request_buffer(void) __THROWS_STRERROR {
 		count = Multiplexer::read(this->get_socket(), buff, to_read); // NOTE: If a read fails it should throw,
 	} else
 		count = Multiplexer::read(this->get_socket(), buff, READ_CHUNK_SIZE); // NOTE: If a read fails it should throw,
-	std::cout << "Read " << count << " bytes from client\n";
 	utility::push_into_buffer(this->_buffer, buff, count); // Read..
 	if (clientP.state() == READY) {
 		return ;
@@ -117,7 +116,7 @@ void Client::parse_request() __THROWS_STRERROR
 		}
 	}
 	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done)  this->switch_mode(WRITING);
-	if (this->response.getstage() == SendingResource)						     this->switch_mode(WRITING);
+	if (this->response.getstage() == SendingResource)							 this->switch_mode(WRITING);
 	if (this->getParser().getRequestObject().getMethod() != "POST")              this->switch_mode(WRITING);
 }
 
@@ -145,8 +144,7 @@ void Client::generate_response(void) __THROWS_STRERROR
 			this->response.send_resource(request);
 		} break;
 	}
-	if (s == DoneSending)
-		this->free();
+	if (s == DoneSending) this->free();
 }
 
 bool Client::timeout(void) __THROWS_STRERROR

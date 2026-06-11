@@ -52,24 +52,24 @@ async def worker(worker_id: int, session: aiohttp.ClientSession):
             stats["exceptions"] += 1
             stats["upload_fail"] += 1
             continue
-    # for i in range(TOTAL_REQUESTS_PER_WORKER):
-    #     filename = f"stress_worker_{worker_id}_file_{i}.txt"
-    #     upload_url = f"{TARGET_URL.rstrip('/')}{UPLOAD_ENDPOINT}/{filename}"
-    #     # Yield control briefly to simulate slight network interleaving
-    #     # await asyncio.sleep(random.uniform(0.01, 0.05))
-    #     # time.sleep(1)
-    #     # # --- 2. TEST DELETE ---
-    #     try:
-    #         async with session.delete(upload_url) as response:
-    #             if response.status in [200, 202, 204]:
-    #                 stats["delete_success"] += 1
-    #             else:
-    #                 stats["delete_fail"] += 1
-    #             print("code:" + str(response.status))
-    #     except Exception as e:
-    #         print(e)
-    #         stats["exceptions"] += 1
-    #         stats["delete_fail"] += 1
+    for i in range(TOTAL_REQUESTS_PER_WORKER):
+        filename = f"stress_worker_{worker_id}_file_{i}.txt"
+        upload_url = f"{TARGET_URL.rstrip('/')}{UPLOAD_ENDPOINT}/{filename}"
+        # Yield control briefly to simulate slight network interleaving
+        # await asyncio.sleep(random.uniform(0.01, 0.05))
+        # time.sleep(1)
+        # # --- 2. TEST DELETE ---
+        try:
+            async with session.delete(upload_url) as response:
+                if response.status in [200, 202, 204]:
+                    stats["delete_success"] += 1
+                else:
+                    stats["delete_fail"] += 1
+                print("code:" + str(response.status))
+        except Exception as e:
+            print(e)
+            stats["exceptions"] += 1
+            stats["delete_fail"] += 1
 
 async def main():
     print(f"==================================================")

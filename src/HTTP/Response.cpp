@@ -290,7 +290,6 @@ void Response::setup(const HttpRequest &request)
 	this->request_ptr = &request;
 	this->setup_max_body_size(request.owner);
 	this->setup_response(request);
-
 	if (this->status != OK) {
 		return ;
 	}
@@ -387,25 +386,20 @@ void Response::setup_response(const HttpRequest &request)
 	this->resolved_results = Response::resolve_uri_to_path(request);
 	if (!this->is_method_allowed(request.method))
 	{
-		std::cout << "Method " << request.method << " is not allowed for this resource\n";
 		this->set_status(MethodNotAllowed);
 		return ;
 	}
 	if (request.content_length != -1 && request.content_length > (ssize_t)this->client_max_body_size)
 	{
-		std::cout << "Content-Length: " << request.content_length << " exceeds client_max_body_size: " << this->client_max_body_size << std::endl;
 		this->set_status(RequestEntityTooLarge);
 		return ;
 	}
-	std::cout << "fs path: " << this->resolved_results.filesystem_path << std::endl;
-	std::cout << "Index: "   << this->resolved_results.index           << std::endl;
 	if (this->resolved_results.resource_type == UriResolutionResult::redirect)
 	{
 		this->appendheader("Location", this->resolved_results.matched_location->return_loc.second.c_str());
 		this->set_status(resolved_results.matched_location->return_loc.first);
 		return ;
 	}
-	// BUG: When send a curl -X DELETE 'http://localhost:9090/post/anyfileexists'  we are getting not found Status even if the file exists
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
@@ -614,6 +608,7 @@ void Response::handle_delete()
         "<!DOCTYPE html>\n"
         "<html><body>File deleted.</body></html>\n"
     );
+	this->stage = SendingResource;
 }
 
 void Response::get_error_page_html(const HttpRequest &request, int code)
