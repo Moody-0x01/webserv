@@ -292,7 +292,6 @@ void Response::setup(const HttpRequest &request)
 	this->setup_response(request);
 
 	if (this->status != OK) {
-		// std::cout << "Response setup failed with status: " << this->status << std::endl;
 		return ;
 	}
 	if (this->resource.getresource_type() == CGI)
@@ -406,6 +405,7 @@ void Response::setup_response(const HttpRequest &request)
 		this->set_status(resolved_results.matched_location->return_loc.first);
 		return ;
 	}
+	// BUG: When send a curl -X DELETE 'http://localhost:9090/post/anyfileexists'  we are getting not found Status even if the file exists
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
 		this->set_status(NotFound);
@@ -597,7 +597,6 @@ void Response::handle_delete()
 		this->set_status(Forbidden);
 		return;
 	}
-
 	if (std::remove(file_path.c_str()) != 0)
 	{
 		if (errno == ENOENT)
@@ -608,15 +607,12 @@ void Response::handle_delete()
 			this->set_status(InternalServerError);
 		return;
 	}
-	this->set_status(NoContent);
+	this->set_status(OK);
 	this->resource.setresource_type(Text);
 	this->resource.setmime_type(TextHtml);
 	this->resource.set_stream_buffer(
         "<!DOCTYPE html>\n"
-        "<html>\n"
-        "<head><title>Deleted</title></head>\n"
-        "<body><h1>200 Deleted</h1><span>....</body>\n"
-        "</html>\n"
+        "<html><body>File deleted.</body></html>\n"
     );
 }
 
