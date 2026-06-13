@@ -48,7 +48,10 @@ struct LocationConfig;
 #define  ApplicationOctet     "application/octet-stream"
 #define  ApplicationJs        "application/javascript"
 
-#define  Audio				  "audio/mpeg"
+#define  AudioMp3        "audio/mpeg"
+#define  AudioMp4        "audio/mp4"
+#define  AudioMpeg       "audio/mpeg"
+
 #define  VideoMp4             "video/mp4"
 #define  VideoWebm            "video/webm"
 

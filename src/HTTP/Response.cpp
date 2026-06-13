@@ -223,25 +223,40 @@ void Response::init_mimes() {
 		return;
 	Response::mimes["md"] = TextMarkDown;
 	Response::mimes["html"] = TextHtml;
+	Response::mimes["htm"] = TextHtml;
 	Response::mimes["txt"] = TextPlain;
 	Response::mimes["css"] = TextCss;
 	Response::mimes["csv"] = TextCsv;
+
 	Response::mimes["jpg"] = ImageJpeg;
 	Response::mimes["png"] = ImagePng;
 	Response::mimes["gif"] = ImageGif;
 	Response::mimes["webp"] = ImageWebp;
 	Response::mimes["svg"] = ImageSvg;
 	Response::mimes["ico"] = ImageIco;
+	Response::mimes["bmp"]  = "image/bmp";
+	Response::mimes["tiff"] = "image/tiff";
+
+	Response::mimes["js"]   = ApplicationJs;
+	Response::mimes["mjs"]  = ApplicationJs;
 	Response::mimes["json"] = ApplicationJson;
-	Response::mimes["xml"] = ApplicationXml;
-	Response::mimes["pdf"] = ApplicationPdf;
-	Response::mimes["zip"] = ApplicationZip;
-	Response::mimes["bin"] = ApplicationOctet;
-	Response::mimes["js"] = ApplicationJs;
-	Response::mimes["mp3"] = Audio;
-	Response::mimes["mp4"] = VideoMp4;
-	Response::mimes["m4a"] = VideoMp4;
+	Response::mimes["xml"]  = ApplicationXml;
+	Response::mimes["pdf"]  = ApplicationPdf;
+	Response::mimes["zip"]  = ApplicationZip;
+	Response::mimes["bin"]  = ApplicationOctet;
+	Response::mimes["wasm"] = "application/wasm";
+
+	Response::mimes["mp3"] = AudioMp3;
+	Response::mimes["m4a"] = AudioMp4;
+	Response::mimes["aac"] = AudioMp4;
+	Response::mimes["mpeg"] = AudioMpeg;
+	Response::mimes["mpga"] = AudioMpeg;
+
+	Response::mimes["mp4"]  = VideoMp4;
+	Response::mimes["m4v"]  = VideoMp4;
 	Response::mimes["webm"] = VideoWebm;
+	Response::mimes["ogv"]  = "video/ogg";
+	Response::mimes["ogg"]  = "video/ogg";
 }
 
 Response::Response()
