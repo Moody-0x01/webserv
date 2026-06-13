@@ -13,8 +13,7 @@ ASocketContext::ASocketContext(int sock) : _sockfd(sock), _owns_fd(true)
 ASocketContext::~ASocketContext()
 {
 
-	if (!_owns_fd || _sockfd == -1)
-		return ;
+	if (!_owns_fd || _sockfd == -1) return ;
 	unregister_fd(_sockfd);
 	_sockfd = -1;
 	_owns_fd = false;

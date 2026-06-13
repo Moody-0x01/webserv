@@ -291,7 +291,10 @@ void Multiplexer::check_connections_timeout(void)
 
 	for (ContextSet::iterator it = self->connected_contexts.begin(); it != self->connected_contexts.end(); ++it)
 	{
-		if (!iscontext_valid(*it)) return ;
+		if (!iscontext_valid(*it)) {
+			to_erase.insert(*it);
+			continue ;
+		}
 		try {
 			ASocketContext *ctx = (ASocketContext *)*it;
 			if (ctx->timeout()) {
@@ -302,8 +305,7 @@ void Multiplexer::check_connections_timeout(void)
 			std::cerr << "[ Multiplexer::check_connections_timeout ] " << e << "\n";
 		}
 	}
-	for (ContextSet::iterator it = to_erase.begin(); it != to_erase.end(); ++it)
-		self->connected_contexts.erase(*it);
+	for (ContextSet::iterator it = to_erase.begin(); it != to_erase.end(); ++it) self->connected_contexts.erase(*it);
 }
 
 void Multiplexer::erase_context(uintptr_t context)

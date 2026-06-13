@@ -240,6 +240,7 @@ void Response::init_mimes() {
 	Response::mimes["js"] = ApplicationJs;
 	Response::mimes["mp3"] = Audio;
 	Response::mimes["mp4"] = VideoMp4;
+	Response::mimes["m4a"] = VideoMp4;
 	Response::mimes["webm"] = VideoWebm;
 }
 
@@ -545,23 +546,29 @@ void Response::handle_post(const HttpRequest &request)
 		this->resolved_results.filesystem_path += "/";
 	std::string fullpath = this->resolved_results.filesystem_path + this->resolved_results.post_fn;
 	std::cout << "File: " << fullpath << std::endl;
-	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary);
 	if (!this->__rstream->is_open())
 	{
 		delete this->__rstream;
 		this->__rstream = NULL;
         if (errno == EACCES) this->set_status(Unauthorized);
-        else this->set_status(InternalServerError);
+        else {
+			std::cout << "Error opening file for POST: " << strerror(errno) << std::endl;
+			this->set_status(InternalServerError);
+		}
 		return ;
 	}
+	std::cout << "Opened file for POST: " << fullpath << std::endl;
 	this->stage = ProcessingPost;
 }
 
 void Response::dump_post_body(std::vector<char> &body)
 {
+	std::cout << "Dumping POST body chunk of size " << body.size() << " bytes\n";
 	if(this->__rstream->write(body.data(), body.size()))
 	{
 		this->bytes_sent += body.size();
+		std::cout << "Written " << this->bytes_sent << " bytes to file, total: " << this->bytes_sent << "\n";
 		if (this->bytes_sent >= request_ptr->content_length || request_ptr->chunked_context.is_done())
 		{
 			this->set_status(Created);
