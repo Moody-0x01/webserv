@@ -189,6 +189,7 @@ public:
 
 	void setup(const HttpRequest &request); // TODO: Once the server finishes reading the headers. call this so anything that needs to be done before trying to get the body is actually done, including..
 	
+	void inject_cors(void);
 	void dump_post_body(std::vector<char> &body);
 };
 

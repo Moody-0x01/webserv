@@ -662,9 +662,17 @@ Response::~Response()
 {
 }
 
+void Response::inject_cors(void)
+{
+	this->appendheader("Access-Control-Allow-Origin", "*");
+	this->appendheader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+	this->appendheader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
 void Response::serialize_headers(void) {
 	// Max header size will be <= 16Kb so we need to just serialize it then send
 	// Then check for any error. and close in case.
+	this->inject_cors();
 	this->headers_as_str = (this->status_line + utility::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
