@@ -1,0 +1,5 @@
+[*] Headers:
+  [*] TODO: Validate Content-Type header
+      1. define valid content types (e.g., application/json, text/html)
+	  2. check if it exists.
+  [*] TODO: Validate Status

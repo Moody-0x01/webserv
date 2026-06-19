@@ -34,7 +34,7 @@ void Cgi::close_write(void) {
 	std::cout << "close_write\n";
 	unregister_fd(this->streams[CGI_WRITE_END]);
 	this->streams[CGI_WRITE_END] = -1;
-	if (this->streams[CGI_READ_END] == -1) { // Unregister context when there is no reader nor writer
+	if (this->streams[CGI_READ_END] == -1) {
 		this->state = DONE;
 		Multiplexer::unintroduce_context((uintptr_t)this);
 	}
@@ -44,7 +44,7 @@ void Cgi::close_read(void) {
 	std::cout << "close_read\n";
 	unregister_fd(this->streams[CGI_READ_END]);
 	this->streams[CGI_READ_END] = -1;
-	if (this->streams[CGI_WRITE_END] == -1) { // Unregister context when there is no reader nor writer
+	if (this->streams[CGI_WRITE_END] == -1) {
 		this->state = DONE;
 		Multiplexer::unintroduce_context((uintptr_t)this);
 	}
@@ -458,6 +458,18 @@ void Cgi::gateway_failure(void)
 	this->done();
 }
 
+bool Cgi::check_status_code(std::string &status_line)
+{
+	std::vector<std::string> parts = utility::split(status_line, " ");
+	std::stringstream ss(parts[0]);
+	int code;
+
+	if (!(ss >> code)) return false;
+	if (Response::status_phrases.find(code) == Response::status_lines.end()) return (false);
+	status_line = parts[0] + " " + Response::status_phrases[code];
+	return (true);
+}
+
 void Cgi::parse_headers()    __THROWS_STRERROR
 {
 	std::vector<std::string> headers;
@@ -472,21 +484,35 @@ void Cgi::parse_headers()    __THROWS_STRERROR
 	}
 	for (size_t i = 0; i < headers.size(); ++i)
 	{
-		pair = utility::split_by_two(headers[i], ":");
+		pair = utility::split_by_two(headers[i], ": ");
 		if (pair.size() != 2) {
 			this->gateway_failure();
 			return ;
 		}
 		std::transform(pair[0].begin(), pair[0].end(), pair[0].begin(), ::tolower);
+		if (pair[0] == "status")
+		{
+			if (!Cgi::check_status_code(pair[1]))
+			{
+				this->gateway_failure();
+				return ;
+			}
+		}
 		this->headers[pair[0]] = pair[1];
+	}
+
+	if (this->headers.find("content-type") == this->headers.end())
+		this->headers["content-type"] = TextHtml;
+	else if (!Response::ismime_valid(this->headers["content-type"]))
+	{
+		this->gateway_failure();
+		return ;
 	}
 	this->state = ReadingBody;
 	this->headers_parsed = true;
-
-	if (this->headers.find("content-type") == this->headers.end()) 
-		this->headers["content-type"] = TextHtml;
 	if (this->headers.find("content-length") == this->headers.end()) 
 		return ;
 	std::stringstream ss(this->headers.at("content-length"));
-	if (!(ss >> this->cgi_content_length)) this->gateway_failure();
+	if (!(ss >> this->cgi_content_length))
+		this->gateway_failure();
 }

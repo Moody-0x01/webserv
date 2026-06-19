@@ -19,6 +19,7 @@
 #include <ctime>
 
 std::map<int, std::string> Response::status_lines;
+std::map<int, std::string> Response::status_phrases;
 std::map<std::string, std::string> Response::mimes;
 
 static bool location_matches(const std::string &request_path, const std::string &location_uri)
@@ -218,6 +219,14 @@ Response::MethodKind Response::classify_method(const std::string &method)
 	return MethodInvalid;
 }
 
+bool Response::ismime_valid(const std::string &mime) {
+	for (std::map<std::string, std::string>::iterator it = Response::mimes.begin(); it != Response::mimes.end(); ++it) {
+		if (it->second == mime)
+			return (true);
+	}
+	return (false);
+}
+
 void Response::init_mimes() {
 	if (!mimes.empty())
 		return;
@@ -244,6 +253,7 @@ void Response::init_mimes() {
 	Response::mimes["pdf"]  = ApplicationPdf;
 	Response::mimes["zip"]  = ApplicationZip;
 	Response::mimes["bin"]  = ApplicationOctet;
+	Response::mimes["exe"]  = ApplicationOctet;
 	Response::mimes["wasm"] = "application/wasm";
 
 	Response::mimes["mp3"] = AudioMp3;
@@ -400,6 +410,7 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
+	std::cout << "Resolved URI: " << resolved_results.request_path << " to filesystem path: " << resolved_results.filesystem_path << "\n";
 	if (!this->is_method_allowed(request.method))
 	{
 		this->set_status(MethodNotAllowed);
@@ -418,6 +429,7 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
+		std::cout << "Not found\n";
 		this->set_status(NotFound);
 		return ;
 	}
@@ -686,22 +698,40 @@ void Response::send_headers(int conn) __THROWS_STRERROR
 		 this->headers_as_str.size());
 }
 
-
 void Response::init_status_lines()
 {
-    Response::status_lines[OK                 ] = "HTTP/1.0 200 OK";
-    Response::status_lines[Created            ] = "HTTP/1.0 201 Created";
-    Response::status_lines[NoContent          ] = "HTTP/1.0 204 No Content";
-    Response::status_lines[MovedPermanently   ] = "HTTP/1.0 301 Moved Permanently";
-    Response::status_lines[Found              ] = "HTTP/1.0 302 Found";
-    Response::status_lines[NotModified        ] = "HTTP/1.0 304 Not Modified";
-    Response::status_lines[BadRequest         ] = "HTTP/1.0 400 Bad Request";
-    Response::status_lines[Unauthorized       ] = "HTTP/1.0 401 Unauthorized";
-    Response::status_lines[Forbidden          ] = "HTTP/1.0 403 Forbidden";
-    Response::status_lines[NotFound           ] = "HTTP/1.0 404 Not Found";
-    Response::status_lines[MethodNotAllowed   ] = "HTTP/1.0 405 Method Not Allowed";
-    Response::status_lines[RequestTimeout     ] = "HTTP/1.0 408 Request Timeout";
-    Response::status_lines[InternalServerError] = "HTTP/1.0 500 Internal Server Error";
+    Response::status_phrases[OK                   ] = "OK";
+    Response::status_phrases[Created              ] = "Created";
+    Response::status_phrases[NoContent            ] = "No Content";
+    Response::status_phrases[MovedPermanently     ] = "Moved Permanently";
+    Response::status_phrases[Found                ] = "Found";
+    Response::status_phrases[NotModified          ] = "Not Modified";
+    Response::status_phrases[BadRequest           ] = "Bad Request";
+    Response::status_phrases[Unauthorized         ] = "Unauthorized";
+    Response::status_phrases[Forbidden            ] = "Forbidden";
+    Response::status_phrases[NotFound             ] = "Not Found";
+    Response::status_phrases[MethodNotAllowed     ] = "Method Not Allowed";
+    Response::status_phrases[RequestTimeout       ] = "Request Timeout";
+    Response::status_phrases[InternalServerError  ] = "Internal Server Error";
+    Response::status_phrases[RequestEntityTooLarge] = "Request Entity TooLarge";
+	Response::status_phrases[ContentLengthRequired] = "Length Required";
+    Response::status_phrases[NotImplemented       ] = "Not Implemented";
+    Response::status_phrases[BadGateway           ] = "Bad Gateway";
+    Response::status_phrases[ServiceUnavailable   ] = "Service Unavailable";
+
+    Response::status_lines[OK                   ] = "HTTP/1.0 200 OK";
+    Response::status_lines[Created              ] = "HTTP/1.0 201 Created";
+    Response::status_lines[NoContent            ] = "HTTP/1.0 204 No Content";
+    Response::status_lines[MovedPermanently     ] = "HTTP/1.0 301 Moved Permanently";
+    Response::status_lines[Found                ] = "HTTP/1.0 302 Found";
+    Response::status_lines[NotModified          ] = "HTTP/1.0 304 Not Modified";
+    Response::status_lines[BadRequest           ] = "HTTP/1.0 400 Bad Request";
+    Response::status_lines[Unauthorized         ] = "HTTP/1.0 401 Unauthorized";
+    Response::status_lines[Forbidden            ] = "HTTP/1.0 403 Forbidden";
+    Response::status_lines[NotFound             ] = "HTTP/1.0 404 Not Found";
+    Response::status_lines[MethodNotAllowed     ] = "HTTP/1.0 405 Method Not Allowed";
+    Response::status_lines[RequestTimeout       ] = "HTTP/1.0 408 Request Timeout";
+    Response::status_lines[InternalServerError  ] = "HTTP/1.0 500 Internal Server Error";
     Response::status_lines[RequestEntityTooLarge] = "HTTP/1.0 413 Request Entity TooLarge";
 	Response::status_lines[ContentLengthRequired] = "HTTP/1.0 411 Length Required";
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";

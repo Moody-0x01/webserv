@@ -66,6 +66,7 @@ public:
 	std::vector<char>    cgi_body_buffer; // Cgi writes here and client reads from here.
 	std::vector<char> client_body_buffer; // Client writes here then Cgi reads from here.
 
+	static bool check_status_code(std::string &status_line);
 	void switch_mode(socket_mode_t mode, int fd) __THROWS_STRERROR;
 	void setup(const HttpRequest &request, std::string fn, std::string interpreter_);
 	void execute(void)          __THROWS_STRERROR;

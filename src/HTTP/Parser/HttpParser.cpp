@@ -217,7 +217,7 @@ void HttpParser::handle()
 					parent->_buffer.begin() + endOfHeaders);
 			this->getRequestObject().setBody(&parent->_buffer);
             this->lexerInstence.tokenize(headersOnly);
-			std::cout << "Headers Only : " << headersOnly << "\n";
+			// std::cout << "Headers Only : " << headersOnly << "\n";
             if (lexerInstence.isBadRequest()) // for now am doing it from here.
             {
                 this->request.setcode(BadRequest);

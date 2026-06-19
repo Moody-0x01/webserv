@@ -161,11 +161,13 @@ private:
 	void serve_file(void);
 public:
 	static std::map<std::string, std::string> mimes;
+	static bool ismime_valid(const std::string &mime);
 	static void init_mimes();
     Response();
     ~Response();
 
 	static std::map<int, std::string> status_lines;
+	static std::map<int, std::string> status_phrases;
 	static void init_status_lines();
 
 	void setup_max_body_size(const int owner);
