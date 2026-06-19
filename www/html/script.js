@@ -389,3 +389,214 @@ async function runAll() {
 
 // Auto-ping on load
 window.addEventListener('load', pingServer);
+
+// ── Extended CGI Engine Handlers ────────────────────────
+async function runCgiGet() {
+    const scriptPath = document.getElementById('cgi-get-path').value.trim();
+    const query = document.getElementById('cgi-get-query').value.trim();
+    const queryString = query ? `?${query}` : '';
+    const fullUrl = `${base()}${scriptPath}${queryString}`;
+
+    setCard('cgi-get', 'running', 'executing…');
+    log(`GET ${scriptPath}${queryString}`, 'info');
+
+    try {
+        const t0 = Date.now();
+        const r = await fetch(fullUrl, { method: 'GET' });
+        const ms = Date.now() - t0;
+        const text = await r.text();
+
+        showResponse('cgi-get', r.status, text, ms);
+        if (r.ok) {
+            setCard('cgi-get', 'success', `${r.status} OK`);
+            log(`CGI GET Success → ${r.status} (${ms}ms)`, 'ok');
+        } else {
+            setCard('cgi-get', 'error', `${r.status}`);
+            log(`CGI GET Error Code → ${r.status}`, 'fail');
+        }
+    } catch (e) {
+        setCard('cgi-get', 'error', 'network error');
+        showResponse('cgi-get', 'ERR', e.message);
+        log(`CGI GET Failed: ${e.message}`, 'fail');
+    }
+}
+
+async function runCgiPost() {
+    const scriptPath = document.getElementById('cgi-post-path').value.trim();
+    const payload = document.getElementById('cgi-post-body').value;
+    const fullUrl = `${base()}${scriptPath}`;
+
+    setCard('cgi-post', 'running', 'piping payload…');
+    log(`POST ${scriptPath} [Len: ${payload.length}]`, 'info');
+
+    try {
+        const t0 = Date.now();
+        const r = await fetch(fullUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: payload
+        });
+        const ms = Date.now() - t0;
+        const text = await r.text();
+
+        showResponse('cgi-post', r.status, text, ms);
+        if (r.ok) {
+            setCard('cgi-post', 'success', `${r.status} OK`);
+            log(`CGI POST Success → ${r.status} (${ms}ms)`, 'ok');
+        } else {
+            setCard('cgi-post', 'error', `${r.status}`);
+            log(`CGI POST Error Code → ${r.status}`, 'fail');
+        }
+    } catch (e) {
+        setCard('cgi-post', 'error', 'network error');
+        showResponse('cgi-post', 'ERR', e.message);
+        log(`CGI POST Failed: ${e.message}`, 'fail');
+    }
+}
+
+async function runCgiTimeout() {
+    const scriptPath = document.getElementById('cgi-timeout-path').value.trim();
+    const fullUrl = `${base()}${scriptPath}`;
+
+    setCard('cgi-timeout', 'running', 'watching…');
+    log(`GET ${scriptPath} (Testing 504 timeout limit)`, 'info');
+
+    try {
+        const t0 = Date.now();
+        const r = await fetch(fullUrl, { method: 'GET' });
+        const ms = Date.now() - t0;
+        const text = await r.text();
+
+        showResponse('cgi-timeout', r.status, text, ms);
+        if (r.status === 504) {
+            setCard('cgi-timeout', 'success', '504 Timeout ✓');
+            log(`CGI process terminated securely by webserv (Took ${ms}ms) ✓`, 'ok');
+        } else {
+            setCard('cgi-timeout', 'error', `${r.status}`);
+            log(`CGI executed with status ${r.status} instead of expected 504 timeout`, 'fail');
+        }
+    } catch (e) {
+        setCard('cgi-timeout', 'error', 'network error');
+        showResponse('cgi-timeout', 'ERR', e.message);
+        log(`CGI execution interrupted: ${e.message}`, 'fail');
+    }
+}
+// ── CGI Binary Media Handlers ───────────────────────────
+async function doCgiUpload() {
+    const scriptPath = document.getElementById('cgi-upload-path').value.trim();
+    const filename = document.getElementById('cgi-upload-name').value.trim();
+    const fileInput = document.getElementById('cgi-upload-file');
+
+    if (!filename) return alert('Specify a target filename.');
+    if (!fileInput.files.length) return alert('Select a media file.');
+
+    const file = fileInput.files[0];
+    // Pass the target filename inside a custom header for the CGI gateway to pass along
+    const fullUrl = `${base()}${scriptPath}`;
+
+    setCard('cgi-upload', 'running', 'streaming binary…');
+    log(`POST ${scriptPath} (Media: ${filename})`, 'info');
+
+    try {
+        const t0 = Date.now();
+        const r = await fetch(fullUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': file.type || 'application/octet-stream',
+                'X-Target-Filename': filename // Custom header to track target name inside webserv/CGI
+            },
+            body: await file.arrayBuffer()
+        });
+        const ms = Date.now() - t0;
+        const text = await r.text();
+
+        showResponse('cgi-upload', r.status, text, ms);
+        if (r.ok) {
+            setCard('cgi-upload', 'success', `${r.status} OK`);
+            log(`CGI Upload Complete → ${r.status} (${ms}ms)`, 'ok');
+            
+            // Sync up the input boxes automatically
+            const cgiGetInput = document.getElementById('cgi-media-get-name');
+            if (cgiGetInput) cgiGetInput.value = filename;
+        } else {
+            setCard('cgi-upload', 'error', `${r.status}`);
+            log(`CGI Upload failed with code: ${r.status}`, 'fail');
+        }
+    } catch (e) {
+        setCard('cgi-upload', 'error', 'network error');
+        showResponse('cgi-upload', 'ERR', e.message);
+        log(`CGI Upload tracking failure: ${e.message}`, 'fail');
+    }
+}
+
+async function doCgiMediaGet() {
+    const scriptPath = document.getElementById('cgi-media-get-path').value.trim();
+    const filename = document.getElementById('cgi-media-get-name').value.trim();
+    if (!filename) return alert('Enter a filename to query.');
+
+    const fullUrl = `${base()}${scriptPath}?file=${encodeURIComponent(filename)}`;
+
+    setCard('cgi-media-get', 'running', 'rendering pipeline…');
+    log(`GET ${scriptPath}?file=${filename}`, 'info');
+
+    try {
+        const t0 = Date.now();
+        const r = await fetch(fullUrl, { method: 'GET' });
+        const ms = Date.now() - t0;
+
+        const contentType = r.headers.get('Content-Type') || '';
+        const blob = await r.blob();
+
+        const rh = document.getElementById('rh-cgi-media-get');
+        const rb = document.getElementById('rb-cgi-media-get');
+        const sc = document.getElementById('sc-cgi-media-get');
+        const rt = document.getElementById('rt-cgi-media-get');
+        const preview = document.getElementById('preview-cgi-get');
+
+        rh.classList.add('visible');
+        rt.textContent = `${ms}ms`;
+        sc.textContent = r.status;
+        sc.className = 'status-code ' + (r.ok ? 'sc-2xx' : (r.status < 500 ? 'sc-4xx' : 'sc-5xx'));
+
+        rb.classList.remove('visible');
+        preview.style.with = '100%';
+        preview.style.display = 'none';
+        preview.innerHTML = '';
+
+        if (r.ok) {
+            setCard('cgi-media-get', 'success', `${r.status} OK`);
+            log(`CGI Media Fetch Complete → ${r.status} (${ms}ms) [${contentType}]`, 'ok');
+
+            const objectUrl = URL.createObjectURL(blob);
+
+            if (contentType.startsWith('image/')) {
+                preview.innerHTML = `<img src="${objectUrl}" style="max-width: 100%; max-height: 350px; border-radius: 4px;" />`;
+                preview.style.display = 'block';
+            } 
+            else if (contentType.startsWith('video/')) {
+                preview.innerHTML = `<video controls src="${objectUrl}" style="max-width: 100%; max-height: 350px; border-radius: 4px;"></video>`;
+                preview.style.display = 'block';
+            } 
+            else if (contentType.startsWith('audio/')) {
+                preview.innerHTML = `<audio controls src="${objectUrl}" style="width: 100%;"></audio>`;
+                preview.style.display = 'block';
+            } 
+            else {
+                rb.value = await blob.text();
+                rb.classList.add('visible');
+            }
+        } else {
+            setCard('cgi-media-get', 'error', `${r.status}`);
+            log(`CGI Media Fetch failed with code: ${r.status}`, 'fail');
+            rb.value = await blob.text();
+            rb.classList.add('visible');
+        }
+    } catch (e) {
+        setCard('cgi-media-get', 'error', 'network error');
+        document.getElementById('sc-cgi-media-get').textContent = 'ERR';
+        document.getElementById('sc-cgi-media-get').className = 'status-code sc-err';
+        document.getElementById('rb-cgi-media-get').value = e.message;
+        document.getElementById('rb-cgi-media-get').classList.add('visible');
+        log(`CGI Media Fetch error state: ${e.message}`, 'fail');
+    }
+}

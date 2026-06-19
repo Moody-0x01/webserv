@@ -1,0 +1,233 @@
+<!DOCTYPE html> <html lang="en">
+<head>
+  <meta charset="UTF-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>File Server Tester — localhost:9090</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="./style.css" rel="stylesheet"/>
+  <!-- <script defer src="./script.js"><script/> -->
+</head>
+<body>
+
+<header>
+  <div class="logo">FS</div>
+  <div>
+    <h1>File Server Tester</h1>
+    <p>POST · GET · DELETE — localhost:9090</p>
+  </div>
+  <button class="status-pill" onclick="pingServer()">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Check server</span>
+  </button>
+</header>
+
+<div class="shell">
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tests</div>
+      <button class="sidebar-item active" onclick="scrollTo('test-upload')">
+        <span class="method-badge badge-post">POST</span> Upload File
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-get')">
+        <span class="method-badge badge-get">GET</span> Fetch File
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-delete')">
+        <span class="method-badge badge-del">DEL</span> Delete File
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-missing')">
+        <span class="method-badge badge-get">GET</span> Missing File (404)
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-del-missing')">
+        <span class="method-badge badge-del">DEL</span> Delete Missing
+      </button>
+    </div>
+    <hr class="sidebar-divider"/>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Activity</div>
+      <div id="sidebarStats" style="padding: 0 8px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); line-height: 2;">
+        <div>Passed: <span id="statPass" style="color:var(--accent)">0</span></div>
+        <div>Failed: <span id="statFail" style="color:var(--delete)">0</span></div>
+        <div>Total: <span id="statTotal" style="color:var(--text)">0</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="page-title">HTTP Test Suite</div>
+    <p class="page-sub">Send real requests to your file server and inspect responses.</p>
+
+    <div class="url-bar">
+      <span>BASE URL</span>
+      <input type="text" id="baseUrl" value="http://localhost:9090" />
+    </div>
+
+    <button class="run-all-btn" onclick="runAll()">
+      <span>▶</span> Run All Tests
+    </button>
+
+    <div class="log-panel">
+      <div class="log-header">
+        <h2>Activity Log</h2>
+        <button class="btn btn-neutral" style="padding:4px 12px;font-size:11px;" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-line"><span class="log-time">--:--:--</span><span class="log-info">Ready. Run a test to begin.</span></div>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-upload">
+      <div class="card-header" onclick="toggle('body-upload')">
+        <span class="method-badge badge-post" style="font-size:11px;">POST</span>
+        <div>
+          <h2>Upload File</h2>
+          <p>POST /post/[filename] — multipart or raw body</p>
+        </div>
+        <span class="spinner" id="spin-upload"></span>
+        <span class="card-status" id="status-upload">idle</span>
+      </div>
+      <div class="card-body" id="body-upload">
+        <div class="field">
+          <label>Filename</label>
+          <input type="text" id="upload-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
+        </div>
+        <div class="field">
+          <label>File</label>
+          <div class="dropzone" id="dz-upload" onclick="document.getElementById('upload-file').click()"
+               ondragover="dzDrag(event,'dz-upload')" ondragleave="dzLeave('dz-upload')" ondrop="dzDrop(event,'upload-file','dz-upload','fp-upload')">
+            <div class="dz-icon">📂</div>
+            <p><strong>Click to browse</strong> or drag & drop</p>
+            <p>Any file type</p>
+            <input type="file" id="upload-file" onchange="showPreview('upload-file','fp-upload','upload-name')"/>
+          </div>
+          <div class="file-preview" id="fp-upload">
+            <span>📄</span><span id="fp-upload-name">—</span>
+            <button class="btn btn-neutral" style="padding:3px 10px;" onclick="clearFile('upload-file','fp-upload')">✕</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-post" onclick="doUpload()">POST File</button>
+        </div>
+        <div class="response-header" id="rh-upload">
+          <span>Response</span>
+          <span class="status-code" id="sc-upload">—</span>
+          <span id="rt-upload"></span>
+        </div>
+        <textarea class="response-box" id="rb-upload" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-get">
+      <div class="card-header" onclick="toggle('body-get')">
+        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
+        <div>
+          <h2>Fetch File</h2>
+          <p>GET /post/[filename] — retrieve uploaded file</p>
+        </div>
+        <span class="spinner" id="spin-get"></span>
+        <span class="card-status" id="status-get">idle</span>
+      </div>
+      <div class="card-body" id="body-get">
+        <div class="field">
+          <label>Filename</label>
+          <input type="text" id="get-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-get" onclick="doGet()">GET File</button>
+          <button class="btn btn-neutral" onclick="doGetDownload()">Download</button>
+        </div>
+        <div class="response-header" id="rh-get">
+          <span>Response</span>
+          <span class="status-code" id="sc-get">—</span>
+          <span id="rt-get"></span>
+        </div>
+        
+        <div id="preview-get" style="display: none; margin-top: 16px; padding: 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius); text-align: center;"></div>
+        
+        <textarea class="response-box" id="rb-get" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-delete">
+      <div class="card-header" onclick="toggle('body-delete')">
+        <span class="method-badge badge-del" style="font-size:11px;">DEL</span>
+        <div>
+          <h2>Delete File</h2>
+          <p>DELETE /post/[filename] — remove from server</p>
+        </div>
+        <span class="spinner" id="spin-delete"></span>
+        <span class="card-status" id="status-delete">idle</span>
+      </div>
+      <div class="card-body" id="body-delete">
+        <div class="field">
+          <label>Filename</label>
+          <input type="text" id="delete-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-delete" onclick="doDelete()">DELETE File</button>
+        </div>
+        <div class="response-header" id="rh-delete">
+          <span>Response</span>
+          <span class="status-code" id="sc-delete">—</span>
+          <span id="rt-delete"></span>
+        </div>
+        <textarea class="response-box" id="rb-delete" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-missing">
+      <div class="card-header" onclick="toggle('body-missing')">
+        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
+        <div>
+          <h2>Missing File — Expect 404</h2>
+          <p>GET a file that doesn't exist</p>
+        </div>
+        <span class="spinner" id="spin-missing"></span>
+        <span class="card-status" id="status-missing">idle</span>
+      </div>
+      <div class="card-body" id="body-missing">
+        <div class="field">
+          <label>Filename (should not exist)</label>
+          <input type="text" id="missing-name" value="does-not-exist-abc123.bin"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-get" onclick="doGetMissing()">GET (expect 404)</button>
+        </div>
+        <div class="response-header" id="rh-missing">
+          <span>Response</span>
+          <span class="status-code" id="sc-missing">—</span>
+          <span id="rt-missing"></span>
+        </div>
+        <textarea class="response-box" id="rb-missing" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-del-missing">
+      <div class="card-header" onclick="toggle('body-del-missing')">
+        <span class="method-badge badge-del" style="font-size:11px;">DEL</span>
+        <div>
+          <h2>Delete Missing File</h2>
+          <p>DELETE a file that doesn't exist — tests error handling</p>
+        </div>
+        <span class="spinner" id="spin-del-missing"></span>
+        <span class="card-status" id="status-del-missing">idle</span>
+      </div>
+      <div class="card-body" id="body-del-missing">
+        <div class="field">
+          <label>Filename (should not exist)</label>
+          <input type="text" id="del-missing-name" value="ghost-file-xyz.txt"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-delete" onclick="doDeleteMissing()">DELETE (expect error)</button>
+        </div>
+        <div class="response-header" id="rh-del-missing">
+          <span>Response</span>
+          <span class="status-code" id="sc-del-missing">—</span>
+          <span id="rt-del-missing"></span>
+        </div>
+        <textarea class="response-box" id="rb-del-missing" readonly></textarea>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="./script.js" defer></script>
+</body>
+</html>

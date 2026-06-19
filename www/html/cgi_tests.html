@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CGI Engine Tester — localhost:9090</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="./style.css" rel="stylesheet"/>
+</head>
+<body>
+
+<header>
+  <div class="logo" style="background: var(--purple, #a855f7); color: #fff;">CG</div>
+  <div>
+    <h1>CGI Engine Tester</h1>
+    <p>Dynamic Script Execution · Environment Queries — localhost:9090</p>
+  </div>
+  <button class="status-pill" onclick="pingServer()">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Check server</span>
+  </button>
+</header>
+
+<div class="shell">
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-label">CGI Scenarios</div>
+      <button class="sidebar-item active" onclick="scrollTo('test-cgi-get')">
+        <span class="method-badge badge-get">GET</span> CGI Environment
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-cgi-post')">
+        <span class="method-badge badge-post">POST</span> Body Processing
+      </button>
+      <button class="sidebar-item" onclick="scrollTo('test-cgi-timeout')">
+        <span class="method-badge badge-del" style="background: var(--warn-dim); color: var(--warn);">TIME</span> Infinite Loop
+      </button>
+    </div>
+    <hr class="sidebar-divider"/>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Activity</div>
+      <div id="sidebarStats" style="padding: 0 8px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); line-height: 2;">
+        <div>Passed: <span id="statPass" style="color:var(--accent)">0</span></div>
+        <div>Failed: <span id="statFail" style="color:var(--delete)">0</span></div>
+        <div>Total: <span id="statTotal" style="color:var(--text)">0</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="page-title">CGI Gateway Gateway</div>
+    <p class="page-sub">Verify routing, environment variables, parsing configurations, and execution limits.</p>
+
+    <div class="url-bar">
+      <span>BASE URL</span>
+      <input type="text" id="baseUrl" value="http://localhost:9090" />
+    </div>
+
+    <div class="log-panel">
+      <div class="log-header">
+        <h2>CGI Engine Log</h2>
+        <button class="btn btn-neutral" style="padding:4px 12px;font-size:11px;" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-body" id="logBody">
+        <div class="log-line"><span class="log-time">--:--:--</span><span class="log-info">Ready. Execute a script routine below.</span></div>
+      </div>
+    </div>
+<div class="test-card" id="test-cgi-upload">
+      <div class="card-header" onclick="toggle('body-cgi-upload')">
+        <span class="method-badge badge-post" style="font-size:11px;">POST</span>
+        <div>
+          <h2>CGI Media Upload</h2>
+          <p>POST /cgi/upload.py — Upload images, audio, or video through CGI stdin</p>
+        </div>
+        <span class="spinner" id="spin-cgi-upload"></span>
+        <span class="card-status" id="status-cgi-upload">idle</span>
+      </div>
+      <div class="card-body" id="body-cgi-upload">
+        <div class="field">
+          <label>CGI Script Path</label>
+          <input type="text" id="cgi-upload-path" value="/cgi/upload.py"/>
+        </div>
+        <div class="field">
+          <label>Target Filename on Server</label>
+          <input type="text" id="cgi-upload-name" placeholder="e.g. track.mp3" value="mediafile.png"/>
+        </div>
+        <div class="field">
+          <label>Media File</label>
+          <div class="dropzone" id="dz-cgi-upload" onclick="document.getElementById('cgi-upload-file').click()"
+               ondragover="dzDrag(event,'dz-cgi-upload')" ondragleave="dzLeave('dz-cgi-upload')" ondrop="dzDrop(event,'cgi-upload-file','dz-cgi-upload','fp-cgi-upload')">
+            <div class="dz-icon">🎬</div>
+            <p><strong>Click to browse</strong> or drag & drop media</p>
+            <p>Images, Audio, or Video</p>
+            <input type="file" id="cgi-upload-file" onchange="showPreview('cgi-upload-file','fp-cgi-upload','cgi-upload-name')"/>
+          </div>
+          <div class="file-preview" id="fp-cgi-upload">
+            <span>📄</span><span id="fp-cgi-upload-name">—</span>
+            <button class="btn btn-neutral" style="padding:3px 10px;" onclick="clearFile('cgi-upload-file','fp-cgi-upload')">✕</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-post" onclick="doCgiUpload()">Upload via CGI</button>
+        </div>
+        <div class="response-header" id="rh-cgi-upload">
+          <span>Response</span>
+          <span class="status-code" id="sc-cgi-upload">—</span>
+          <span id="rt-cgi-upload"></span>
+        </div>
+        <textarea class="response-box" id="rb-cgi-upload" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-cgi-media-get">
+      <div class="card-header" onclick="toggle('body-cgi-media-get')">
+        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
+        <div>
+          <h2>CGI Media Fetch & Preview</h2>
+          <p>GET /cgi/get.py?file=[filename] — Stream back and render media through CGI</p>
+        </div>
+        <span class="spinner" id="spin-cgi-media-get"></span>
+        <span class="card-status" id="status-cgi-media-get">idle</span>
+      </div>
+      <div class="card-body" id="body-cgi-media-get">
+        <div class="field">
+          <label>CGI Script Path</label>
+          <input type="text" id="cgi-media-get-path" value="/cgi/get.py"/>
+        </div>
+        <div class="field">
+          <label>Requested Filename</label>
+          <input type="text" id="cgi-media-get-name" placeholder="e.g. image.jpg" value="mediafile.png"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-get" onclick="doCgiMediaGet()">Fetch Media</button>
+        </div>
+        <div class="response-header" id="rh-cgi-media-get">
+          <span>Response</span>
+          <span class="status-code" id="sc-cgi-media-get">—</span>
+          <span id="rt-cgi-media-get"></span>
+        </div>
+        
+        <div id="preview-cgi-get" style="display: none; margin-top: 16px; padding: 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius); text-align: center;"></div>
+        
+        <textarea class="response-box" id="rb-cgi-media-get" readonly></textarea>
+      </div>
+    </div>
+    <div class="test-card" id="test-cgi-get">
+      <div class="card-header" onclick="toggle('body-cgi-get')">
+        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
+        <div>
+          <h2>CGI Environment Variables</h2>
+          <p>GET /cgi/env.py?user=lazmoud&mode=debug — inspect meta-variables</p>
+        </div>
+        <span class="spinner" id="spin-cgi-get"></span>
+        <span class="card-status" id="status-cgi-get">idle</span>
+      </div>
+      <div class="card-body" id="body-cgi-get">
+        <div class="field">
+          <label>CGI Script Path</label>
+          <input type="text" id="cgi-get-path" value="/cgi/env.py"/>
+        </div>
+        <div class="field">
+          <label>Query Parameters</label>
+          <input type="text" id="cgi-get-query" placeholder="e.g. user=lazmoud&test=true" value="user=lazmoud&status=active"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-get" onclick="runCgiGet()">Execute Script</button>
+        </div>
+        <div class="response-header" id="rh-cgi-get">
+          <span>Response</span>
+          <span class="status-code" id="sc-cgi-get">—</span>
+          <span id="rt-cgi-get"></span>
+        </div>
+        <textarea class="response-box" id="rb-cgi-get" readonly style="min-height: 220px;"></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-cgi-post">
+      <div class="card-header" onclick="toggle('body-cgi-post')">
+        <span class="method-badge badge-post" style="font-size:11px;">POST</span>
+        <div>
+          <h2>CGI Plaintext / JSON Input Processing</h2>
+          <p>POST /cgi/upper.py — verifying stdin pipelines, Content-Length, and reading</p>
+        </div>
+        <span class="spinner" id="spin-cgi-post"></span>
+        <span class="card-status" id="status-cgi-post">idle</span>
+      </div>
+      <div class="card-body" id="body-cgi-post">
+        <div class="field">
+          <label>CGI Script Path</label>
+          <input type="text" id="cgi-post-path" value="/cgi/upper.py"/>
+        </div>
+        <div class="field">
+          <label>Payload (Plain text to modify)</label>
+          <input type="text" id="cgi-post-body" value="hello from the webserv dashboard frontend! compile clean!"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-post" onclick="runCgiPost()">Stream to Stdin</button>
+        </div>
+        <div class="response-header" id="rh-cgi-post">
+          <span>Response</span>
+          <span class="status-code" id="sc-cgi-post">—</span>
+          <span id="rt-cgi-post"></span>
+        </div>
+        <textarea class="response-box" id="rb-cgi-post" readonly></textarea>
+      </div>
+    </div>
+
+    <div class="test-card" id="test-cgi-timeout">
+      <div class="card-header" onclick="toggle('body-cgi-timeout')">
+        <span class="method-badge badge-del" style="font-size:11px; background: var(--warn-dim); color: var(--warn);">TIME</span>
+        <div>
+          <h2>CGI Infinite Loop & Timeout</h2>
+          <p>GET /cgi/timeout.py — verifies epoll hanging mitigation (Expect 504 Gateway Timeout)</p>
+        </div>
+        <span class="spinner" id="spin-cgi-timeout"></span>
+        <span class="card-status" id="status-cgi-timeout">idle</span>
+      </div>
+      <div class="card-body" id="body-cgi-timeout">
+        <div class="field">
+          <label>CGI Script Path</label>
+          <input type="text" id="cgi-timeout-path" value="/cgi/timeout.py"/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-neutral" style="border: 1px solid var(--delete);" onclick="runCgiTimeout()">Trigger Loop</button>
+        </div>
+        <div class="response-header" id="rh-cgi-timeout">
+          <span>Response</span>
+          <span class="status-code" id="sc-cgi-timeout">—</span>
+          <span id="rt-cgi-timeout"></span>
+        </div>
+        <textarea class="response-box" id="rb-cgi-timeout" readonly></textarea>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="./script.js" defer></script>
+</body>
+</html>

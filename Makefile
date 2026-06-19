@@ -4,7 +4,7 @@ NAME=./webserv
 OBJDIR = .build
 OBJS=$(SRCS:%.cpp=$(OBJDIR)/%.o)
 INCLUDE=./include/
-CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE) -ggdb # -g3 -fsanitize=address 
+CXXFLAGS=-Wall -Wextra -Werror -std=c++98 -I$(INCLUDE)
 RM=rm -rf
 MAIN=$(SOURCE_DIR)/main.cpp
 SRCS=$(SOURCE_DIR)/multiplexing/Multiplexer.cpp $(SOURCE_DIR)/multiplexing/ASocketContext.cpp \

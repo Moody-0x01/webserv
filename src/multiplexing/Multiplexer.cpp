@@ -150,8 +150,9 @@ Client *Multiplexer::register_client(uint32_t e, Server *server) __THROWS_STRERR
 	len = sizeof(addr);
 	conn = accept(server->get_socket(), (struct sockaddr*)&addr, &len);
 	if (conn == -1) throw strerror(errno);
-	ip = ntohl(addr.sin_addr.s_addr);
-	port = ntohl(addr.sin_addr.s_addr);
+	ip   = ntohl(addr.sin_addr.s_addr);
+	port = ntohs(addr.sin_port);
+
 	if (utility::set_nonblocking(conn) == -1) throw strerror(errno);
 
 	self->servers[server->get_socket()].second[conn] = Client();
@@ -231,7 +232,7 @@ void Multiplexer::execute_epoll_event(int epoll_index)
 		// Cgi | cliet | server | signal handler |  proxy
 		handle->action(this->events[epoll_index].events);
 	} catch (const char *error) {
-		std::cerr << "[ handle->action ] " << error << "\n";
+		// std::cerr << "[ handle->action ] " << error << "\n";
 	}
 }
 

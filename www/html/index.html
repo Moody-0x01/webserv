@@ -1,233 +1,156 @@
-<!DOCTYPE html> <html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" /> <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>File Server Tester — localhost:9090</title>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
-  <link href="./style.css" rel="stylesheet"/>
-  <!-- <script defer src="./script.js"><script/> -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webserv Test Suite</title>
+    <style>
+        :root {
+            --bg-color: #0f141c;
+            --card-bg: #1e2530;
+            --text-main: #f0f4fc;
+            --text-muted: #8a99ad;
+            --accent-blue: #3b82f6;
+            --accent-purple: #a855f7;
+            --border-color: #2d3748;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.05em;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .container {
+            display: flex;
+            gap: 2rem;
+            max-width: 900px;
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 380px;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Top decorative accent lines for the cards */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+        }
+
+        .card.basic::before { background: var(--accent-blue); }
+        .card.cgi::before { background: var(--accent-purple); }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.5;
+            flex-grow: 1;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-action {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card.basic .card-action { color: var(--accent-blue); }
+        .card.cgi .card-action { color: var(--accent-purple); }
+
+        .card-action cubic-bezier {
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover .card-action span {
+            transform: translateX(4px);
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">FS</div>
-  <div>
-    <h1>File Server Tester</h1>
-    <p>POST · GET · DELETE — localhost:9090</p>
-  </div>
-  <button class="status-pill" onclick="pingServer()">
-    <div class="dot" id="statusDot"></div>
-    <span id="statusText">Check server</span>
-  </button>
-</header>
+    <header>
+        <h1>Server Test Dashboard</h1>
+        <p>Select a gateway to verify endpoint responsiveness and configurations</p>
+    </header>
 
-<div class="shell">
-  <aside>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Tests</div>
-      <button class="sidebar-item active" onclick="scrollTo('test-upload')">
-        <span class="method-badge badge-post">POST</span> Upload File
-      </button>
-      <button class="sidebar-item" onclick="scrollTo('test-get')">
-        <span class="method-badge badge-get">GET</span> Fetch File
-      </button>
-      <button class="sidebar-item" onclick="scrollTo('test-delete')">
-        <span class="method-badge badge-del">DEL</span> Delete File
-      </button>
-      <button class="sidebar-item" onclick="scrollTo('test-missing')">
-        <span class="method-badge badge-get">GET</span> Missing File (404)
-      </button>
-      <button class="sidebar-item" onclick="scrollTo('test-del-missing')">
-        <span class="method-badge badge-del">DEL</span> Delete Missing
-      </button>
-    </div>
-    <hr class="sidebar-divider"/>
-    <div class="sidebar-section">
-      <div class="sidebar-label">Activity</div>
-      <div id="sidebarStats" style="padding: 0 8px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); line-height: 2;">
-        <div>Passed: <span id="statPass" style="color:var(--accent)">0</span></div>
-        <div>Failed: <span id="statFail" style="color:var(--delete)">0</span></div>
-        <div>Total: <span id="statTotal" style="color:var(--text)">0</span></div>
-      </div>
-    </div>
-  </aside>
+    <main class="container">
+        <a href="basic_tests.html" class="card basic">
+            <h2>Basic Tests</h2>
+            <p>Test standard HTTP methods, file uploads, static file serving, error pages, and overall server responsiveness.</p>
+            <div class="card-action">Launch Tests <span>&rarr;</span></div>
+        </a>
 
-  <main>
-    <div class="page-title">HTTP Test Suite</div>
-    <p class="page-sub">Send real requests to your file server and inspect responses.</p>
+        <a href="cgi_tests.html" class="card cgi">
+            <h2>CGI Tests</h2>
+            <p>Execute dynamic scripts via Common Gateway Interface. Verify environment variables, POST body parsing, and script timeouts.</p>
+            <div class="card-action">Launch Tests <span>&rarr;</span></div>
+        </a>
+    </main>
 
-    <div class="url-bar">
-      <span>BASE URL</span>
-      <input type="text" id="baseUrl" value="http://localhost:9090" />
-    </div>
-
-    <button class="run-all-btn" onclick="runAll()">
-      <span>▶</span> Run All Tests
-    </button>
-
-    <div class="log-panel">
-      <div class="log-header">
-        <h2>Activity Log</h2>
-        <button class="btn btn-neutral" style="padding:4px 12px;font-size:11px;" onclick="clearLog()">Clear</button>
-      </div>
-      <div class="log-body" id="logBody">
-        <div class="log-line"><span class="log-time">--:--:--</span><span class="log-info">Ready. Run a test to begin.</span></div>
-      </div>
-    </div>
-
-    <div class="test-card" id="test-upload">
-      <div class="card-header" onclick="toggle('body-upload')">
-        <span class="method-badge badge-post" style="font-size:11px;">POST</span>
-        <div>
-          <h2>Upload File</h2>
-          <p>POST /post/[filename] — multipart or raw body</p>
-        </div>
-        <span class="spinner" id="spin-upload"></span>
-        <span class="card-status" id="status-upload">idle</span>
-      </div>
-      <div class="card-body" id="body-upload">
-        <div class="field">
-          <label>Filename</label>
-          <input type="text" id="upload-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
-        </div>
-        <div class="field">
-          <label>File</label>
-          <div class="dropzone" id="dz-upload" onclick="document.getElementById('upload-file').click()"
-               ondragover="dzDrag(event,'dz-upload')" ondragleave="dzLeave('dz-upload')" ondrop="dzDrop(event,'upload-file','dz-upload','fp-upload')">
-            <div class="dz-icon">📂</div>
-            <p><strong>Click to browse</strong> or drag & drop</p>
-            <p>Any file type</p>
-            <input type="file" id="upload-file" onchange="showPreview('upload-file','fp-upload','upload-name')"/>
-          </div>
-          <div class="file-preview" id="fp-upload">
-            <span>📄</span><span id="fp-upload-name">—</span>
-            <button class="btn btn-neutral" style="padding:3px 10px;" onclick="clearFile('upload-file','fp-upload')">✕</button>
-          </div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-post" onclick="doUpload()">POST File</button>
-        </div>
-        <div class="response-header" id="rh-upload">
-          <span>Response</span>
-          <span class="status-code" id="sc-upload">—</span>
-          <span id="rt-upload"></span>
-        </div>
-        <textarea class="response-box" id="rb-upload" readonly></textarea>
-      </div>
-    </div>
-
-    <div class="test-card" id="test-get">
-      <div class="card-header" onclick="toggle('body-get')">
-        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
-        <div>
-          <h2>Fetch File</h2>
-          <p>GET /post/[filename] — retrieve uploaded file</p>
-        </div>
-        <span class="spinner" id="spin-get"></span>
-        <span class="card-status" id="status-get">idle</span>
-      </div>
-      <div class="card-body" id="body-get">
-        <div class="field">
-          <label>Filename</label>
-          <input type="text" id="get-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-get" onclick="doGet()">GET File</button>
-          <button class="btn btn-neutral" onclick="doGetDownload()">Download</button>
-        </div>
-        <div class="response-header" id="rh-get">
-          <span>Response</span>
-          <span class="status-code" id="sc-get">—</span>
-          <span id="rt-get"></span>
-        </div>
-        
-        <div id="preview-get" style="display: none; margin-top: 16px; padding: 12px; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius); text-align: center;"></div>
-        
-        <textarea class="response-box" id="rb-get" readonly></textarea>
-      </div>
-    </div>
-
-    <div class="test-card" id="test-delete">
-      <div class="card-header" onclick="toggle('body-delete')">
-        <span class="method-badge badge-del" style="font-size:11px;">DEL</span>
-        <div>
-          <h2>Delete File</h2>
-          <p>DELETE /post/[filename] — remove from server</p>
-        </div>
-        <span class="spinner" id="spin-delete"></span>
-        <span class="card-status" id="status-delete">idle</span>
-      </div>
-      <div class="card-body" id="body-delete">
-        <div class="field">
-          <label>Filename</label>
-          <input type="text" id="delete-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-delete" onclick="doDelete()">DELETE File</button>
-        </div>
-        <div class="response-header" id="rh-delete">
-          <span>Response</span>
-          <span class="status-code" id="sc-delete">—</span>
-          <span id="rt-delete"></span>
-        </div>
-        <textarea class="response-box" id="rb-delete" readonly></textarea>
-      </div>
-    </div>
-
-    <div class="test-card" id="test-missing">
-      <div class="card-header" onclick="toggle('body-missing')">
-        <span class="method-badge badge-get" style="font-size:11px;">GET</span>
-        <div>
-          <h2>Missing File — Expect 404</h2>
-          <p>GET a file that doesn't exist</p>
-        </div>
-        <span class="spinner" id="spin-missing"></span>
-        <span class="card-status" id="status-missing">idle</span>
-      </div>
-      <div class="card-body" id="body-missing">
-        <div class="field">
-          <label>Filename (should not exist)</label>
-          <input type="text" id="missing-name" value="does-not-exist-abc123.bin"/>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-get" onclick="doGetMissing()">GET (expect 404)</button>
-        </div>
-        <div class="response-header" id="rh-missing">
-          <span>Response</span>
-          <span class="status-code" id="sc-missing">—</span>
-          <span id="rt-missing"></span>
-        </div>
-        <textarea class="response-box" id="rb-missing" readonly></textarea>
-      </div>
-    </div>
-
-    <div class="test-card" id="test-del-missing">
-      <div class="card-header" onclick="toggle('body-del-missing')">
-        <span class="method-badge badge-del" style="font-size:11px;">DEL</span>
-        <div>
-          <h2>Delete Missing File</h2>
-          <p>DELETE a file that doesn't exist — tests error handling</p>
-        </div>
-        <span class="spinner" id="spin-del-missing"></span>
-        <span class="card-status" id="status-del-missing">idle</span>
-      </div>
-      <div class="card-body" id="body-del-missing">
-        <div class="field">
-          <label>Filename (should not exist)</label>
-          <input type="text" id="del-missing-name" value="ghost-file-xyz.txt"/>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-delete" onclick="doDeleteMissing()">DELETE (expect error)</button>
-        </div>
-        <div class="response-header" id="rh-del-missing">
-          <span>Response</span>
-          <span class="status-code" id="sc-del-missing">—</span>
-          <span id="rt-del-missing"></span>
-        </div>
-        <textarea class="response-box" id="rb-del-missing" readonly></textarea>
-      </div>
-    </div>
-  </main>
-</div>
-<script src="./script.js" defer></script>
 </body>
 </html>

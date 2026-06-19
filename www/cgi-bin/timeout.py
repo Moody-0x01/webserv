@@ -1,4 +1,6 @@
-#!/usr/bin/env python2
-
+#!/usr/bin/env python3
 import time
-time.sleep(10000)
+import sys
+
+while True:
+    time.sleep(1)

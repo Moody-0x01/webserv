@@ -26,6 +26,7 @@ struct LocationConfig;
 #define  NotImplemented       501
 #define  BadGateway           502
 #define  ServiceUnavailable   503
+#define  GateWayTimeout       504
 
 // Mime types
 #define  TextHtml             "text/html"

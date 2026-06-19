@@ -23,11 +23,11 @@ typedef struct ASocketContext
 public:
 	ASocketContext(int sock);
 	ASocketContext();
-	virtual ~ASocketContext();
 
+	virtual ~ASocketContext();
 	virtual bool timeout(void) __THROWS_STRERROR;
 	virtual void free();
-	void virtual action(uint32_t e) __THROWS_STRERROR = 0;
+	virtual void action(uint32_t e) __THROWS_STRERROR = 0;
 
 	void set_socket(int sockfd);
 	int get_socket(void) const;

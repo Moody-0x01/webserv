@@ -99,23 +99,25 @@ void Client::parse_request() __THROWS_STRERROR
 	if (clientP.state() != READY) return ;
 
 	this->unchunkify_buffer();
-	if (this->response.getstage() == Setup)
+	if (this->response.getstage() == Setup) {
 		this->response.setup(request);
-	switch (this->response.getstage())
-	{
-		case ProcessingPost: {
-			this->response
-				.dump_post_body(this->_buffer);
-		} break;
-		case ProcessingCgi: {
-			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
-					(ChunkContext*)(request.ischunked * (uintptr_t)&chunk));
-			this->_buffer.clear();
-		} break;
-		default: {} break;
+	} else {
+		switch (this->response.getstage())
+		{
+			case ProcessingPost: {
+				this->response
+					.dump_post_body(this->_buffer);
+			} break;
+			case ProcessingCgi: {
+				cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
+						(ChunkContext*)(request.ischunked * (uintptr_t)&chunk));
+				this->_buffer.clear();
+			} break;
+			default: {} break;
+		}
 	}
 	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done)  this->switch_mode(WRITING);
-	if (this->response.getstage() == SendingResource)							 this->switch_mode(WRITING);
+	if (this->response.getstage() == SendingResource)                            this->switch_mode(WRITING);
 	if (this->getParser().getRequestObject().getMethod() != "POST")              this->switch_mode(WRITING);
 }
 
@@ -228,13 +230,12 @@ void Client::setip_from_bytes(uint32_t ip_bytes)
 
 void Client::setport_from_bytes(uint32_t port_bytes)
 {
+	// static int i = 0;
 	HttpRequest r = this->getParser().getRequestObject().getHttpRequest();
 	std::stringstream ss;
 
-    ss << ((port_bytes >> 24) & 0xFF) << "."
-       << ((port_bytes >> 16) & 0xFF) << "."
-       << ((port_bytes >> 8)  & 0xFF) << "."
-       << ((port_bytes >> 0)  & 0xFF);
+	ss << port_bytes;
     this->setport(ss.str());
 	r.headers["REMOTE_PORT"] = this->getport();
+	// std::cout << "[" << i++ << "]" << this->getip() << ":" << this->getport() << "\n";
 }

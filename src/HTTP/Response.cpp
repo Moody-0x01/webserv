@@ -354,9 +354,8 @@ void Response::process_cgi_instance(const HttpRequest &request)
 
 	if (cgi.timeout())
 	{
-		std::cout << "CGI timeout\n";
 		if (!cgi.headers_sent) {
-			this->set_status(RequestTimeout);
+			this->set_status(GateWayTimeout);
 			return ;
 		}
 		this->stage = DoneSending;
@@ -410,7 +409,7 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
-	std::cout << "Resolved URI: " << resolved_results.request_path << " to filesystem path: " << resolved_results.filesystem_path << "\n";
+	// std::cout << "Resolved URI: " << resolved_results.request_path << " to filesystem path: " << resolved_results.filesystem_path << "\n";
 	if (!this->is_method_allowed(request.method))
 	{
 		this->set_status(MethodNotAllowed);
@@ -429,7 +428,6 @@ void Response::setup_response(const HttpRequest &request)
 	}
 	if (this->resolved_results.resource_type == UriResolutionResult::None)
 	{
-		std::cout << "Not found\n";
 		this->set_status(NotFound);
 		return ;
 	}
@@ -572,7 +570,7 @@ void Response::handle_post(const HttpRequest &request)
 	if (!this->resolved_results.post_fn.empty() && this->resolved_results.filesystem_path[this->resolved_results.filesystem_path.length() - 1] != '/')
 		this->resolved_results.filesystem_path += "/";
 	std::string fullpath = this->resolved_results.filesystem_path + this->resolved_results.post_fn;
-	std::cout << "File: " << fullpath << std::endl;
+	// std::cout << "File: " << fullpath << std::endl;
 	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary);
 	if (!this->__rstream->is_open())
 	{
@@ -585,17 +583,15 @@ void Response::handle_post(const HttpRequest &request)
 		}
 		return ;
 	}
-	std::cout << "Opened file for POST: " << fullpath << std::endl;
+	// std::cout << "Opened file for POST: " << fullpath << std::endl;
 	this->stage = ProcessingPost;
 }
 
 void Response::dump_post_body(std::vector<char> &body)
 {
-	std::cout << "Dumping POST body chunk of size " << body.size() << " bytes\n";
 	if(this->__rstream->write(body.data(), body.size()))
 	{
 		this->bytes_sent += body.size();
-		std::cout << "Written " << this->bytes_sent << " bytes to file, total: " << this->bytes_sent << "\n";
 		if (this->bytes_sent >= request_ptr->content_length || request_ptr->chunked_context.is_done())
 		{
 			this->set_status(Created);
@@ -718,6 +714,7 @@ void Response::init_status_lines()
     Response::status_phrases[NotImplemented       ] = "Not Implemented";
     Response::status_phrases[BadGateway           ] = "Bad Gateway";
     Response::status_phrases[ServiceUnavailable   ] = "Service Unavailable";
+    Response::status_phrases[GateWayTimeout       ] = "Gateway Timeout";
 
     Response::status_lines[OK                   ] = "HTTP/1.0 200 OK";
     Response::status_lines[Created              ] = "HTTP/1.0 201 Created";
@@ -737,6 +734,8 @@ void Response::init_status_lines()
     Response::status_lines[NotImplemented       ] = "HTTP/1.0 501 Not Implemented";
     Response::status_lines[BadGateway           ] = "HTTP/1.0 502 Bad Gateway";
     Response::status_lines[ServiceUnavailable   ] = "HTTP/1.0 503 Service Unavailable";
+    Response::status_lines[GateWayTimeout       ] = "HTTP/1.0 504 Gateway Timeout";
+	
 }
 
 void Response::appendheader(const char *key, const char  *value)

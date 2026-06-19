@@ -31,7 +31,6 @@ Cgi::~Cgi()
 }
 
 void Cgi::close_write(void) {
-	std::cout << "close_write\n";
 	unregister_fd(this->streams[CGI_WRITE_END]);
 	this->streams[CGI_WRITE_END] = -1;
 	if (this->streams[CGI_READ_END] == -1) {
@@ -41,7 +40,6 @@ void Cgi::close_write(void) {
 }
 
 void Cgi::close_read(void) {
-	std::cout << "close_read\n";
 	unregister_fd(this->streams[CGI_READ_END]);
 	this->streams[CGI_READ_END] = -1;
 	if (this->streams[CGI_WRITE_END] == -1) {
@@ -93,6 +91,7 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 	}
 	utility::push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
+	// std::cout << "Cgi read bytes: " << this->cgi_read_bytes << "\n";
 	if (!chunk && this->cgi_read_bytes >= this->client_content_length)
 		this->client_done = true;
 	if (chunk && chunk->is_done())
@@ -118,8 +117,12 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 	}
 }
 
+
 void Cgi::send_headers(int conn) __THROWS_STRERROR
 {
+	this->headers["Access-Control-Allow-Origin"]  = "*";
+	this->headers["Access-Control-Allow-Methods"]  = "GET, POST, DELETE, OPTIONS";
+	this->headers["Access-Control-Allow-Headers"]  = "Content-Type, Authorization";
 	std::string headers = utility::serialize_headers(this->headers, true);
 	::send(conn, headers.c_str(), headers.size(), 0);
 	this->headers_sent = true;
@@ -353,6 +356,11 @@ void Cgi::setup_environment_variables(const std::map<std::string, std::string> &
 		if (key == "content-type" || key == "content-length")
 			continue ;
 		std::transform(key.begin(), key.end(), key.begin(), ::toupper);
+		for (std::string::iterator char_it = key.begin(); char_it != key.end(); ++char_it)
+		{
+			if (*char_it == '-')
+				*char_it = '_';
+		}
 		this->env
 			.push_back("HTTP_" + key + "=" + value);
 	}
