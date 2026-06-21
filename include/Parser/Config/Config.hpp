@@ -59,6 +59,7 @@ struct ServerConfig {
 
     ServerConfig();
     ServerConfig& operator=(const ServerConfig& other);
+	std::string label() const;
 };
 
 class Config {

@@ -415,6 +415,10 @@ Config ConfigParser::parse() {
     return _mainConfig;
 }
 
+std::string ServerConfig::label() const {
+	return (this->server_name + ":" + this->port);
+}
+
 Config parse_config_file(std::string fileName) {
     std::vector<ConfigToken> tokens = configLexer(fileName);
     ConfigParser parser(tokens, fileName);

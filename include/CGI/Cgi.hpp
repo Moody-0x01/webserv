@@ -20,7 +20,7 @@ extern char **environ;
 
 # define CGI_READ_END  0
 # define CGI_WRITE_END 1
-# define SCRIPT_TIMEOUT 5
+# define SCRIPT_TIMEOUT 30
 # define MAX_HEADERS_SIZE (4096 * 2)
 
 typedef struct Cgi: public ASocketContext
@@ -46,6 +46,7 @@ typedef struct Cgi: public ASocketContext
     ssize_t cgi_read_bytes; // To know when the script is done
     std::vector<std::string> env; 
 	std::map<std::string, std::string> headers;
+	bool   at_initial_body;
     time_t last_event_time;          // Use this in your loop to kill(pid, SIGKILL) 
                                 // if the script takes > 30 seconds.
 public:

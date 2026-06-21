@@ -85,13 +85,16 @@ void Cgi::append_into_cgi_body_buffer(const char *buffer,
 		ssize_t size,
 		ChunkContext *chunk)
 {
+	if (this->at_initial_body) {
+		this->at_initial_body = false;
+		return ;
+	}
 	if (size <= 0 || this->client_done) {
 		this->client_done = true;
 		return ;
 	}
 	utility::push_into_buffer(this->cgi_body_buffer, buffer, size);
 	this->cgi_read_bytes += size; 
-	// std::cout << "Cgi read bytes: " << this->cgi_read_bytes << "\n";
 	if (!chunk && this->cgi_read_bytes >= this->client_content_length)
 		this->client_done = true;
 	if (chunk && chunk->is_done())
@@ -300,6 +303,7 @@ Cgi::Cgi(): ASocketContext()
 	this->cgi_done               = false;
 	this->client_done            = false;
 	this->last_event_time = time(NULL);
+	this->at_initial_body = false;
 }
 
 void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpreter_)
@@ -328,6 +332,7 @@ void Cgi::setup(const HttpRequest &request, std::string fn, std::string interpre
 				request.body->size(),
 				(ChunkContext*)(request.ischunked * (uintptr_t)&request.chunked_context));
 		request.body->clear();
+		this->at_initial_body = true;
 	}
 }
 

@@ -34,5 +34,6 @@ void Server::action(uint32_t e) __THROWS_STRERROR
 			throw strerror(errno);
 		}
 		Multiplexer::introduce_new_context((uint64_t)conn, true);
+		std::cout << "[" << Multiplexer::get_conf(this->get_socket()).label() << "][Client Connected] " << conn->getip() << ":" << conn->getport() << "\n";
 	}
 }

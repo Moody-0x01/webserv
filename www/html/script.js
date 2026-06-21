@@ -151,39 +151,26 @@ async function doUpload() {
     const name = document.getElementById('upload-name').value.trim();
     const fileInput = document.getElementById('upload-file');
 
-    // Toggle this or change it to read from your radio buttons/UI state
-    let isChunked = false; 
 
     if (!name) return alert('Enter a filename.');
     if (!fileInput.files.length) return alert('Please select a file to upload.');
 
-    // Grab the actual file object
     const file = fileInput.files[0];
-    const typeLabel = isChunked ? 'Chunked' : 'Content-Length';
 
     setCard('upload', 'running', 'sending…');
-    log(`POST /post/${name} [${typeLabel}]`, 'info');
+    log(`POST /post/${name}`, 'info');
 
     try {
       const opts = {
         method: 'POST',
         headers: {
-          // Use the file's type, not the input element's type
           'Content-Type': file.type || 'application/octet-stream'
         }
       };
 
-      if (isChunked) {
-        // Stream directly from the file object
-        opts.body = file.stream();
-        opts.duplex = 'half'; // CRITICAL: Required by browsers for chunked upload streams
-      } else {
-        // Read file into an ArrayBuffer for a fixed Content-Length body
-        opts.body = await file.arrayBuffer();
-      }
+    opts.body = await file.arrayBuffer();
 
       const t0 = Date.now();
-      // Bypassing the req() helper so fetch receives the duplex option correctly
       const r = await fetch(url(name), opts); 
       const ms = Date.now() - t0;
       
@@ -193,10 +180,10 @@ async function doUpload() {
       showResponse('upload', r.status, text, ms);
       if (r.ok) {
         setCard('upload', 'success', `${r.status} OK`);
-        log(`POST ${name} [${typeLabel}] → ${r.status} (${ms}ms)`, 'ok');
+        log(`POST ${name} → ${r.status} (${ms}ms)`, 'ok');
       } else {
         setCard('upload', 'error', `${r.status}`);
-        log(`POST ${name} [${typeLabel}] → ${r.status}`, 'fail');
+        log(`POST ${name} → ${r.status}`, 'fail');
       }
     } catch (e) {
       setCard('upload', 'error', 'network error');
@@ -204,6 +191,7 @@ async function doUpload() {
       log(`POST ${name} → ${e.message}`, 'fail');
     }
 }
+
 async function doGet() {
     const name = document.getElementById('get-name').value.trim();
     if (!name) return alert('Enter a filename.');

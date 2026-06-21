@@ -74,46 +74,48 @@
       </div>
     </div>
 
-    <div class="test-card" id="test-upload">
-      <div class="card-header" onclick="toggle('body-upload')">
-        <span class="method-badge badge-post" style="font-size:11px;">POST</span>
-        <div>
-          <h2>Upload File</h2>
-          <p>POST /post/[filename] — multipart or raw body</p>
-        </div>
-        <span class="spinner" id="spin-upload"></span>
-        <span class="card-status" id="status-upload">idle</span>
+<div class="test-card" id="test-upload">
+  <div class="card-header" onclick="toggle('body-upload')">
+    <span class="method-badge badge-post" style="font-size:11px;">POST</span>
+    <div>
+      <h2>Upload File</h2>
+      <p>POST /post/[filename] — multipart or raw body</p>
+    </div>
+    <span class="spinner" id="spin-upload"></span>
+    <span class="card-status" id="status-upload">idle</span>
+  </div>
+  <div class="card-body" id="body-upload">
+    <div class="field">
+      <label>Filename</label>
+      <input type="text" id="upload-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
+    </div>
+    <div class="field">
+      <label>File</label>
+      <div class="dropzone" id="dz-upload" onclick="document.getElementById('upload-file').click()"
+           ondragover="dzDrag(event,'dz-upload')" ondragleave="dzLeave('dz-upload')" ondrop="dzDrop(event,'upload-file','dz-upload','fp-upload')">
+        <div class="dz-icon">📂</div>
+        <p><strong>Click to browse</strong> or drag & drop</p>
+        <p>Any file type</p>
+        <input type="file" id="upload-file" onchange="showPreview('upload-file','fp-upload','upload-name')"/>
       </div>
-      <div class="card-body" id="body-upload">
-        <div class="field">
-          <label>Filename</label>
-          <input type="text" id="upload-name" placeholder="e.g. hello.txt" value="testfile.txt"/>
-        </div>
-        <div class="field">
-          <label>File</label>
-          <div class="dropzone" id="dz-upload" onclick="document.getElementById('upload-file').click()"
-               ondragover="dzDrag(event,'dz-upload')" ondragleave="dzLeave('dz-upload')" ondrop="dzDrop(event,'upload-file','dz-upload','fp-upload')">
-            <div class="dz-icon">📂</div>
-            <p><strong>Click to browse</strong> or drag & drop</p>
-            <p>Any file type</p>
-            <input type="file" id="upload-file" onchange="showPreview('upload-file','fp-upload','upload-name')"/>
-          </div>
-          <div class="file-preview" id="fp-upload">
-            <span>📄</span><span id="fp-upload-name">—</span>
-            <button class="btn btn-neutral" style="padding:3px 10px;" onclick="clearFile('upload-file','fp-upload')">✕</button>
-          </div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-post" onclick="doUpload()">POST File</button>
-        </div>
-        <div class="response-header" id="rh-upload">
-          <span>Response</span>
-          <span class="status-code" id="sc-upload">—</span>
-          <span id="rt-upload"></span>
-        </div>
-        <textarea class="response-box" id="rb-upload" readonly></textarea>
+      <div class="file-preview" id="fp-upload">
+        <span>📄</span><span id="fp-upload-name">—</span>
+        <button class="btn btn-neutral" style="padding:3px 10px;" onclick="clearFile('upload-file','fp-upload')">✕</button>
       </div>
     </div>
+
+
+    <div class="btn-row">
+      <button class="btn btn-post" onclick="doUpload()">POST File</button>
+    </div>
+    <div class="response-header" id="rh-upload">
+      <span>Response</span>
+      <span class="status-code" id="sc-upload">—</span>
+      <span id="rt-upload"></span>
+    </div>
+    <textarea class="response-box" id="rb-upload" readonly></textarea>
+  </div>
+</div>
 
     <div class="test-card" id="test-get">
       <div class="card-header" onclick="toggle('body-get')">

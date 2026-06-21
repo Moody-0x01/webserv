@@ -34,12 +34,14 @@ Server *Client::get_server(void) const __THROWS_STRERROR {
 
 void Client::free()
 {
+	std::string ip_ = this->ip;
+	std::string port_ = this->port;
 	shutdown(this->get_socket(), SHUT_RDWR);
 	Multiplexer::unregister_client(this->get_owner(),
 				this->get_socket());
 	Multiplexer::unintroduce_context((uintptr_t)this);
 	Multiplexer::erase_context((uintptr_t)this);
-	std::cout << "Client freed!\n";
+	std::cout << "[" << Multiplexer::get_conf(this->get_owner()).label() << "][Client disconnected] " << ip_ << ":" << port_ << "\n";
 }
 
 void Client::switch_mode(socket_mode_t mode) __THROWS_STRERROR
@@ -99,22 +101,19 @@ void Client::parse_request() __THROWS_STRERROR
 	if (clientP.state() != READY) return ;
 
 	this->unchunkify_buffer();
-	if (this->response.getstage() == Setup) {
-		this->response.setup(request);
-	} else {
-		switch (this->response.getstage())
-		{
-			case ProcessingPost: {
-				this->response
-					.dump_post_body(this->_buffer);
-			} break;
-			case ProcessingCgi: {
-				cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
-						(ChunkContext*)(request.ischunked * (uintptr_t)&chunk));
-				this->_buffer.clear();
-			} break;
-			default: {} break;
-		}
+	if (this->response.getstage() == Setup) this->response.setup(request);
+	switch (this->response.getstage())
+	{
+		case ProcessingPost: {
+			this->response
+				.dump_post_body(this->_buffer);
+		} break;
+		case ProcessingCgi: {
+			cgi_instance.append_into_cgi_body_buffer(this->_buffer.data(), this->_buffer.size(), 
+					(ChunkContext*)(request.ischunked * (uintptr_t)&chunk));
+			this->_buffer.clear();
+		} break;
+		default: {} break;
 	}
 	if (this->response.getstage() == ProcessingCgi && cgi_instance.client_done)  this->switch_mode(WRITING);
 	if (this->response.getstage() == SendingResource)                            this->switch_mode(WRITING);
