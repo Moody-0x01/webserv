@@ -58,7 +58,7 @@ int Resource::open(const std::string &path)
 		delete this->__rstream;
 		this->__rstream = NULL;
 		if (errno == ENOENT) return (NotFound);
-        if (errno == EACCES) return (Unauthorized);
+        if (errno == EACCES) return (Forbidden);
         return (InternalServerError);
 	}
 	Resource::identify_type(path);
