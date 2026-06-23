@@ -513,16 +513,7 @@ void Response::serve_file(void)
 	const std::string &file_path = this->resolved_results.filesystem_path;
 	int open_status = this->resource.open(file_path);
 
-	if (open_status != OK)
-	{
-		if (open_status == Unauthorized)
-			this->set_status(Forbidden);
-		else
-			this->set_status(open_status);
-	}
-	else
-		this->set_status(OK);
-
+	this->set_status(open_status);
 	std::string content_type = this->resource.getmime_type();
 	this->appendheader("Content-Type", content_type.c_str());
 }
@@ -576,7 +567,7 @@ void Response::handle_post(const HttpRequest &request)
 	{
 		delete this->__rstream;
 		this->__rstream = NULL;
-        if (errno == EACCES) this->set_status(Unauthorized);
+        if (errno == EACCES) this->set_status(Forbidden);
         else {
 			std::cout << "Error opening file for POST: " << strerror(errno) << std::endl;
 			this->set_status(InternalServerError);
