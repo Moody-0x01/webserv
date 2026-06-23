@@ -561,7 +561,6 @@ void Response::handle_post(const HttpRequest &request)
 	if (!this->resolved_results.post_fn.empty() && this->resolved_results.filesystem_path[this->resolved_results.filesystem_path.length() - 1] != '/')
 		this->resolved_results.filesystem_path += "/";
 	std::string fullpath = this->resolved_results.filesystem_path + this->resolved_results.post_fn;
-	// std::cout << "File: " << fullpath << std::endl;
 	this->__rstream = new std::ofstream(fullpath.c_str(), std::ios::out | std::ios::binary);
 	if (!this->__rstream->is_open())
 	{
@@ -574,7 +573,6 @@ void Response::handle_post(const HttpRequest &request)
 		}
 		return ;
 	}
-	// std::cout << "Opened file for POST: " << fullpath << std::endl;
 	this->stage = ProcessingPost;
 }
 
