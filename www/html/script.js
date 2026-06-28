@@ -388,6 +388,17 @@ async function runCgiGet() {
     setCard('cgi-get', 'running', 'executing…');
     log(`GET ${scriptPath}${queryString}`, 'info');
 
+	if (!scriptPath) {
+		setCard('cgi-get', 'error', 'no script path');
+		log(`CGI GET failed: no script path provided`, 'fail');
+		return;
+	}
+	if (!query) {
+		setCard('cgi-get', 'error', 'no query string');
+		log(`CGI GET failed: no query string provided`, 'fail');
+		return;
+	}
+
     try {
         const t0 = Date.now();
         const r = await fetch(fullUrl, { method: 'GET' });
@@ -414,6 +425,16 @@ async function runCgiPost() {
     const payload = document.getElementById('cgi-post-body').value;
     const fullUrl = `${base()}${scriptPath}`;
 
+	if (!scriptPath) {
+		setCard('cgi-post', 'error', 'no script path');
+		log(`CGI POST failed: no script path provided`, 'fail');
+		return;
+	}
+	if (!payload) {
+		setCard('cgi-post', 'error', 'no payload');
+		log(`CGI POST failed: no payload provided`, 'fail');
+		return;
+	}
     setCard('cgi-post', 'running', 'piping payload…');
     log(`POST ${scriptPath} [Len: ${payload.length}]`, 'info');
 
@@ -475,6 +496,7 @@ async function doCgiUpload() {
     const filename = document.getElementById('cgi-upload-name').value.trim();
     const fileInput = document.getElementById('cgi-upload-file');
 
+	if (!scriptPath) return alert('Specify a CGI script path.');
     if (!filename) return alert('Specify a target filename.');
     if (!fileInput.files.length) return alert('Select a media file.');
 
@@ -520,6 +542,8 @@ async function doCgiUpload() {
 async function doCgiMediaGet() {
     const scriptPath = document.getElementById('cgi-media-get-path').value.trim();
     const filename = document.getElementById('cgi-media-get-name').value.trim();
+
+	if (!scriptPath) return alert('Enter a CGI script path to query.');
     if (!filename) return alert('Enter a filename to query.');
 
     const fullUrl = `${base()}${scriptPath}?file=${encodeURIComponent(filename)}`;
@@ -587,4 +611,25 @@ async function doCgiMediaGet() {
         document.getElementById('rb-cgi-media-get').classList.add('visible');
         log(`CGI Media Fetch error state: ${e.message}`, 'fail');
     }
+}
+
+async function runAllCgi() {
+    const fileInput = document.getElementById('cgi-upload-file');
+    if (!fileInput.files.length) return alert('Please select a file to upload.');
+    log('═══ Running all tests ═══', 'info');
+
+	await doCgiUpload();
+	await new Promise(r => setTimeout(r, 400));
+
+	await doCgiMediaGet();
+    await new Promise(r => setTimeout(r, 400));
+
+	await runCgiGet();
+    await new Promise(r => setTimeout(r, 400));
+
+	await runCgiPost();
+    await new Promise(r => setTimeout(r, 400));
+
+    await runCgiTimeout();
+    log(`═══ Done — ${passed} passed, ${failed} failed ═══`, passed > 0 && failed === 0 ? 'ok' : 'fail');
 }
