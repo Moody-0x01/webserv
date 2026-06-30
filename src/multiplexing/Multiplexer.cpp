@@ -62,9 +62,10 @@ void Multiplexer::init(std::vector<ServerConfig> &confs) throw(std::runtime_erro
 	{
 		try {
 			this->register_server(confs[c]);
+			std::cout << "[*][ Multiplexer::init            ] Registered server on " << confs[c].host << ":" << confs[c].port << "\n";
 			alive++;
 		} catch (const char *error) {
-			std::cerr << "[ Multiplexer::register_server ] " << error << "\n";
+			std::cerr << "[E][ Multiplexer::register_server ] " << error << "\n";
 		}
 	}
 	if (alive > 0) return ;
@@ -202,6 +203,7 @@ void Multiplexer::deinit(void)
 
 int Multiplexer::run(void)
 {
+
 	Multiplexer::introduce_new_context((uint64_t)&this->signal_handler);
     while (this->servers.size() && !this->aborted)
 	{
@@ -211,7 +213,7 @@ int Multiplexer::run(void)
 		if (ready < 0)
 		{
 			if (errno == EINTR) continue;
-			std::cerr << "[ Multiplexer::loop ] epoll_wait: " << strerror(errno) << "\n";
+			std::cerr << "[E][ Multiplexer::loop            ] epoll_wait: " << strerror(errno) << "\n";
 			return 1;
 		}
 		for (int index = 0; index < ready && (this->servers.size()) && !this->aborted; ++index)
@@ -227,12 +229,12 @@ void Multiplexer::execute_epoll_event(int epoll_index)
 	ptr = this->events[epoll_index].data.ptr;
 	if (!this->iscontext_valid((uintptr_t)ptr))
 		return ;
+
 	ASocketContext *handle = (ASocketContext *)ptr;
 	try {
-		// Cgi | cliet | server | signal handler |  proxy
 		handle->action(this->events[epoll_index].events);
 	} catch (const char *error) {
-		// std::cerr << "[ handle->action ] " << error << "\n";
+		std::cerr << "[E][ handle->action               ] " << error << "\n";
 	}
 }
 

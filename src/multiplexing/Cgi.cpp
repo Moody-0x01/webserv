@@ -224,13 +224,8 @@ void Cgi::read() __THROWS_STRERROR
 			this->append_into_headers_buffer(buffer, read_from_cgi);
 			if (this->strip_body_if_found())
 			{
-				try {
-					this->parse_headers();
-				} catch (const char *e) {
-					std::cout << "Failed to parse headers\n";
-					this->done();
-					throw e;
-				}
+				this->parse_headers();
+				if (this->gateway_failed) throw "Headers parsing failed";
 			}
 			if (read_from_cgi <= 0)
 				this->close_read();
@@ -275,8 +270,7 @@ void Cgi::action(uint32_t e) __THROWS_STRERROR
 			if (e & EPOLLERR)   std::cerr << "Crit: EPOLLERR\n";
 			if (e & EPOLLHUP)   std::cerr << "Info: EPOLLHUP\n";
 			if (e & EPOLLRDHUP) std::cerr << "Info: EPOLLRDHUP\n";
-    
-			this->done();
+
 			this->gateway_failure();
 		}
 	} catch (const char *e) {
@@ -483,7 +477,7 @@ bool Cgi::check_status_code(std::string &status_line)
 	return (true);
 }
 
-void Cgi::parse_headers()    __THROWS_STRERROR
+void Cgi::parse_headers()
 {
 	std::vector<std::string> headers;
 	std::vector<std::string> pair;

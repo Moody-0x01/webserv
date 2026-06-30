@@ -17,7 +17,7 @@ int main(int ac, char **av)
 		Config conf = parse_config_file(config_file);
 		std::vector<ServerConfig> servers = conf.getservers();
 		Multiplexer *multi = Multiplexer::create_multiplexer(servers);
-		conf.debug();
+		// conf.debug();
 		multi->run();
 	} catch (std::runtime_error &e) {
 		std::cerr << "[ Multiplexer::init ] " << e.what() << "\n";

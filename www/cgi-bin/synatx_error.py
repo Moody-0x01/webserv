@@ -1,16 +1,1 @@
-print("Content-Type: text/html\n")
-print()
-# Make a x/o game and send it to the client.
-print("<html><head><title>X/O</title></head><body>")
-print("<h1>X/O</h1>")
-print("<p>Enter your move in the form of 'x,y' where x and your opponent's move will be marked on the board.</p>")
-print("<p>Example: '1,2' will mark the center of the board.</p>")
-print("<p>Current board:</p>")
-print("<pre>")
-print("   0   1   2")
-print("0  .   .   .")
-print("1  .   .   .")
-print("2  .   .   .")
-print("</pre>")
-print("</body></html>")
-
+wjdijiwjdjiwjidj
