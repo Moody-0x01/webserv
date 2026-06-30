@@ -1,14 +1,4 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <iostream>
-#include <map>
-#include <string>
-#include <unistd.h>
-#include <fcntl.h>           /* Definition of AT_* constants */
-#include <unistd.h>
-#include <unistd.h>
-#include <utility>
-#include <vector>
 
 namespace utility {
 	std::vector<std::string> split_by_two(const std::string &s, const std::string &delim)

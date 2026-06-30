@@ -1,10 +1,4 @@
 #include <Server.hpp>
-// #include <cstdint>
-#include <stdint.h>
-#include <cstdlib>
-#include <strings.h>
-#include <sys/epoll.h>
-#include <sys/socket.h>
 
 
 Multiplexer *Multiplexer::get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *)

@@ -1,12 +1,4 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <cstring>
-#include <ios>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <unistd.h>
-#include <vector>
 
 
 int main(int ac, char **av)

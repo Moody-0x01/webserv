@@ -1,22 +1,4 @@
-#include "HTTP/Response.hpp"
-#include "Multiplexing/Multiplexer.hpp"
 #include <Server.hpp>
-#include <algorithm>
-#include <cstddef>
-#include <dirent.h>
-#include <cstdlib>
-#include <cerrno>
-#include <fstream>
-#include <ios>
-#include <iostream>
-#include <map>
-#include <ostream>
-#include <sstream>
-#include <string>
-#include <sys/stat.h>
-#include <utility>
-#include <vector>
-#include <ctime>
 
 std::map<int, std::string> Response::status_lines;
 std::map<int, std::string> Response::status_phrases;

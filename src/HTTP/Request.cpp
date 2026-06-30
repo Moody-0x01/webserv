@@ -1,7 +1,5 @@
 #include <Server.hpp>
 
-
-// Tod
 Request::Request() {
 	this->request.ischunked = false;
 	this->request.isbadrequest = false;

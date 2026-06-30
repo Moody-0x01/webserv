@@ -1,19 +1,4 @@
 #include <Server.hpp>
-#include <algorithm>
-#include <cctype>
-#include <cerrno>
-#include <cstddef>
-#include <stdint.h>
-#include <cstdlib>
-#include <cstring>
-#include <ctime>
-#include <iostream>
-#include <ostream>
-#include <sstream>
-#include <string>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <vector>
 
 bool Cgi::did_fail(void) const
 {
