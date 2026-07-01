@@ -416,7 +416,7 @@ Config ConfigParser::parse() {
 }
 
 std::string ServerConfig::label() const {
-	return (this->server_name + ":" + this->port);
+	return (this->host + ":" + this->port);
 }
 
 Config parse_config_file(std::string fileName) {

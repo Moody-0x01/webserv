@@ -1,6 +1,5 @@
 #include <Server.hpp>
 
-
 Multiplexer *Multiplexer::get_multiplexer(std::vector<ServerConfig> *confs) throw(std::runtime_error, const char *)
 {
 	static Multiplexer m;
