@@ -1,6 +1,15 @@
 #include <Server.hpp>
 
 namespace utility {
+
+	void inject_cors(std::map<std::string, std::string> &h)
+	{
+		h["Allow"]                        = "GET, POST, DELETE, OPTIONS";
+		h["Access-Control-Allow-Origin"]  = "*";
+		h["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS";
+		h["Access-Control-Allow-Headers"] = "*";
+	}
+
 	std::vector<std::string> split_by_two(const std::string &s, const std::string &delim)
 	{
 		std::vector<std::string> result;

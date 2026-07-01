@@ -135,6 +135,7 @@ private:
 		MethodGet,
 		MethodPost,
 		MethodDelete,
+		MethodOptions,
 		MethodInvalid
 	};
 
@@ -156,6 +157,7 @@ private:
 	static MethodKind classify_method(const std::string &method);
 	void handle_get(const HttpRequest &request);
 	void handle_post(const HttpRequest &request);
+	void handle_options(const HttpRequest &request);
 	void handle_delete();
 
 	void list_dir(void);

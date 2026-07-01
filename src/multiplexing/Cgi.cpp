@@ -108,9 +108,7 @@ void Cgi::send_body_chunk(int conn) __THROWS_STRERROR
 
 void Cgi::send_headers(int conn) __THROWS_STRERROR
 {
-	this->headers["Access-Control-Allow-Origin"]  = "*";
-	this->headers["Access-Control-Allow-Methods"]  = "GET, POST, DELETE, OPTIONS";
-	this->headers["Access-Control-Allow-Headers"]  = "Content-Type, Authorization";
+	utility::inject_cors(this->headers);
 	std::string headers = utility::serialize_headers(this->headers, true);
 	::send(conn, headers.c_str(), headers.size(), 0);
 	this->headers_sent = true;

@@ -31,4 +31,5 @@ namespace utility {
 	map_iterator				 search(const std::map<std::string, std::string> &map, std::string target);
 	std::pair<bool, std::string> get_value(const std::map<std::string, std::string> &map, std::string target);
 	void                         logr(std::string &buffer);
+	void inject_cors(std::map<std::string, std::string> &h);
 } // namespace utility

@@ -1,4 +1,5 @@
 #include <Server.hpp>
+#include <string>
 
 std::map<int, std::string> Response::status_lines;
 std::map<int, std::string> Response::status_phrases;
@@ -195,9 +196,10 @@ static std::string build_default_error_html(int code)
 
 Response::MethodKind Response::classify_method(const std::string &method)
 {
-	if (method == "GET") return MethodGet;
-	if (method == "POST") return MethodPost;
-	if (method == "DELETE") return MethodDelete;
+	if (method == "GET")     return MethodGet;
+	if (method == "POST")    return MethodPost;
+	if (method == "DELETE")  return MethodDelete;
+	if (method == "OPTIONS") return MethodOptions;
 	return MethodInvalid;
 }
 
@@ -313,6 +315,9 @@ void Response::setup(const HttpRequest &request)
 	}
 	switch (Response::classify_method(request.method))
 	{
+		case MethodOptions:
+			this->handle_options(request);
+			break ;
 		case MethodGet:
 			this->handle_get(request);
 			break ;
@@ -365,6 +370,7 @@ void Response::process_cgi_instance(const HttpRequest &request)
 
 bool Response::is_method_allowed(std::string method)
 {
+	if (method == "OPTIONS") return (true);
 	if (!resolved_results.matched_location)
 		return (false);
 	if (resolved_results.matched_location->methods.empty())
@@ -391,12 +397,13 @@ void Response::setup_response(const HttpRequest &request)
 		return ;
 	}
 	this->resolved_results = Response::resolve_uri_to_path(request);
-	// std::cout << "Resolved URI: " << resolved_results.request_path << " to filesystem path: " << resolved_results.filesystem_path << "\n";
 	if (!this->is_method_allowed(request.method))
 	{
 		this->set_status(MethodNotAllowed);
 		return ;
 	}
+	if (request.method == "OPTIONS")
+		return ;
 	if (request.content_length != -1 && request.content_length > (ssize_t)this->client_max_body_size)
 	{
 		this->set_status(RequestEntityTooLarge);
@@ -504,6 +511,13 @@ void Response::setup_max_body_size(const int owner)
 {
 	const ServerConfig &server_conf = Multiplexer::get_conf(owner);
 	this->client_max_body_size = server_conf.client_max_body_size;
+}
+
+void Response::handle_options(const HttpRequest &request)
+{
+	(void)request;
+	this->set_status(NoContent);
+	this->stage = SendingResource;
 }
 
 void Response::handle_get(const HttpRequest &request)
@@ -641,17 +655,8 @@ Response::~Response()
 {
 }
 
-void Response::inject_cors(void)
-{
-	this->appendheader("Access-Control-Allow-Origin", "*");
-	this->appendheader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-	this->appendheader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
 void Response::serialize_headers(void) {
-	// Max header size will be <= 16Kb so we need to just serialize it then send
-	// Then check for any error. and close in case.
-	this->inject_cors();
+	utility::inject_cors(this->headers);
 	this->headers_as_str = (this->status_line + utility::serialize_headers(this->headers, false));
 	this->bytes_sent = 0;
 }
