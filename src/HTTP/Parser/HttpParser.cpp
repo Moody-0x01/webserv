@@ -217,7 +217,7 @@ void HttpParser::handle()
 					parent->_buffer.begin() + endOfHeaders);
 			this->getRequestObject().setBody(&parent->_buffer);
             this->lexerInstence.tokenize(headersOnly);
-            if (lexerInstence.isBadRequest()) // for now am doing it from here.
+            if (lexerInstence.isBadRequest())
             {
                 this->request.setcode(BadRequest);
                 this->currentState = READY;
@@ -245,7 +245,7 @@ void HttpParser::handle()
             else if (key == URI)
             {
                 this->parseParams(tokens[i].second);
-                this->request.setURI(val); 
+                this->request.setURI(val);
             }
             else if (key == VERSION)
                 this->request.setHttpVersion(val);
