@@ -1,4 +1,3 @@
-#include "HTTP/Response.hpp"
 #include <Server.hpp>
 
 Resource::Resource(): __rstream(NULL), __isbuf(false), __done(false), __isopen(false), type(std::string("")), __headers_sent(false)

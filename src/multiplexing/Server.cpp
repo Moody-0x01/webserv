@@ -1,6 +1,4 @@
 # include <Server.hpp>
-#include <iostream>
-#include <sys/epoll.h>
 
 void Server::action(uint32_t e) __THROWS_STRERROR
 {

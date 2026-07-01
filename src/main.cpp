@@ -1,12 +1,4 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <cstring>
-#include <ios>
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <unistd.h>
-#include <vector>
 
 
 int main(int ac, char **av)
@@ -17,7 +9,7 @@ int main(int ac, char **av)
 		Config conf = parse_config_file(config_file);
 		std::vector<ServerConfig> servers = conf.getservers();
 		Multiplexer *multi = Multiplexer::create_multiplexer(servers);
-		conf.debug();
+		// conf.debug();
 		multi->run();
 	} catch (std::runtime_error &e) {
 		std::cerr << "[ Multiplexer::init ] " << e.what() << "\n";

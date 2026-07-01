@@ -75,7 +75,7 @@ public:
 	void action(uint32_t e)     __THROWS_STRERROR;
 	void write()                __THROWS_STRERROR;
 	void read()                 __THROWS_STRERROR;
-	void parse_headers()        __THROWS_STRERROR;
+	void parse_headers();
 	void epoll_register(void)   __THROWS_STRERROR;
 	bool timeout(void)     __THROWS_STRERROR;
 	void free(void);

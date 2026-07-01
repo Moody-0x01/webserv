@@ -1,14 +1,4 @@
-#include "HTTP/Response.hpp"
 #include <Server.hpp>
-#include <cassert>
-#include <cctype>
-#include <cstdio>
-#include <stdint.h>
-#include <cstdlib>
-#include <iostream>
-#include <sys/epoll.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 HttpParser &Client::getParser(void) {
 	return this->parserInstance;

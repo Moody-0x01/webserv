@@ -1,10 +1,4 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <iostream>
-#include <string>
-#include <unistd.h>
-#include <utility>
-#include <vector>
 
 HttpParser::HttpParser() : currentState(IDLE), lexerInstence(), parent(NULL), targetBodySize(-1)
 {

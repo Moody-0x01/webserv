@@ -1,16 +1,15 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <iostream>
-#include <map>
-#include <string>
-#include <unistd.h>
-#include <fcntl.h>           /* Definition of AT_* constants */
-#include <unistd.h>
-#include <unistd.h>
-#include <utility>
-#include <vector>
 
 namespace utility {
+
+	void inject_cors(std::map<std::string, std::string> &h)
+	{
+		h["Allow"]                        = "GET, POST, DELETE, OPTIONS";
+		h["Access-Control-Allow-Origin"]  = "*";
+		h["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS";
+		h["Access-Control-Allow-Headers"] = "*";
+	}
+
 	std::vector<std::string> split_by_two(const std::string &s, const std::string &delim)
 	{
 		std::vector<std::string> result;

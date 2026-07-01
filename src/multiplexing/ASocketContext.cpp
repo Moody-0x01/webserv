@@ -1,6 +1,4 @@
 #include <Server.hpp>
-#include <cstddef>
-#include <sys/epoll.h>
 
 ASocketContext::ASocketContext() : _sockfd(-1), _owns_fd(true)
 {

@@ -1,4 +1,3 @@
-#include "Parser/HTTP/Lexer.hpp"
 #include <Server.hpp>
 
 Lexer::Lexer() : content(""), pos(0), badRequest(false) {}
