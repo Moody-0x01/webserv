@@ -1,5 +1,7 @@
 # This project has been created as part of the 42 curriculum by zbakour, arajma, lazmoud.
 
+![App screenshot](img/img1.png)
+
 ## Description
 
 * webserv is a multi-server HTTP/1.0 implementation configured via a single config file. It supports GET, POST, and DELETE methods, serves static files, and executes CGI scripts in any language with a standard I/O interface — Python, PHP, Node.js, C, and more.
